@@ -7,32 +7,12 @@ import shutil       # Shell Utilities (High Level File Operations)
 import threading    # Multithreading for Commands Outside of Loop
 import flask        # Lightweight web server
 import requests     # For Command Line Interface Window
+import serial                   # Serial Communications over USB<->USB
+import serial.tools.list_ports  # Serial communication tools for port detection
 
 # Import the scripts folder
 from scripts import dataManager
 from scripts import flaskConfig
-
-# Flask Command Structure
-app = flask.Flask(__name__)             # Runs Flask Thread for Command Inputs
-
-@app.route("/initialize", methods=["POST"])
-def handle_initialize():
-    result = dataManager.initDataPath()
-    return {"success": result}
-
-@app.route("/migrate", methods=["POST"])
-def handle_migrate():
-    path = flask.request.json["path"]
-    result = dataManager.migrate(path)
-    return {"success": result}
-
-@app.route("/recover", methods=["POST"])
-def handle_recover():
-    path = flask.request.json["path"]
-    result = dataManager.recover(path)
-    return {"success": result}
-
-
 
 def main():                             # Main Method - Program Entry Point
     path = dataManager.initDataPath()   # Initialize Data Path
