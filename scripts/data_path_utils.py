@@ -15,7 +15,7 @@ man_pointer = def_dataPath / pathlib.Path("Pointer.json")   # If the manual path
                                                             # JSON should contain one field: "man_pointer" with relative data path
 
 # Initiate Data Path
-def initDataPath():
+def init_data_path():
 
     global man_dataPath                                                 # Pass by reference global variable into function
     
@@ -211,12 +211,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.command == "initDataPath":
-        initDataPath()
+        init_data_path()
     elif args.command == "migrate":
-        initDataPath()          # Always load state first!
+        init_data_path()          # Always load state first!
         migrate(args.location)
     elif args.command == "recover":
-        initDataPath()          # Always load state first!
+        init_data_path()          # Always load state first!
         recover(args.location)
     else:
         parser.print_help()
