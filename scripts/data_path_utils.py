@@ -1,4 +1,5 @@
-# dataManager.py
+# data_path_utils.py
+# Manages initialization, migration, recovery and path return for the persistent data path
 
 # Import Needed Libraries
 import os       # Operating System Management
@@ -191,6 +192,10 @@ def recover(new_location):
         # 2. Finishing Steps - Same for both cases
         man_dataPath = new_location                                             # Reset man_DataPath to new_location value
         return True                                                             # The data directory was migrated
+
+# Get Data Path from outside this script - returns manual data path
+def get_data_path():
+    return man_dataPath
 
 # This block only runs if the script is executed DIRECTLY
 # It is skipped when imported as a module
