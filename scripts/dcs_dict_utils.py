@@ -1,5 +1,5 @@
 # dcs_dict_utils.py
-# DESCRIBE
+# This file contains the methods needed to describe and load descriptions of dcs into main-thread memory
 
 # Import Needed Libraries
 import os       # Operating System Management
@@ -17,10 +17,8 @@ def init_dcs_path(data_path):
 
     try:                                                    # Attempt to make folder if it does not exist
         dcs_path.mkdir(parents=True, exist_ok=True)         # parents=True creates any missing parent directories
-        print(f"DCS Datapath '{dcs_path}' Initialized")     # Print verification to console
         return True                                         # The folder was initialized
     except FileExistsError:                                 # If the folder exists and is blocking verification
-        print(f"Folder '{dcs_path}' already exists.")       # This should not be possible as exist_ok=True...
         return True                                         # The folder was initialized before (just in case)
     except Exception as e:                                  # Handle other potential errors like permission issues
         print(f"An error occurred: {e}")                    # Print error information
@@ -852,6 +850,8 @@ def check_saved(data_path, port):
         with open(file, 'r') as f:                              # Open each file in read mode...
           dcs = json.load(f)                                    # Load each file in read mode...
         if dcs.get("serial_number") == port["serial_number"]:   # If serial number matches...
+          
+          dcs["hwid"] = port["hwid"]                            # Ensure any hwid changes are saved
 
           if file.stem != dcs.get("name"):                      # When opening an existing file, ensure the names match!
               dcs["name"] = file.stem                           # Always ensure the nickname matches the file name
@@ -954,7 +954,7 @@ def create_dict(data_path, port):
     current_dict = {                                        # Create a light weight dictionary entry for the currently active controller
             port_to_name(data_path, port) : {
                 "serial_number": port["serial_number"],
-                "name": port_to_name(data_path, port)
+                "port": port["port"]
             }
         }
     return current_dict                                     # Return the current_dict dictionary

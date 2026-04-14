@@ -28,23 +28,24 @@ def get_port_details(target_port, current_ports):       # Method gets all inform
             }
     return None                                         # If the target port was not found, return nothing (fail silently)
 
-def serial_loop(event_queue):                                                       # Method is ran in entry point - returns "queue" of serial events
+def serial_loop(event_queue, is_init):                                              # Method is ran in entry point - returns "queue" of serial events
     prev_ports = set()                                                              # Create an empty set of previous ports
     while True:                                                                     # Continously while the main thread runs...
         
-        port_objects = serial.tools.list_ports.comports()                           # Call comports() to find all current port connections
-        current_ports = set(p.device for p in port_objects)                         # Set of device name strings for comparison
+        if is_init:
+            port_objects = serial.tools.list_ports.comports()                           # Call comports() to find all current port connections
+            current_ports = set(p.device for p in port_objects)                         # Set of device name strings for comparison
         
-        for port in current_ports - prev_ports:                                     # For all ports found this cycle...
-            details = get_port_details(port, port_objects)                          # Store full port information is 'details'
-            with devices_lock:                                                      # Prevents simultaneous read/write corruption
-                connected_devices[port] = details                                   # Set the connected_devices[port] entry to 'details'
-            event_queue.put({"event": "connected", "port": port})                   # Send new connection to queue
+            for port in current_ports - prev_ports:                                     # For all ports found this cycle...
+                details = get_port_details(port, port_objects)                          # Store full port information is 'details'
+                with devices_lock:                                                      # Prevents simultaneous read/write corruption
+                    connected_devices[port] = details                                   # Set the connected_devices[port] entry to 'details'
+                event_queue.put({"event": "connected", "port": port})                   # Send new connection to queue
         
-        for port in prev_ports - current_ports:                                     # For all ports NOT found this cycle...
-            with devices_lock:                                                      # Prevents simultaneous read/write corruption
-                connected_devices.pop(port, None)                                   # Remove this device from connected_devices
-            event_queue.put({"event": "disconnected", "port": port})                # Send new disconnection to queue
+            for port in prev_ports - current_ports:                                     # For all ports NOT found this cycle...
+                with devices_lock:                                                      # Prevents simultaneous read/write corruption
+                    connected_devices.pop(port, None)                                   # Remove this device from connected_devices
+                event_queue.put({"event": "disconnected", "port": port})                # Send new disconnection to queue
         
         prev_ports = current_ports                                                  # Update previous ports
         time.sleep(1)                                                               # Wait 1 second before checking ports again
