@@ -27,15 +27,15 @@ def main():                                         # Main Method - Program Entr
     is_info = dcs_dict_utils.init_dcs_path(path)    # Initialize DCS Info Path
     is_sp = dcs_flash_utils.init_code_path(path)    # Initialize DCS Code Path
 
-    if is_path:                                                 # If the data path is initialized (if not, nothing can/should run)
-        serial_queue = queue.Queue()                            # Create an event queue for the serial monitoring thread
-        flash_queue = queue.Queue()                             # Create an event queue for flashing DCS controllers
+    serial_queue = queue.Queue()                            # Create an event queue for the serial monitoring thread
+    flash_queue = queue.Queue()                             # Create an event queue for flashing DCS controllers
     
-        current_dcs = {}                                        # Array for current dcs connections
+    current_dcs = {}                                        # Array for current dcs connections
 
-        devices = {}                                            # Array for current devices (USB connections)
-        previous_devices = {}                                   # Array for previous devices (USB connections)
+    devices = {}                                            # Array for current devices (USB connections)
+    previous_devices = {}                                   # Array for previous devices (USB connections)
 
+    if is_path:                                                 # If the data path is initialized (if not, nothing can/should run)
                                                                 # Create a thread that runs serial_thread.serial_loop
                                                                 # Pass the thread the event queue so results can be used in main thread
         monitor_thread = threading.Thread(target=serial_thread.serial_loop, args=(serial_queue,is_info))

@@ -32,10 +32,10 @@ def serial_loop(event_queue, is_init):                                          
     prev_ports = set()                                                              # Create an empty set of previous ports
     while True:                                                                     # Continously while the main thread runs...
         
+        port_objects = serial.tools.list_ports.comports()                           # Call comports() to find all current port connections
+        current_ports = set(p.device for p in port_objects)                         # Set of device name strings for comparison
+
         if is_init:
-            port_objects = serial.tools.list_ports.comports()                           # Call comports() to find all current port connections
-            current_ports = set(p.device for p in port_objects)                         # Set of device name strings for comparison
-        
             for port in current_ports - prev_ports:                                     # For all ports found this cycle...
                 details = get_port_details(port, port_objects)                          # Store full port information is 'details'
                 with devices_lock:                                                      # Prevents simultaneous read/write corruption
