@@ -95,4 +95,7 @@ def flask_loop():                               # Method is ran in entry point -
         return {"Initialize DCS Info Sucsess": result}  # Return Message
 
 
-    return app                                  # Returns the Flask Thread Created
+    print("--- Starting Flask Server on Port 5000 ---")                     # Start the flask server
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+
+    return app                                                              # Returns the Flask Thread Created
