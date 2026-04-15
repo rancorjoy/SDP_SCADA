@@ -26,14 +26,22 @@ def init_dcs_path(data_path):
 
 # Get the plugged in Arduino Model
 def get_dcs_type(port):
-    description = (port["description"] or "").upper()       # The description should contain either UNO or MEGA for the supported boards
+    vid = port.get("vid")                                 # Try identifying by VID/PID (Linux Friendly)
+    pid = port.get("pid")                                 # Note: These are often integers when coming from pyserial
+
+    if vid == 0x2341 and pid in [0x0010, 0x0042]:         # Arduino Mega 2560 IDs
+        return "MEGA"
     
-    if "MEGA" in description:                               # If MEGA is in the description...
-        return "MEGA"                                       # Return "MEGA"
-    elif "UNO" in description:                              # If UNO is in the description...
-        return "UNO"                                        # Return "UNO"
-    else:                                                   # If neither is found in the description (or empty description)...
-        return None                                         # The device is NOT a valid dcs
+    if vid == 0x2341 and pid in [0x0043, 0x0001]:         # Arduino Uno IDs
+        return "UNO"
+
+    description = (port.get("description") or "").upper() # Fallback to Description (Windows legacy)
+    if "MEGA" in description:                             # Arduino Mega 2560 IDs
+        return "MEGA"
+    elif "UNO" in description:                            # Arduino Uno IDs
+        return "UNO"
+
+    return None
 
 # Returns Arduino UNO Default Pin Map
 def uno_pin_map():
