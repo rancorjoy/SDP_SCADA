@@ -15,6 +15,9 @@ connected_devices = {}                          # Shared dictionary - accessed f
 devices_lock = threading.Lock()                 # Prevents simultaneous read/write corruption
 
 def get_port_details(target_port, current_ports):       # Method gets all information from a connected serial port
+    
+    fresh_ports = serial.tools.list_ports.comports()
+
     for port in current_ports:                          # Check all current ports for the target port...
         if port.device == target_port:                  # If the indexed port is the target port...
             return {                                    # Return a JSON encoded port information packet
@@ -41,8 +44,11 @@ def serial_loop(event_queue, is_init):                                          
                 for port in current_ports - prev_ports:                                     # For all ports found this cycle...
                     details = get_port_details(port, port_objects)                          # Store full port information is 'details'
                     with devices_lock:                                                      # Prevents simultaneous read/write corruption
-                        connected_devices[port] = details                                   # Set the connected_devices[port] entry to 'details'
-                    event_queue.put({"event": "connected", "port": port})                   # Send new connection to queue
+
+                                                                                            # If the port has been populated...
+                        if details and details.get("vid") is not None and details.get("pid") is not None:               
+                            connected_devices[port] = details                               # Set the connected_devices[port] entry to 'details'
+                            event_queue.put({"event": "connected", "port": port})           # Send new connection to queue
         
                 for port in prev_ports - current_ports:                                     # For all ports NOT found this cycle...
                     with devices_lock:                                                      # Prevents simultaneous read/write corruption
