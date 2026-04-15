@@ -49,6 +49,8 @@ def serial_loop(event_queue, is_init):                                          
                         if details and details.get("vid") is not None and details.get("pid") is not None:               
                             connected_devices[port] = details                               # Set the connected_devices[port] entry to 'details'
                             event_queue.put({"event": "connected", "port": port})           # Send new connection to queue
+                        else:                                                               # If the current port HAS NOT been populated...
+                            current_ports.discard(port)                                     # Do not add it to current ports yet...
         
                 for port in prev_ports - current_ports:                                     # For all ports NOT found this cycle...
                     with devices_lock:                                                      # Prevents simultaneous read/write corruption
@@ -60,4 +62,4 @@ def serial_loop(event_queue, is_init):                                          
             except Exception as e:
                 print(f"[!] Serial Scan Error: {e}")
         
-        time.sleep(1)                                                               # Wait 1 second before checking ports again
+        time.sleep(0.5)                                                               # Wait 1/2 second before checking ports again
