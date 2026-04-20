@@ -8,6 +8,8 @@ import json     # JSON File Management
 import shutil   # Shell Utilities (High Level File Operations)
 import argparse # Allows Console Use of Functions with Variables
 
+from . import print_log
+
 # Persistent Data File Location
 _scriptDir = pathlib.Path(__file__).parent                  # Path relative to main SCADA.py file
 def_dataPath = _scriptDir.parent.parent / "SCADA_Data"      # Defualt Data Path
@@ -29,16 +31,17 @@ def init_data_path():
             if man_dataPath != def_dataPath:                                # If the data path is not the default data path, ensure there is a data directory
                 try:                                                        # Create a data path if there is not one present  
                     os.makedirs(man_dataPath, exist_ok=True)                # Creates persistent data path if it doesn't already exist
-                except PermissionError as e:                                # Failed to create default data path due to folder permissions! - Data cannot be stored!    
-                    print(f"Error: Could not create data directory. Check folder permissions.\n  Details: {e}")
+                except PermissionError as e:                                # Failed to create default data path due to folder permissions! - Data cannot be stored!  
+
+                    print_log.pL("System", "Error", "Could not create data directory. Check folder permissions.", "System", True, None)  
                     return False                                            # Failed to resolve data location
 
-                except OSError as e:                                        # Failed to create default data path due to unknown error! - Data cannot be stored!    
-                    print(f"Error: Unexpected OS error while creating data directory.\n  Details: {e}")
+                except OSError as e:                                        # Failed to create default data path due to unknown error! - Data cannot be stored!   
+                    print_log.pL("System", "Error", "Unexpected OS error while creating data directory.", "System", True, {e})  
                     return False                                            # Failed to resolve data location
 
-        else:                                                           # Pointer file exists, manual path lost: store data here              
-            print("Warning: Pointer.json missing 'man_pointer' field. Falling back to default path.")
+        else:                                                           # Pointer file exists, manual path lost: store data here    
+            print_log.pL("System", "Error", "Pointer.json missing 'man_pointer' field. Falling back to default path.", "System", True, None)
             man_dataPath = def_dataPath                                 # Ensure data path is set to default path
             man_pointer.unlink()                                        # Delete malformed JSON pointer file
 
@@ -46,20 +49,20 @@ def init_data_path():
         try:                                                            # Create a default data path if there is not one present  
             os.makedirs(def_dataPath, exist_ok=True)                    # Creates persistent data path if it doesn't already exist
         except PermissionError as e:                                    # Failed to create default data path due to folder permissions! - Data cannot be stored!    
-            print(f"Error: Could not create data directory. Check folder permissions.\n  Details: {e}")
+            print_log.pL("System", "Error", "Could not create data directory. Check folder permissions.", "System", True, {e})
             return False                                                # Failed to resolve data location
 
         except OSError as e:                                            # Failed to create default data path due to unknown error! - Data cannot be stored!    
-            print(f"Error: Unexpected OS error while creating data directory.\n  Details: {e}")
+            print_log.pL("System", "Error", "Unexpected OS error while creating data directory.", "System", True, {e})
             return False                                                # Failed to resolve data location
 
     except json.JSONDecodeError as e:                                   # Pointer file exists but contains malformed/corrupted JSON
-        print(f"Warning: Pointer.json is corrupted and could not be read. Falling back to default path.\n  Details: {e}")
+        print_log.pL("System", "Error", "Pointer.json is corrupted and could not be read. Falling back to default path.", "System", True, {e})
         man_dataPath = def_dataPath                                     # Ensure data path is set to default path
         man_pointer.unlink()                                            # Delete malformed JSON pointer file
 
     except PermissionError as e:                                        # Pointer file exists but cannot be read (permission issue)
-        print(f"Error: Could not read Pointer.json, check file permissions. Falling back to default path. \n  Details: {e}")
+        print_log.pL("System", "Error", "Could not read Pointer.json, check file permissions. Falling back to default path.", "System", True, {e})
         man_dataPath = def_dataPath                                     # Ensure data path is set to default path
         try:                                                            # Try to delete malformed JSON pointer file
             man_pointer.unlink()                                        # Delete malformed JSON pointer file
@@ -78,33 +81,33 @@ def migrate(new_location):
         # 1. Copy Old Data Folder Over New Path
         try:                                                                    # Try writing old data path over new data path
             shutil.copytree(man_dataPath, def_dataPath, dirs_exist_ok=True)     # Copy the entire directory tree, overwriting existing files/directories
-            print(f"Data Path moved from '{man_dataPath}' to '{def_dataPath}' with overwrite.")
+            print_log.pL("System", "Event", "Data Path Migrated.", "System", True, None)
         except FileExistsError as e:                                            # Incase flag dirs_exist_ok=True is ignored or superseded
-            print(f"Error: Destination folder already exists and an issue occurred: {e}")
+            print_log.pL("System", "Error", "Destination folder already exists and an issue occurred.", "System", True, {e})
             return False                                                        # The data directory was NOT migrated
         except OSError as e:                                                    # Incase of other OS error
-            print(f"Error: {e}")
+            print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
             return False                                                        # The data directory was NOT migrated
 
         # 2. Delete the JSON File left in the Default Data Path
         try:                                                                    # Try to delete the JSON file
             man_pointer.unlink()                                                # JSON file unlinked from data tree
-            print(f"JSON file '{man_pointer}' has been deleted successfully.")
+            print_log.pL("System", "Event", "System Event: JSON file 'man_pointer' has been deleted successfully.", "System", True, None)
         except FileNotFoundError:                                               # If the file is missing (somehow?)
-            print(f"File '{man_pointer}' does not exist.")                   
+            print_log.pL("System", "Error", "Pointer file does not exist.", "System", True, None)                 
 
-        print(f"About to delete: {man_dataPath}")
-        print(f"def_dataPath is: {def_dataPath}")
+        print_log.pL("System", "Event", "About to delete file.", "System", True, {man_dataPath})
+        print_log.pL("System", "Event", "New Data Path Set.", "System", True, {def_dataPath})
 
         # 3. Delete Old Data Path
         try:                                                                    # Try deleting the old data path file tree
             shutil.rmtree(man_dataPath)                                         # Delete file tree at man_dataPath
-            print(f"Data Path at '{man_dataPath}' deleted successfully.")
+            print_log.pL("System", "Event", "Pre-migration datapath deleted successfully.", "System", True, None)
         except FileNotFoundError:                                               # Incase the file tree is missing (somehow?)
-            print(f"Error: The directory '{man_dataPath}' does not exist.")
+            print_log.pL("System", "Error", "Pointed location does not exist.", "System", True, None)
             return False                                                        # The data directory was NOT migrated
         except OSError as e:                                                    # Incase of other OS error
-            print(f"Error: {e}.")
+            print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
             return False                                                        # The data directory was NOT migrated
 
         # 4. Finishing Steps
@@ -117,24 +120,22 @@ def migrate(new_location):
         # 1. Copy Old Data Folder Over New Path
         try:                                                                    # Try writing old data path over new data path
             shutil.copytree(man_dataPath, new_location, dirs_exist_ok=True)     # Copy the entire directory tree, overwriting existing files/directories
-            print(f"Data Path moved from '{man_dataPath}' to '{new_location}' with overwrite.")
         except FileExistsError as e:                                            # Incase flag dirs_exist_ok=True is ignored or superseded
-            print(f"Error: Destination folder already exists and an issue occurred: {e}")
+            print_log.pL("System", "Error", "Destination folder already exists and an issue occurred.", "System", True, {e})
             return False                                                        # The data directory was NOT migrated
         except OSError as e:                                                    # Incase of other OS error
-            print(f"Error: {e}")
+            print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
             return False                                                        # The data directory was NOT migrated
 
         # 2. Delete Old Data Path
         if man_dataPath != def_dataPath:                                            # Only delete if it's not the default folder
             try:                                                                    # Try deleting the old data path file tree
                 shutil.rmtree(man_dataPath)                                         # Delete file tree at man_dataPath
-                print(f"Data Path at '{man_dataPath}' deleted successfully.")
             except FileNotFoundError:                                               # Incase the file tree is missing (somehow?)
-                print(f"Error: The directory '{man_dataPath}' does not exist.")
+                print_log.pL("System", "Error", "Pointed location does not exist.", "System", True, None)
                 return False                                                        # The data directory was NOT migrated
             except OSError as e:                                                    # Incase of other OS error
-                print(f"Error: {e}. Directory must be empty to use os.rmdir().")
+                print_log.pL("System", "Error", "System Event: Directory must be empty to use os.rmdir().", "System", True, {e})
                 return False                                                        # The data directory was NOT migrated
 
         # 3. Ensure a JSON File exists at the Default Data Path
@@ -144,12 +145,12 @@ def migrate(new_location):
         try:                                                                    # Try to open the file in 'w' (write) mode. 
             with open(def_dataPath / filename, 'w') as json_file:               # This will create a new file or overwrite an existing one.
                 json.dump(data, json_file, indent=4)                            # Use json.dump() to serialize the Python object and write it to the file.
-            print(f"Successfully updated pointer file.")
+            print_log.pL("System", "Event", "Successfully updated pointer file.", "System", True, None)
         except IOError as e:                                                    # Catch I/O errors, such as permission issues or invalid path.
-            print(f"Error writing pointer file: {e}")          
+            print_log.pL("System", "Error", "Pointer file not written.", "System", True, {e})       
             return False                                                        # The data directory was NOT migrated                 
         except Exception as e:                                                  # Catch any other potential exceptions
-            print(f"An unexpected error occurred: {e}")
+            print_log.pL("System", "Error", "An unexpected error occurred.", "System", True, {e})
             return False                                                        # The data directory was NOT migrated  
 
         # 4. Finishing Steps
@@ -166,9 +167,9 @@ def recover(new_location):
                 # 1. Delete the JSON File left in the Default Data Path
                 try:                                                                    # Try to delete the JSON file
                     man_pointer.unlink()                                                # JSON file unlinked from data tree
-                    print(f"JSON file '{man_pointer}' has been deleted successfully.")
                 except FileNotFoundError:                                               # If the file is missing (somehow?)
-                    print(f"File '{man_pointer}' does not exist.")                   
+                
+                    print_log.pL("System", "Error", "Pointed location does not exist.", "System", True, None)                 
 
         else:                                                                           # If the new location is NOT default file location ("recovering out")
         
@@ -180,12 +181,12 @@ def recover(new_location):
             try:                                                                    # Try to open the file in 'w' (write) mode. 
                 with open(def_dataPath / filename, 'w') as json_file:               # This will create a new file or overwrite an existing one.
                     json.dump(data, json_file, indent=4)                            # Use json.dump() to serialize the Python object and write it to the file.
-                print(f"Successfully updated pointer file.")
+                print_log.pL("System", "Event", "Successfully updated pointer file.", "System", True, None)
             except IOError as e:                                                    # Catch I/O errors, such as permission issues or invalid path.
-                print(f"Error writing pointer file: {e}")          
+                print_log.pL("System", "Error", "Error writing pointer file.", "System", True, {e})         
                 return False                                                        # The data directory was NOT migrated                 
             except Exception as e:                                                  # Catch any other potential exceptions
-                print(f"An unexpected error occurred: {e}")
+                print_log.pL("System", "Error", "An unexpected error occurred.", "System", True, {e})
                 return False                                                        # The data directory was NOT migrated  
           
 

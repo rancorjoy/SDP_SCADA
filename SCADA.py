@@ -18,9 +18,12 @@ from scripts import dcs_flash_utils
 from scripts import flask_thread
 from scripts import flash_thread
 from scripts import serial_thread
+from scripts import print_log
 
-def main():                                         # Main Method - Program Entry Point
+def main():                                                         # Main Method - Program Entry Point
     
+    print_log.pL("System", "Event", "System Event: Starting SCADA", "System", True, None)
+
                                                     # Initialize Data Path and Sub-Paths
     is_path = data_path_utils.init_data_path()      # Initialize Data Path
     path = data_path_utils.get_data_path()          # Get Current Data Path
@@ -43,7 +46,7 @@ def main():                                         # Main Method - Program Entr
         monitor_thread.start()                                  # Start the new thread
 
                                                                 # Create a thread that runs flask_thread.flask_loop
-        server_thread = threading.Thread(target=flask_thread.flask_loop, args=()) 
+        server_thread = threading.Thread(target=flask_thread.flask_loop, args=(current_dcs,)) 
         server_thread.daemon = True                             # Dies when main program dies
         server_thread.start()                                   # Start the new thread
 
@@ -53,16 +56,14 @@ def main():                                         # Main Method - Program Entr
         write_thread.daemon = True                              # Dies when main program dies
         write_thread.start()                                    # Start the new thread
 
-        while True:                                 # Main Loop
+        while True:                                             # Main Loop
         
-            time.sleep(1)                           # Wait 1 Second - Temporary Logic
-            print("Main Loop")                      # Print "Main Loop" - Temporary Logic
-
-                                                    # Non-blocking check for new serial events
-            while not serial_queue.empty():         # Whenever the event queue is not empty...
-                event = serial_queue.get()          # Get the current state of the event queue from the serial thread
-                print(f"Serial event: {event}")     # Print detection of connection or disconnection
-                                                    # If a serial event has been detected... update device list:
+                                                                        # Non-blocking check for new serial events
+            while not serial_queue.empty():                             # Whenever the event queue is not empty...
+                event = serial_queue.get()                              # Get the current state of the event queue from the serial thread
+                                                                        # Print detection of connection or disconnection
+                print_log.pL("Serial", "Event", f"Controller {event["event"]}, {event["port"]}", "System", True, None)
+                                                                        # If a serial event has been detected... update device list:
             
                 previous_devices = dict(devices)
 
@@ -73,20 +74,18 @@ def main():                                         # Main Method - Program Entr
                     for device in devices.values():
                         if device not in previous_devices.values():
                             is_saved = dcs_dict_utils.init_dcs(path, device)
-                            flash_queue.put({
-                            "port":             device["port"],
-                            "script_name":      "Blink"
-                            })
-                        if is_saved:
-                            is_loaded = dcs_dict_utils.load_dcs(path, device, current_dcs)
+                            #flash_queue.put({
+                            #"port":             device["port"],
+                            #"script_name":      "Blink"
+                            #})
+                            if is_saved:
+                                is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs)
 
                     # Disconnected devices
                     for device in previous_devices.values():
                         if device not in devices.values():
-                            is_removed = dcs_dict_utils.unload_dcs(path, device, current_dcs)
-
-                    print(current_dcs)
+                            is_removed = dcs_dict_utils.unload_dcs(path, device["port"], current_dcs)
     
     else:                                               # If the data path is not initialized
-        print("Data Path has failed to initialize!")    # The SCADA entry point should do nothing until this is resolved
+        print_log.pL("System", "Error", "Data Path has failed to initialize", "System", True)
 main()  # Run Main Loop

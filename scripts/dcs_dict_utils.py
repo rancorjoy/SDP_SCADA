@@ -9,6 +9,8 @@ import shutil   # Shell Utilities (High Level File Operations)
 import argparse # Allows Console Use of Functions with Variables
 import pickle   # Allows Dictionary to be saved to JSON
 
+from . import print_log
+
 # Initialize dcs folder inside persistent data path
 def init_dcs_path(data_path):
 
@@ -21,7 +23,7 @@ def init_dcs_path(data_path):
     except FileExistsError:                                 # If the folder exists and is blocking verification
         return True                                         # The folder was initialized before (just in case)
     except Exception as e:                                  # Handle other potential errors like permission issues
-        print(f"An error occurred: {e}")                    # Print error information
+        print_log.pL("System", "Error", "An unexpected error occurred", "System", True, {e})
         return False                                        # The folder was not initialized
 
 # Get the plugged in Arduino Model
@@ -43,175 +45,40 @@ def get_dcs_type(port):
 
     return None
 
-# Returns Arduino UNO Default Pin Map
-def uno_pin_map():
-    pin_dict = {
-      "0": {
-        "name": "DP0",
+# Returns a Pin Map for specified data
+def get_pin(pin_name, is_pwm, is_analog, is_int, note):
+    return {
+        "name": pin_name,
         "direction": "INPUT",                   # INPUT, INPUT_PULLUP, OUTPUT
         "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "RX - reserved for serial"
-      },
-      "1": {
-        "name": "DP1",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "TX - reserved for serial"
-      },
-      "2": {
-        "name": "DP2",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": True
-      },
-      "3": {
-        "name": "DP3",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": True
-      },
-      "4": {
-        "name": "DP4",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "5": {
-        "name": "DP5",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "6": {
-        "name": "DP6",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "7": {
-        "name": "DP7",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "8": {
-        "name": "DP8",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "9": {
-        "name": "DP9",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "10": {
-        "name": "DP10",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "11": {
-        "name": "DP11",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "12": {
-        "name": "DP12",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "13": {
-        "name": "DP13",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "built-in LED"
-      },
-      "A0": {
-        "name": "AP0",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A1": {
-        "name": "AP1",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A2": {
-        "name": "AP2",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A3": {
-        "name": "AP3",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A4": {
-        "name": "AP4",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False,
-        "note": "SDA - reserved if using I2C"
-      },
-      "A5": {
-        "name": "AP5",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False,
-        "note": "SCL - reserved if using I2C"
-      }
+        "pwm_capable": is_pwm,
+        "analog_capable": is_analog,
+        "interrupt_capable": is_int,
+        "note": note
     }
+
+# Returns Arduino UNO Default Pin Map
+def uno_pin_map():
+    pin_dict = {}
+
+    for i in range(14):
+      pin_dict[f"DP{i}"] = get_pin(f"DP{i}", False, False, False, None)
+    
+    for i in [3, 5, 6, 9, 10, 11]:
+          pin_dict[f"DP{i}"]["pwn_capable"] = True                
+
+    for i in [2, 3]:
+        pin_dict[f"DP{i}"]["interrupt_capable"] = True
+
+    for i in range(6):
+        pin_dict[f"AP{i}"] = get_pin(f"AP{i}", False, True, False, None)
+          
+    pin_dict["DP0"]["note"] = "RX - reserved for serial"
+    pin_dict["DP1"]["note"] = "TX - reserved for serial"
+    pin_dict["DP13"]["note"] = "built-in LED"
+    pin_dict["AP4"]["note"] = "SDA - reserved if using I2C"
+    pin_dict["AP5"]["note"] = "SCL - reserved if using I2C"
+
     return pin_dict
 
 # Returns Arduino UNO Interrupt Map
@@ -234,579 +101,35 @@ def uno_int_map():
 
 # Returns Arduino MEGA Default Pin Map
 def mega_pin_map():
-    pin_dict = {
-      "0": {
-        "name": "CP0",
-        "direction": "INPUT",                   # INPUT, INPUT_PULLUP, OUTPUT
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "RX0 - reserved for serial"
-      },
-      "1": {
-        "name": "CP1",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "TX0 - reserved for serial"
-      },
-      "2": {
-        "name": "DP2",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": True
-      },
-      "3": {
-        "name": "DP3",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": True
-      },
-      "4": {
-        "name": "DP4",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "5": {
-        "name": "DP5",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "6": {
-        "name": "DP6",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "7": {
-        "name": "DP7",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "8": {
-        "name": "DP8",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "9": {
-        "name": "DP9",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "10": {
-        "name": "DP10",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "11": {
-        "name": "DP11",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "12": {
-        "name": "DP12",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False
-      },
-      "13": {
-        "name": "DP13",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "built-in LED"
-      },
-        "14": {
-        "name": "CP14",
-        "direction": "INPUT",            
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "TX3 - reserved for serial"
-      },
-      "15": {
-        "name": "CP15",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "RX3 - reserved for serial"
-      },
-        "16": {
-        "name": "CP16",
-        "direction": "INPUT",            
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "TX2 - reserved for serial"
-      },
-      "17": {
-        "name": "CP17",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-        "note": "RX2 - reserved for serial"
-      },
-      "18": {
-        "name": "CP18",
-        "direction": "INPUT",            
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": True,
-        "note": "TX1 - reserved for serial"
-      },
-      "19": {
-        "name": "CP19",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": True,
-        "note": "RX1 - reserved for serial"
-      },
-      "20": {
-        "name": "CP20",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": True,
-        "note": "SDA - reserved for I2C"
-      },
-      "21": {
-        "name": "CP21",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": True,
-        "note": "SCL - reserved for I2C"
-      },
-      "22": {
-        "name": "DP22",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "23": {
-        "name": "DP23",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "24": {
-        "name": "DP24",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "25": {
-        "name": "DP25",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "26": {
-        "name": "DP26",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "27": {
-        "name": "DP27",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "28": {
-        "name": "DP28",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "29": {
-        "name": "DP29",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "30": {
-        "name": "DP30",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "31": {
-        "name": "DP31",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "32": {
-        "name": "DP32",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "33": {
-        "name": "DP33",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "34": {
-        "name": "DP34",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "35": {
-        "name": "DP35",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "36": {
-        "name": "DP36",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "37": {
-        "name": "DP37",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "38": {
-        "name": "DP38",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "39": {
-        "name": "DP39",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "40": {
-        "name": "DP40",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "41": {
-        "name": "DP41",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "42": {
-        "name": "DP42",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "43": {
-        "name": "DP43",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "44": {
-        "name": "DP44",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "45": {
-        "name": "DP45",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "46": {
-        "name": "DP46",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": True,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "47": {
-        "name": "DP47",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "48": {
-        "name": "DP48",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "49": {
-        "name": "DP49",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "50": {
-        "name": "DP50",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "51": {
-        "name": "DP51",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "52": {
-        "name": "DP52",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "53": {
-        "name": "DP53",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": False,
-        "interrupt_capable": False,
-      },
-      "A0": {
-        "name": "AP0",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A1": {
-        "name": "AP1",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A2": {
-        "name": "AP2",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A3": {
-        "name": "AP3",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A4": {
-        "name": "AP4",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A5": {
-        "name": "AP5",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A6": {
-        "name": "AP6",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A7": {
-        "name": "AP7",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A8": {
-        "name": "AP8",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A9": {
-        "name": "AP9",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A10": {
-        "name": "AP10",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A11": {
-        "name": "AP11",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A12": {
-        "name": "AP12",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A13": {
-        "name": "AP13",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A14": {
-        "name": "AP14",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      },
-      "A15": {
-        "name": "AP15",
-        "direction": "INPUT",
-        "enabled": False,
-        "pwm_capable": False,
-        "analog_capable": True,
-        "interrupt_capable": False
-      }
-    }
+    pin_dict = {}
+
+    for i in range(54):
+      pin_dict[f"DP{i}"] = get_pin(f"DP{i}", False, False, False, None)
+    
+    for i in range(2, 14):
+            pin_dict[f"DP{i}"]["pwm_capable"] = True 
+
+    for i in range(44, 47):
+            pin_dict[f"DP{i}"]["pwm_capable"] = True 
+
+    for i in [2, 3, 18, 19, 20, 21]:
+        pin_dict[f"DP{i}"]["interrupt_capable"] = True
+
+    for i in range(16):
+        pin_dict[f"AP{i}"] = get_pin(f"AP{i}", False, True, False, None)
+          
+    pin_dict["DP0"]["note"] = "RX0 - reserved for serial"
+    pin_dict["DP1"]["note"] = "TX0 - reserved for serial"
+    pin_dict["DP13"]["note"] = "built-in LED"
+    pin_dict["DP14"]["note"] = "TX3 - reserved for serial"
+    pin_dict["DP15"]["note"] = "RX3 - reserved for serial"
+    pin_dict["DP16"]["note"] = "TX2 - reserved for serial"
+    pin_dict["DP17"]["note"] = "RX2 - reserved for serial"
+    pin_dict["DP18"]["note"] = "TX1 - reserved for serial"
+    pin_dict["DP19"]["note"] = "RX1 - reserved for serial"
+    pin_dict["DP20"]["note"] = "SDA - reserved for I2C"
+    pin_dict["DP21"]["note"] = "SCL - reserved for I2C"
+
     return pin_dict
 
 # Returns Arduino MEGA Interrupt Map
@@ -860,9 +183,13 @@ def check_saved(data_path, port):
         if dcs.get("serial_number") == port["serial_number"]:   # If serial number matches...
           
           dcs["hwid"] = port["hwid"]                            # Ensure any hwid changes are saved
+          dcs["port"] = port["port"]                            # Ensure any port changes are saved
 
           if file.stem != dcs.get("name"):                      # When opening an existing file, ensure the names match!
-              dcs["name"] = file.stem                           # Always ensure the nickname matches the file name
+            dcs["name"] = file.stem                             # Always ensure the nickname matches the file name
+
+          with open(file, 'w') as f:                            # Write changes back to disk
+            json.dump(dcs, f, indent=4)                         # Write as json dump (consistent with original definition)
 
           return True                                           # This port is already saved as a JSON
     return False                                                # If not, this port is not saved as a JSON yet
@@ -898,6 +225,7 @@ def init_dcs(data_path, port):
     "hwid": port["hwid"],
     "manufacturer": port["manufacturer"],
     "serial_number": port["serial_number"],
+    "port": port["port"],      
     "vid": port["vid"],
     "pid": port["pid"],
     "name": controller_name,
@@ -914,61 +242,59 @@ def init_dcs(data_path, port):
         return True                                                             # The DCS JSON was made
 
     except Exception as e:                                                      # If an exception is caught...
-        print(f"Unexpected error: {e}")                                         # Print the exception and halt program
+        print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
         return False                                                            # The DCS JSON was not made (there was an error)
 
 # Delete a dcs JSON from persistent data path for a given controller name
-def delete_dcs(data_path, name):
-    file_path = data_path / "dcs_info" / f"{name}.json"     # The file path containing all controller JSONs
-    try:                                                    # Try to delete the file...
-        file_path.unlink()                                  # Delete the file
-        return True                                         # The DCS JSON was deleted
-    except FileNotFoundError:                               # If the file is not found...
-        print(f"No file found for controller: {name}")      # Print error message
-        return False                                        # Nothing to delete
-    except Exception as e:                                  # If there is another exception...
-        print(f"Unexpected error: {e}")                     # Print error message
-        return False                                        # The DCS JSON was not deleted
-
-# Rename a controller
-def rename_dcs(data_path, old_name, new_name):
-  file_path = data_path / "dcs_info" / f"{old_name}.json"     # The file path containing all controller JSONs
-  if file_path.is_file():                                     # If there is already a controller/file with that name...
-      return False                                            # The controller was not renamed - return false
-  else:                                                       # Else -> the new name is available...
-      try:                                                    # Attempt to rename the controller
-          file_path.rename(new_name)                          # Set new file name
-          return True                                         # Controller was renamed, return true
-      except FileNotFoundError:                               # If the file does not exist...
-          print(f"Error: The file '{old_name}'.json was not found.")
-          return False                                        # Return false
+def delete_dcs(data_path, name, current_dcs):
+    file_path = data_path / "dcs_info" / f"{name}.json"                   # The file path containing all controller JSONs
+    try:                                                                  # Try to delete the file...
+        unload_dcs(data_path, name_to_port(data_path, name),current_dcs); # Unload the old (defunct) data-structure
+        file_path.unlink()                                                # Delete the file
+        return True                                                       # The DCS JSON was deleted
+    except FileNotFoundError:                                             # If the file is not found...
+        print_log.pL("System", "Error", "No file found for controller: {name}.", "System", True, None)
+        return False                                                      # Nothing to delete
+    except Exception as e:                                                # If there is another exception...
+        print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e}) 
+        return False                                                      # The DCS JSON was not deleted
       
 # Return name of existing JSON file from port
-def port_to_name(data_path, port):
-    dcs_dir = data_path / "dcs_info"                            # The file path containing all controller JSONs
-    for file in dcs_dir.glob("*.json"):                         # Check every JSON in the folder...
-        with open(file, 'r') as f:                              # Open each file in read mode...
-          dcs = json.load(f)                                    # Load each file in read mode...
-        if dcs.get("serial_number") == port["serial_number"]:   # If serial number matches...
-          return dcs.get("name")                                # Return the existing JSON file name
-    return None                                                 # If none found, return None
+def port_to_name(data_path, port):            
+    dcs_dir = data_path / "dcs_info"                # The file path for all named controllers
+    for file in dcs_dir.glob("*.json"):             # For json file in the file path...
+        with open(file, 'r') as f:                  # Open the file (read only) as f...
+            dcs = json.load(f)                      # Load dcs from f (json)
+        if dcs.get("port") == port:                 # If this dcs has the given port...
+            return dcs.get("name")                  # Return the name of the dcs
+    return None                                     # If none exist, return none
+
+# Return port from name of existing JSON file
+def name_to_port(data_path, name):
+    file_path = data_path / "dcs_info" / f"{name}.json"         # The file path for the named controller
+    if not file_path.is_file():                                 # If the file doesn't exist...
+        return None                                             # Return None
+    with open(file_path, 'r') as f:                             # Open the file in read mode...
+        dcs = json.load(f)                                      # Load the JSON...
+    return dcs.get("port")                                      # Return the port field, or None if missing
 
 # Create dcs dict item for current_dcs from dcs JSON
-def create_dict(data_path, port):                           
-  name = port_to_name(data_path, port)                      # Get the name of the file/dcs nickname
-  if name != None:                                          # If the given port has an associated JSON file (it should already have one)
-    file_path = data_path / "dcs_info" / f"{name}.json"     # The file path containing all controller JSONs
-
-    current_dict = {                                        # Create a light weight dictionary entry for the currently active controller
-            port_to_name(data_path, port) : {
-                "serial_number": port["serial_number"],
-                "port": port["port"]
+def create_dict(data_path, port):                                                  
+    name = port_to_name(data_path, port)                    # Get the name of the controller from the port
+    if name is not None:                                    # If the name exists (as a string)...
+        file_path = data_path / "dcs_info" / f"{name}.json" # Get the data-path of the relevant info json file
+        with open(file_path, 'r') as f:                     # Open the json file (read only) as f
+            dcs = json.load(f)                              # Load the json data from this file
+        current_dict = {                                    # Create a dictionary element for the dcs element
+            name: {                                         # The controller is accessed by name
+                "serial_number": dcs["serial_number"],      # Add the serial number
+                "port": port                                # Add the port
             }
         }
-    return current_dict                                     # Return the current_dict dictionary
-  return None                                               # If the dcs has no JSON file, return nothing
+        return current_dict
+    return None
 
-# Load a dcs JSON into current_dcs
+# Load a dcs JSON into current_dcs by port
 def load_dcs(data_path, port, current_dcs):
     current_dict = create_dict(data_path, port)
     current_name = port_to_name(data_path, port)
@@ -978,11 +304,41 @@ def load_dcs(data_path, port, current_dcs):
             return True
     return False
 
-# Remove a dcs JSON from current_dcs
+# Remove a dcs JSON from current_dcs by port
 def unload_dcs(data_path, port, current_dcs):
     current_name = port_to_name(data_path, port)
     try:
       return current_dcs.pop(current_name)
     except KeyError:
-      print(f"Error: The key '{current_name}' was not found in the dictionary.")
+      print_log.pL("System", "Error", "The key '{current_name}' was not found in the dictionary.", "System", True, None)
       return False
+
+# Rename a controller
+def rename_dcs(data_path, old_name, new_name, current_dcs): 
+    file_path = data_path / "dcs_info" / f"{old_name}.json"                   # Get the file path for the current controller
+    new_path  = data_path / "dcs_info" / f"{new_name}.json"                   # Get the proposed file path for the current controller
+    if not file_path.is_file():                                               # If the OLD file doesn't exist...
+        print_log.pL("System", "Error", "The dcs info file '{old_name}.json' was not found.", "System", True, None)  
+        return False                                                          # The controller's name was not changed
+    if new_path.is_file():                                                    # If the NEW name is already taken...
+        print_log.pL("System", "Error", "A controller named '{new_name}' already exists.", "System", True, None) 
+        return False                                                          # The controller's name was not changed
+    try:                                                                      # If those two conditions fail (good news)... try:
+        port = name_to_port(data_path, old_name)                              # Get the port name from the DCS
+        if port is None:                                                      # If port not found...
+          print_log.pL("System", "Error", "Could not find port for '{old_name}'.", "System", True, None)            
+          return False                                                        # The controller's name was not changed
+        unload_dcs(data_path, port, current_dcs);                             # Unload the old (defunct) data-structure
+
+        file_path.rename(new_path)                                            # Rename the old file to the new files
+        with open(new_path, 'r') as f:                                        # Open the renamed file as f (read only)
+          dcs = json.load(f)                                                  # Load the json from f as dcs
+        dcs["name"] = new_name                                                # Update the name inside of dcs
+        with open(new_path, 'w') as f:                                        # With the new file open (write) as f
+          json.dump(dcs, f, indent=4)                                         # Write dcs to f, this ensures the file updates
+        load_dcs(data_path, port, current_dcs);                               # Load in the new data-structure
+        return True                                                           # The controller's name WAS changed
+    
+    except Exception as e:                                                    # If an exception is thrown...
+        print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
+        return False                                                          # The controller's name was not changed

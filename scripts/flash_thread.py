@@ -7,10 +7,11 @@ import pathlib  # Object-Oriented File Path Management
 import json     # JSON File Management
 import shutil   # Shell Utilities (High Level File Operations)
 import argparse # Allows Console Use of Functions with Variables
-import pickle   # Allows Dictionary to be saved to JSON
+import pickle       # Allows Dictionary to be saved to JSON
 import threading    # Multithreading for Commands Outside of Loop
 
 from . import dcs_flash_utils                               # Import the dcs_flash_utils script (current) folder
+from . import print_log
 
 flash_locks = {}                                            # Port -> Lock mapping
 
@@ -28,7 +29,7 @@ def flash_loop(event_queue, datapath, is_init):
             script_name = event["script_name"]
             fqbn = dcs_flash_utils.resolve_fqbn(port)
             if fqbn is None:
-                print(f"[!] Could not detect board type on {port}, aborting.")
+                print_log.pL("Flash", "Error", "Could not detect board type on {port}, aborting.", "System", True, None)
                 event_queue.task_done()
                 continue
 
@@ -36,7 +37,7 @@ def flash_loop(event_queue, datapath, is_init):
                 flash_locks[port] = threading.Lock()
 
             if flash_locks[port].locked():                  # If this port is already being flashed, skip
-                print(f"[!] Flash already in progress on {port}, skipping.")
+                print_log.pL("Flash", "Error", "Flash already in progress on {port}, skipping.", "System", True, None)
                 event_queue.task_done()
                 continue
 

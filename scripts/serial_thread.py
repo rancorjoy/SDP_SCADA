@@ -10,6 +10,7 @@ import serial.tools.list_ports                  # Serial communication tools for
 
 from . import data_path_utils                   # Import the data_path_utils script (current) folder
 from . import scan_serial                       # Import the scan_serial script (current) folder
+from . import print_log
 
 connected_devices = {}                          # Shared dictionary - accessed from outside of this thread
 devices_lock = threading.Lock()                 # Prevents simultaneous read/write corruption
@@ -60,6 +61,6 @@ def serial_loop(event_queue, is_init):                                          
                 prev_ports = current_ports                                                  # Update previous ports
             
             except Exception as e:
-                print(f"[!] Serial Scan Error: {e}")
+                print_log.pL("System", "Error", "Serial Scan Error.", "System", True, None)
         
         time.sleep(0.5)                                                               # Wait 1/2 second before checking ports again

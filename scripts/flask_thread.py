@@ -11,14 +11,37 @@ import flask                                    # Lightweight web server
 import requests                                 # For Command Line Interface Window
 import serial                                   # Serial Communications over USB<->USB
 import serial.tools.list_ports                  # Serial communication tools for port detection
+import logging                                  # For custom server logging
+import sys                                      # Used at end to supress logging
 
 from . import data_path_utils                   # Import the data_path_utils script (current) folder
 from . import dcs_dict_utils                    # Import the dcs_dict_utils script (current) folder
 from . import scan_serial                       # Import the scan_serial script (current) folder
+from . import dcs_flash_utils                   # Import the dcs_flash_utils script
+from . import print_log                
 
-def get_path():                                 # Derives the data path when a function needs it from Pointer.json
-    
-    def_dataPath = "../SCADA_Data"                              # Defualt Data Path
+logging.getLogger('werkzeug').disabled = True           # Disable default logging (reduces clutter in main window)
+logging.getLogger('werkzeug.serving').disabled = True
+
+COMMANDS = {
+    #  cmd name        min  max  usage hint
+    "help":          (0,   0,   "help"),
+    "status":        (0,   0,   "status"),
+    "init_data":     (0,   0,   "init_data"),
+    "init_info":     (0,   0,   "init_info"),
+    "init_scripts":  (0,   0,   "init_scripts"),
+    "migrate":       (1,   1,   "migrate <path>"),
+    "recover":       (1,   1,   "recover <path>"),
+    "list_serial":   (0,   0,   "list_serial"),
+    "list_dcs":      (0,   0,   "list_dcs"),
+    "rename_dcs":    (2,   2,   "rename_dcs <old_name> <new_name>"),
+    "unload_dcs":    (1,   1,   "unload_dcs <name>"),
+    "load_dcs":      (1,   1,   "load_dcs <name>"),
+    "delete_dcs":    (1,   1,   "delete_dcs <name>"),
+}
+
+def get_path():                                                 # Derives the data path when a function needs it from Pointer.json
+    def_dataPath = pathlib.Path("../SCADA_Data")                # Defualt Data Path
     man_pointer = def_dataPath / pathlib.Path("Pointer.json")   # If the manual path is migrated, a pointer JSON will be left behind
                                                                 # JSON should contain one field: "man_pointer" with relative data path
 
@@ -38,64 +61,91 @@ def get_path():                                 # Derives the data path when a f
         man_dataPath = def_dataPath                                     # Ensure data path is set to default path
 
     except json.JSONDecodeError as e:                                   # Pointer file exists but contains malformed/corrupted JSON
-        print(f"Warning: Pointer.json is corrupted and could not be read. FLASK falling back to default path.\n  Details: {e}")
+        print_log.pL("Server", "Error", "System Event: Warning: Pointer.json could not be read.", "System", True, {e})
         man_dataPath = def_dataPath                                     # Ensure data path is set to default path
 
     except PermissionError as e:                                        # Pointer file exists but cannot be read (permission issue)
-        print(f"Error: Could not read Pointer.json, check file permissions. FLASK falling back to default path. \n  Details: {e}")
+        print_log.pL("Server", "Error", "Could not read Pointer.json, check file permissions.", "System", True, {e})
         man_dataPath = def_dataPath                                     # Ensure data path is set to default path
 
     return man_dataPath                                                 # Return detected data path
 
+def validate(cmd, args):
+    if cmd not in COMMANDS:
+        return f"Unknown command '{cmd}'. Type 'help' for commands."
+    min_args, max_args, usage = COMMANDS[cmd]
+    if not (min_args <= len(args) <= max_args):
+        return f"Usage: {usage}"
+    if any(not str(a).strip() for a in args):
+        return f"Usage: {usage}"
+    return None  # None means valid
 
-def flask_loop():                               # Method is ran in entry point - returns "app"
+def get_help():
+    help_text = f"""General Commands:
+    help :             \t Displays a list of all valid commands
+    status :           \t Displays the network status of the SCADA server
 
-    app = flask.Flask(__name__)                 # Runs Flask Thread for Command Inputs
+    Data Path Commands:
+    init_data :        \t Initializes the persistent data path
+    init_info :        \t Initializes the dcs information folder
+    init_scripts :     \t Initializes the dcs scripts folder
+    migrate <path> :   \t Migrates the persistent data path to specified location <path>
+    recover <path> :   \t Recovers the persistent data path at specified location <path>
 
-    # GENERAL COMMANDS
+    Serial Commands:
+    list_serial : \t Lists all detected serial connections to the SCADA server
 
-    @app.route("/status", methods=["GET"])                  # Status Command - displays both data paths
-    def handle_status():                                    # Status Definition:
-        return {                                            # Return data paths
-        "man_dataPath": str(data_path_utils.man_dataPath),
-        "def_dataPath": str(data_path_utils.def_dataPath)}
+    Controller Commands:
+    list_dcs :     \t List all known DCS Controllers
+    rename_dcs :   \t Rename a DCS Controller <old name> <new name>
+    unload_dcs :   \t Remove a DCS from the current list <name>
+    load_dcs :     \t Add a DCS from to current list (from file) <name>
+    delete_dcs :   \t Delete a DCS Controller <name>
+    """
+    return help_text
 
-    # FILE PATH COMMANDS
+def flask_loop(dcs_list):                       # Method is ran in entry point - returns "app"
 
-    @app.route("/initialize", methods=["POST"])             # Initialize Command - Initializes File Structure
-    def handle_initialize():                                # Initialize Definition:
-        result = data_path_utils.init_data_path()           # Attempts to Initialize and Stores Result
-        return {"Initialize File Path Success": result}     # Return Message
+    app = flask.Flask(__name__)                             # Runs Flask Thread for Command Inputs
 
-    @app.route("/migrate", methods=["POST"])    # Migrate Command - Moves File Structure to Given Location
-    def handle_migrate():                       # Migrate Definition:
-        path = flask.request.json["path"]       # Stores Input Field "path"
-        result = data_path_utils.migrate(path)  # Attempts to Migrate and Stores Result
-        return {"Migration Success": result}    # Return Message
+    @app.route("/command", methods=["POST"])
+    def handle_command():
+        body = flask.request.json or {}
+        cmd  = body.get("cmd", "").strip()
+        args = [str(a).strip() for a in body.get("args", [])]
 
-    @app.route("/recover", methods=["POST"])    # Recover Command - Moves File Structure to Given Location WITHOUT Overwrite
-    def handle_recover():                       # Recover Definition:
-        path = flask.request.json["path"]       # Stores Input Field "path"
-        result = data_path_utils.recover(path)  # Attempts to Recover and Stores Result
-        return {"Recovery Success": result}     # Return Message
-    
-    # SERIAL COMMANDS
+        error = validate(cmd, args)
+        if error:
+            return flask.jsonify({"ok": False, "message": error}), 400
+        
+        print_log.pL("Server", "Event", f"{cmd}, {', '.join(args)} from {flask.request.remote_addr}.", "User", False, None)
 
-    @app.route("/listSerialPorts", methods=["POST"])        # listSerialPorts Command - Returns all connected serial devices
-    def handle_listSerialPorts():                           # listSerialPorts Definition:
-        result = scan_serial.list_serial_ports()            # Calls function to list all connected devices
-        return {"ports": result}                            # Return Message
-    
-    # CONTROLLER INFO COMMANDS
+        try:
+            if cmd == "help":       return {"ok": True, "message": get_help()}
+            if cmd == "status":     return {"ok": True, "message": "Running"}
 
-    @app.route("/init_dcs_info", methods=["POST"])      # init_dcs_info Command - Initialized dcs_info folder in data path
-    def handle_init_dcs_info():                         # init_dcs_info Definition:
-        path = get_path()                               # Get the current data path
-        result = dcs_dict_utils.init_dcs_path(path)     # Calls function to initialize dcs_info folder
-        return {"Initialize DCS Info Sucsess": result}  # Return Message
+            if cmd == "init_data":      return {"ok": True, "result": data_path_utils.init_data_path()}
+            if cmd == "init_info":      return {"ok": True, "result": dcs_dict_utils.init_dcs_path()}
+            if cmd == "init_scripts":   return {"ok": True, "result": dcs_flash_utils.init_code_path()}
+            if cmd == "migrate":        return {"ok": True, "result": data_path_utils.migrate(args[0])}
+            if cmd == "recover":        return {"ok": True, "result": data_path_utils.recover(args[0])}
 
+            if cmd == "list_serial":    return {"ok": True, "dict": scan_serial.list_serial_ports()}
 
-    print("--- Starting Flask Server on Port 5000 ---")                     # Start the flask server
-    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)
+            if cmd == "list_dcs":   return {"ok": True, "dict": dcs_list}
+            if cmd == "rename_dcs": return {"ok": True, "result": dcs_dict_utils.rename_dcs(get_path(), args[0], args[1], dcs_list)}
+            if cmd == "load_dcs":   return {"ok": True, "result": dcs_dict_utils.load_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
+            if cmd == "unload_dcs": return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
+            if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list)}
+
+        except Exception as e:
+            app.logger.error(f"CMD [{cmd}] raised: {e}")
+            return flask.jsonify({"ok": False, "message": f"Command failed: {e}"}), 500
+
+    cli = sys.modules['flask.cli']
+    cli.show_server_banner = lambda *x: None
+
+    print_log.pL("Server", "Event", "Server Event: Starting on Port 5000.", "System", True, None)                       
+    app.run(host='0.0.0.0', port=5000, debug=False, use_reloader=False)     # Start the flask server
 
     return app                                                              # Returns the Flask Thread Created

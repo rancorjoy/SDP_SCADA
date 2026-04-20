@@ -11,11 +11,12 @@ import pickle     # Allows Dictionary to be saved to JSON
 import subprocess # Manages Extenral Programs (eg Arduino CLI)
 import sys        # Allows Python CLI Arguments to be run via code
 
+from . import print_log
+
 ARDUINO_CLI = "arduino-cli"                                 # Define string
 
 # Initialize code folder inside persistent data path
 def init_code_path(data_path):
-
     data_path = pathlib.Path(data_path)                     # Ensure data path is a path (works for path and string inputs)
     dcs_path = data_path / pathlib.Path("dcs_scripts")      # Assign dcs_path to data_path/dcs_info (name of folder)
 
@@ -29,7 +30,8 @@ def init_code_path(data_path):
         return False                                        # The folder was not initialized
     
 def compile_sketch(sketch_dir, fqbn):
-    print(f"[*] Compiling sketch: {sketch_dir}")
+    time_str = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]"
+    print_log.pL("Flash", "Event", "Compiling Sketch {sketch_dir}.", "System", True, None)
     result = subprocess.run(
         [ARDUINO_CLI, "compile", "--fqbn", fqbn, sketch_dir],
         capture_output=True,
@@ -42,7 +44,8 @@ def compile_sketch(sketch_dir, fqbn):
     return True
 
 def upload_sketch(sketch_dir, fqbn, port):
-    print(f"[*] Uploading to {port} ...")
+    time_str = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]"
+    print_log.pL("Flash", "Event", "Uploading Sketch {sketch_dir} to {port}.", "System", True, None)
     result = subprocess.run(
         [ARDUINO_CLI, "upload", "--fqbn", fqbn, "--port", port, sketch_dir, "-v"],
         capture_output=True,
@@ -50,12 +53,10 @@ def upload_sketch(sketch_dir, fqbn, port):
         timeout=30
     )
     if result.returncode != 0:
-        print(f"[!] Upload failed:\n{result.stderr}")
+        print_log.pL("Flash", "Error", "Uploading Failed.", "System", True, None)
         return False
-    print(f"[+] Upload successful to {port}.")
+    print_log.pL("Flash", "Event", "Upload Successul.", "System", True, None)
     return True
-
-
 
 
 
