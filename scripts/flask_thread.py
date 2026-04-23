@@ -27,17 +27,42 @@ COMMANDS = {
     #  cmd name        min  max  usage hint
     "help":          (0,   0,   "help"),
     "status":        (0,   0,   "status"),
+
     "init_data":     (0,   0,   "init_data"),
     "init_info":     (0,   0,   "init_info"),
     "init_scripts":  (0,   0,   "init_scripts"),
-    "migrate":       (1,   1,   "migrate <path>"),
-    "recover":       (1,   1,   "recover <path>"),
+    "migrate":       (1,   1,   "migrate <relative path>"),
+    "recover":       (1,   1,   "recover <relative path>"),
+
     "list_serial":   (0,   0,   "list_serial"),
+
     "list_dcs":      (0,   0,   "list_dcs"),
-    "rename_dcs":    (2,   2,   "rename_dcs <old_name> <new_name>"),
-    "unload_dcs":    (1,   1,   "unload_dcs <name>"),
-    "load_dcs":      (1,   1,   "load_dcs <name>"),
-    "delete_dcs":    (1,   1,   "delete_dcs <name>"),
+    "rename_dcs":    (2,   2,   "rename_dcs <old controller name> <new controller name>"),
+    "unload_dcs":    (1,   1,   "unload_dcs <controller name>"),
+    "load_dcs":      (1,   1,   "load_dcs <controller name>"),
+    "delete_dcs":    (1,   1,   "delete_dcs <controller name>"),
+    "save_dcs":      (1,   1,   "save_dcs <controller name>"),
+
+    "list_dcs_pins":    (2,   2,    "list_dcs_pins <controller name> <bool> (active only?)"),
+    "edit_pin_enable":  (3,   3,    "edit_pin_enable <controller name> <pin name> <bool> (enabled?)"),
+    "edit_pin_name":    (3,   3,    "edit_pin_name <controller name> <old pin name> <new pin name>"),
+    "edit_pin_type":    (3,   3,    "edit_pin_type <controller name> <pin name> <bool> (analog?)"),
+    "edit_pin_dir":     (3,   3,    "edit_pin_dir <controller name> <pin name> <type> (INPUT, INPUT_PULLUP, OUTPUT)"),
+    "edit_pin_pwm":     (3,   3,    "edit_pin_pwm <controller name> <pin name> <point name>"),
+    "edit_pin_int":     (3,   3,    "edit_pin_int <controller name> <pin name> <bool> (interrupt enabled?)"),
+
+    "list_dcs_points":          (1,   1,    "list_dcs_points <controller name>"),
+    "add_dcs_point":            (2,   2,    "add_dcs_point <controller name> <point name>"),
+    "rem_dcs_point":            (2,   2,    "rem_dcs_point <controller name> <point name>"),
+    "rename_dcs_point":         (3,   3,    "rem_dcs_point <controller name> <old point name> <new point name>"),
+    "edit_point_type":          (3,   3,    "edit_point_type <controller name> <point name> <type> (int, float, bool)"),
+    "edit_point_def":           (3,   3,    "edit_point_def <controller name> <point name> <value>"),
+    "edit_point_hold_enable":   (3,   3,    "edit_point_hold_enable <controller name> <point name> <bool> (hold point?)"),
+    "edit_point_hold":          (3,   3,    "edit_point_hold <controller name> <point name> <value>"),
+    "edit_point_min_enable":    (3,   3,    "edit_point_min_enable <controller name> <point name> <bool> (enforce minimum?)"),
+    "edit_point_min":           (3,   3,    "edit_point_min <controller name> <point name> <value>"),
+    "edit_point_max_enable":    (3,   3,    "edit_point_max_enable <controller name> <point name> <bool> (enforce maximum?)"),
+    "edit_point_max":           (3,   3,    "edit_point_max <controller name> <point name> <value>"),
 }
 
 def get_path():                                                 # Derives the data path when a function needs it from Pointer.json
@@ -89,22 +114,49 @@ def get_help():
     init_data :        \t Initializes the persistent data path
     init_info :        \t Initializes the dcs information folder
     init_scripts :     \t Initializes the dcs scripts folder
-    migrate <path> :   \t Migrates the persistent data path to specified location <path>
-    recover <path> :   \t Recovers the persistent data path at specified location <path>
+    migrate <path> :   \t Migrates the persistent data path to specified location <relative path>
+    recover <path> :   \t Recovers the persistent data path at specified location <relative path>
 
     Serial Commands:
     list_serial : \t Lists all detected serial connections to the SCADA server
 
-    Controller Commands:
+    Controller General Commands:
     list_dcs :     \t List all known DCS Controllers
-    rename_dcs :   \t Rename a DCS Controller <old name> <new name>
-    unload_dcs :   \t Remove a DCS from the current list <name>
-    load_dcs :     \t Add a DCS from to current list (from file) <name>
-    delete_dcs :   \t Delete a DCS Controller <name>
+    rename_dcs :   \t Rename a DCS Controller <old controller name> <new controller name>
+    unload_dcs :   \t Remove a DCS from the current list <controller name>
+    load_dcs :     \t Add a DCS from to current list (from file) <controller name>
+    delete_dcs :   \t Delete a DCS Controller <controller name>
+    save_dcs :     \t Save Changes to a DCS Controller <controller name>
+
+    Controller Pin Commands:
+    list_dcs_pins :     \t List all physical pins on a controller <controller name> <bool> (enabled only?)
+    edit_pin_enable :   \t Enable or Disable a pin on a controller <controller name> <pin name> <bool> (enable?)
+    edit_pin_name :     \t Change the name of a pin <controller name> <pin old name> <pin new name>
+    edit_pin_type :     \t Change the analog behavior of a pin <controller name> <pin name> <bool> (analog?)
+    edit_pin_dir :      \t Change the direction of a pin <controller name> <pin name> <type> (INPUT, INPUT_PULLUP, OUTPUT)
+    edit_pin_pwm :      \t Tie the pin to output PWM from a software point <controller name> <pin name> <point name> (None to disable PWM)
+    edit_pin_int:       \t Enable or Disable the ISR for this pin <controller name> <pin name> <bool> (enable?)
+
+    Controller Point Commands:
+    list_dcs_points :       \t List all enabled/active points on a controller <controller name>
+    add_dcs_point :         \t Add a software point to a controller <controller name> <point name>
+    rem_dcs_point :         \t Remove a software point from a controller <controller name> <point name> (this cannot be undone)
+    rename_dcs_point :      \t Rename a software point on a controller <controller name> <point name>
+    edit_point_type :       \t Edit the data-type stored in a point <controller name> <point name> <type> (int, float, bool)
+    edit_point_def :        \t Edit the default value of a point <controller name> <point name> <value>
+    edit_point_hold_enable  \t Enable or Disable point hold on a controller <controller name> <point> <bool> (hold the point?)
+    edit_point_hold         \t Edit the held value of a point on a controller <controller name> <point> <value>
+    edit_point_min_enable   \t Enable or Disable point minimum value on a controller <controller name> <point> <bool> (enforce minimum value?)
+    edit_point_min          \t Edit the minimum value of a point on a controller <controller name> <point> <value>
+    edit_point_max_enable   \t Enable or Disable point maximum value on a controller <controller name> <point> <bool> (enforce maximum value?)
+    edit_point_max          \t Edit the maximum value of a point on a controller <controller name> <point> <value>
     """
     return help_text
 
-def flask_loop(dcs_list):                       # Method is ran in entry point - returns "app"
+def eval_bool(input):
+    return input.lower() == "true"
+
+def flask_loop(dcs_list, current_dict, current_dict_lock):  # Method is ran in entry point - returns "app"
 
     app = flask.Flask(__name__)                             # Runs Flask Thread for Command Inputs
 
@@ -133,16 +185,38 @@ def flask_loop(dcs_list):                       # Method is ran in entry point -
             if cmd == "list_serial":    return {"ok": True, "dict": scan_serial.list_serial_ports()}
 
             if cmd == "list_dcs":   return {"ok": True, "dict": dcs_list}
-            if cmd == "rename_dcs": return {"ok": True, "result": dcs_dict_utils.rename_dcs(get_path(), args[0], args[1], dcs_list)}
-            if cmd == "load_dcs":   return {"ok": True, "result": dcs_dict_utils.load_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
+            if cmd == "rename_dcs": return {"ok": True, "result": dcs_dict_utils.rename_dcs(get_path(), args[0], args[1], dcs_list, current_dict, current_dict_lock)}
+            if cmd == "load_dcs":   return {"ok": True, "result": dcs_dict_utils.load_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list,  current_dict, current_dict_lock)}
             if cmd == "unload_dcs": return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
-            if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list)}
+            if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list,  current_dict, current_dict_lock)}
+            if cmd == "save_dcs":   return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
+
+            if cmd == "list_dcs_pins":      return {"ok": True, "dict": dcs_dict_utils.list_pins(current_dict[args[0]]["pin_config"],eval_bool(args[1]))}
+            if cmd == "edit_pin_enable":    return {"ok": True, "result": dcs_dict_utils.change_pin_enable(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]))}
+            if cmd == "edit_pin_name":      return {"ok": True, "result": dcs_dict_utils.change_pin_name(current_dict[args[0]]["pin_config"],args[1], args[2])}
+            if cmd == "edit_pin_type":      return {"ok": True, "result": dcs_dict_utils.change_pin_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
+            if cmd == "edit_pin_dir":       return {"ok": True, "result": dcs_dict_utils.change_pin_dir(current_dict[args[0]]["pin_config"],args[1], args[2])}
+            if cmd == "edit_pin_pwm":       return {"ok": True, "result": dcs_dict_utils.change_pin_pwm(current_dict[args[0]]["pin_config"],args[1], current_dict[args[0]]["pin_config"], args[2])}
+            if cmd == "edit_pin_int":       return {"ok": True, "result": dcs_dict_utils.change_pin_int(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]))}
+
+            if cmd == "list_dcs_points":        return {"ok": True, "dict": dcs_dict_utils.list_points(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"])}
+            if cmd == "add_dcs_point":          return {"ok": True, "result": dcs_dict_utils.add_point(current_dict[args[0]]["software_points"], args[1])}
+            if cmd == "rem_dcs_point":          return {"ok": True, "result": dcs_dict_utils.rem_point(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1])}
+            if cmd == "rename_dcs_point":       return {"ok": True, "result": dcs_dict_utils.change_point_name(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2])}
+            if cmd == "edit_point_type":        return {"ok": True, "result": dcs_dict_utils.change_point_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2])}
+            if cmd == "edit_point_def":         return {"ok": True, "result": dcs_dict_utils.change_point_def(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
+            if cmd == "edit_point_hold_enable": return {"ok": True, "result": dcs_dict_utils.change_point_hold_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
+            if cmd == "edit_point_hold":        return {"ok": True, "result": dcs_dict_utils.change_point_hold_val(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
+            if cmd == "edit_point_min_enable":  return {"ok": True, "result": dcs_dict_utils.change_point_min_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
+            if cmd == "edit_point_min":         return {"ok": True, "result": dcs_dict_utils.change_point_min(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
+            if cmd == "edit_point_max_enable":  return {"ok": True, "result": dcs_dict_utils.change_point_max_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
+            if cmd == "edit_point_max":         return {"ok": True, "result": dcs_dict_utils.change_point_max(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
 
         except Exception as e:
             app.logger.error(f"CMD [{cmd}] raised: {e}")
             return flask.jsonify({"ok": False, "message": f"Command failed: {e}"}), 500
 
-    cli = sys.modules['flask.cli']
+    cli = sys.modules['flask.cli']                                          # Server Banner Suppression
     cli.show_server_banner = lambda *x: None
 
     print_log.pL("Server", "Event", "Server Event: Starting on Port 5000.", "System", True, None)                       

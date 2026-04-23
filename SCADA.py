@@ -22,7 +22,7 @@ from scripts import print_log
 
 def main():                                                         # Main Method - Program Entry Point
     
-    print_log.pL("System", "Event", "System Event: Starting SCADA", "System", True, None)
+    print_log.pL("System", "Event", "Starting SCADA", "System", True, None)
 
                                                     # Initialize Data Path and Sub-Paths
     is_path = data_path_utils.init_data_path()      # Initialize Data Path
@@ -35,6 +35,10 @@ def main():                                                         # Main Metho
     
     current_dcs = {}                                        # Array for current dcs connections
 
+    current_dict = {}                                       # Dictionary for DCS details of each controller (current/unsaved versions)
+    current_dict = dcs_dict_utils.init_current_dict(path)   # Get the (starting) current dictionary from previously learned devices
+    current_dict_lock = threading.Lock()                    # Prevents errors from read/write collisions in the FLASK server
+
     devices = {}                                            # Array for current devices (USB connections)
     previous_devices = {}                                   # Array for previous devices (USB connections)
 
@@ -46,7 +50,7 @@ def main():                                                         # Main Metho
         monitor_thread.start()                                  # Start the new thread
 
                                                                 # Create a thread that runs flask_thread.flask_loop
-        server_thread = threading.Thread(target=flask_thread.flask_loop, args=(current_dcs,)) 
+        server_thread = threading.Thread(target=flask_thread.flask_loop, args=(current_dcs,current_dict, current_dict_lock)) 
         server_thread.daemon = True                             # Dies when main program dies
         server_thread.start()                                   # Start the new thread
 
@@ -73,13 +77,13 @@ def main():                                                         # Main Metho
                     # Newly connected devices
                     for device in devices.values():
                         if device not in previous_devices.values():
-                            is_saved = dcs_dict_utils.init_dcs(path, device)
+                            is_saved = dcs_dict_utils.init_dcs(path, device, current_dict, current_dict_lock)
                             #flash_queue.put({
                             #"port":             device["port"],
-                            #"script_name":      "Blink"
+                            #"script_name":      "uc0"
                             #})
                             if is_saved:
-                                is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs)
+                                is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs, current_dict, current_dict_lock)
 
                     # Disconnected devices
                     for device in previous_devices.values():

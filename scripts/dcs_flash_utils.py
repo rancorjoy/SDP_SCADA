@@ -30,7 +30,6 @@ def init_code_path(data_path):
         return False                                        # The folder was not initialized
     
 def compile_sketch(sketch_dir, fqbn):
-    time_str = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]"
     print_log.pL("Flash", "Event", "Compiling Sketch {sketch_dir}.", "System", True, None)
     result = subprocess.run(
         [ARDUINO_CLI, "compile", "--fqbn", fqbn, sketch_dir],
@@ -44,7 +43,6 @@ def compile_sketch(sketch_dir, fqbn):
     return True
 
 def upload_sketch(sketch_dir, fqbn, port):
-    time_str = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}]"
     print_log.pL("Flash", "Event", "Uploading Sketch {sketch_dir} to {port}.", "System", True, None)
     result = subprocess.run(
         [ARDUINO_CLI, "upload", "--fqbn", fqbn, "--port", port, sketch_dir, "-v"],
@@ -57,8 +55,6 @@ def upload_sketch(sketch_dir, fqbn, port):
         return False
     print_log.pL("Flash", "Event", "Upload Successul.", "System", True, None)
     return True
-
-
 
 # Common Arduino VID/PID → FQBN mappings
 FQBN_MAP = {
