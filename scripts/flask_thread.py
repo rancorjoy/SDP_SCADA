@@ -13,12 +13,14 @@ import serial                                   # Serial Communications over USB
 import serial.tools.list_ports                  # Serial communication tools for port detection
 import logging                                  # For custom server logging
 import sys                                      # Used at end to supress logging
+from dataclasses import dataclass               # Allows current state to be passed as a struct to FLASK thread
 
 from . import data_path_utils                   # Import the data_path_utils script (current) folder
 from . import dcs_dict_utils                    # Import the dcs_dict_utils script (current) folder
 from . import scan_serial                       # Import the scan_serial script (current) folder
 from . import dcs_flash_utils                   # Import the dcs_flash_utils script
 from . import print_log                
+from scripts.current_state import CurrentState
 
 logging.getLogger('werkzeug').disabled = True           # Disable default logging (reduces clutter in main window)
 logging.getLogger('werkzeug.serving').disabled = True
@@ -158,7 +160,12 @@ def get_help():
 def eval_bool(input):
     return input.lower() == "true"
 
-def flask_loop(dcs_list, current_dict, current_dict_lock):  # Method is ran in entry point - returns "app"
+def flask_loop(CurrentState):                               # Method is ran in entry point - returns "app"
+
+    # Get data objects out of current state
+    dcs_list = CurrentState.current_dcs
+    current_dict = CurrentState.current_dict
+    current_dict_lock = CurrentState.current_dict_lock
 
     app = flask.Flask(__name__)                             # Runs Flask Thread for Command Inputs
 

@@ -7,9 +7,10 @@ import shutil       # Shell Utilities (High Level File Operations)
 import threading    # Multithreading for Commands Outside of Loop
 import flask        # Lightweight web server
 import requests     # For Command Line Interface Window
-import serial                   # Serial Communications over USB<->USB
-import serial.tools.list_ports  # Serial communication tools for port detection
-import queue                    # Adds queues that can be pushed or popped to from a thread
+import serial                       # Serial Communications over USB<->USB
+import serial.tools.list_ports      # Serial communication tools for port detection
+import queue                        # Adds queues that can be pushed or popped to from a thread
+from dataclasses import dataclass   # Allows current state to be passed as a struct to FLASK thread
 
 # Import the scripts folder - scripts and utility methods
 from scripts import data_path_utils
@@ -19,6 +20,7 @@ from scripts import flask_thread
 from scripts import flash_thread
 from scripts import serial_thread
 from scripts import print_log
+from scripts.current_state import CurrentState
 
 def main():                                                         # Main Method - Program Entry Point
     
@@ -49,8 +51,11 @@ def main():                                                         # Main Metho
         monitor_thread.daemon = True                            # Dies when main program dies
         monitor_thread.start()                                  # Start the new thread
 
+        # Data structure being passed to the FLASK server with current state of system (pass by reference)
+        thisState = CurrentState(current_dcs,current_dict, current_dict_lock) 
+
                                                                 # Create a thread that runs flask_thread.flask_loop
-        server_thread = threading.Thread(target=flask_thread.flask_loop, args=(current_dcs,current_dict, current_dict_lock)) 
+        server_thread = threading.Thread(target=flask_thread.flask_loop, args=(thisState,)) 
         server_thread.daemon = True                             # Dies when main program dies
         server_thread.start()                                   # Start the new thread
 
