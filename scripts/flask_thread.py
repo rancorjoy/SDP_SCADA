@@ -42,6 +42,7 @@ COMMANDS = {
     "load_dcs":      (1,   1,   "load_dcs <controller name>"),
     "delete_dcs":    (1,   1,   "delete_dcs <controller name>"),
     "save_dcs":      (1,   1,   "save_dcs <controller name>"),
+    "reset_dcs":     (1,   1,   "reset_dcs <controller name>"),
 
     "list_dcs_pins":    (2,   2,    "list_dcs_pins <controller name> <bool> (active only?)"),
     "edit_pin_enable":  (3,   3,    "edit_pin_enable <controller name> <pin name> <bool> (enabled?)"),
@@ -127,6 +128,7 @@ def get_help():
     load_dcs :     \t Add a DCS from to current list (from file) <controller name>
     delete_dcs :   \t Delete a DCS Controller <controller name>
     save_dcs :     \t Save Changes to a DCS Controller <controller name>
+    reset_dcs :    \t Undo Changes to a DCS Controller, reload from saved file <controller name>
 
     Controller Pin Commands:
     list_dcs_pins :     \t List all physical pins on a controller <controller name> <bool> (enabled only?)
@@ -190,6 +192,8 @@ def flask_loop(dcs_list, current_dict, current_dict_lock):  # Method is ran in e
             if cmd == "unload_dcs": return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
             if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list,  current_dict, current_dict_lock)}
             if cmd == "save_dcs":   return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
+            if cmd == "reset_dcs":  return {"ok": True, "result": dcs_dict_utils.reset_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
+            
 
             if cmd == "list_dcs_pins":      return {"ok": True, "dict": dcs_dict_utils.list_pins(current_dict[args[0]]["pin_config"],eval_bool(args[1]))}
             if cmd == "edit_pin_enable":    return {"ok": True, "result": dcs_dict_utils.change_pin_enable(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]))}

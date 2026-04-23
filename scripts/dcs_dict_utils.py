@@ -478,6 +478,23 @@ def save_locked_dict(curr_dict, current_dict_lock, data_path, name):
     with current_dict_lock:
         return save_current_dict(curr_dict, data_path, name)
 
+# Resets a json from the current directory (opposite of saving)
+def reset_current_dict(curr_dict, data_path, name):
+    json_file = pathlib.Path(data_path) / "dcs_info" / f"{name}.json"
+    
+    if not json_file.exists():
+        print_log.pL("System", "Error", f"JSON file '{name}' not found.", "System", True, None)
+        return False
+    
+    with json_file.open("r", encoding="utf-8") as f:
+        curr_dict[name] = json.load(f)
+    
+    return True
+
+# Flask call to reset current dict with locking
+def reset_locked_dict(curr_dict, current_dict_lock, data_path, name):
+    with current_dict_lock:
+        return reset_current_dict(curr_dict, data_path, name)
 
 
 
