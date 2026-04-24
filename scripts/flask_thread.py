@@ -66,6 +66,13 @@ COMMANDS = {
     "edit_point_min":           (3,   3,    "edit_point_min <controller name> <point name> <value>"),
     "edit_point_max_enable":    (3,   3,    "edit_point_max_enable <controller name> <point name> <bool> (enforce maximum?)"),
     "edit_point_max":           (3,   3,    "edit_point_max <controller name> <point name> <value>"),
+
+    "list_dcs_timers":          (1,   1,    "list_dcs_timers <controller name>"),
+    "edit_timer_enable":        (3,   3,    "edit_timer_enable <controller name> <point name> <value> (enabled?)"),
+    "edit_timer_mode":          (3,   3,    "edit_timer_mode <controller name> <point name> <mode> (See Arduino manual for timer operating modes)"),
+    "list_dcs_interrupts":      (1,   1,    "list_dcs_interrupts <controller name>"),
+    "edit_int_enable":          (3,   3,    "edit_int_enable <controller name> <point name> <value> (enabled?)"),
+    "edit_int_mode":            (3,   3,    "edit_int_mode <controller name> <point name> <mode> (Pin: LOW, CHANGE, RISING, FALLING, HIGH; Timer: OVF, MATCH)"),
 }
 
 def get_path():                                                 # Derives the data path when a function needs it from Pointer.json
@@ -154,6 +161,14 @@ def get_help():
     edit_point_min          \t Edit the minimum value of a point on a controller <controller name> <point> <value>
     edit_point_max_enable   \t Enable or Disable point maximum value on a controller <controller name> <point> <bool> (enforce maximum value?)
     edit_point_max          \t Edit the maximum value of a point on a controller <controller name> <point> <value>
+
+    Timer and Interrupt Commands:
+    list_dcs_timers :       \t List all timers on a controller <controller name>
+    edit_timer_enable :     \t Enable or Disable a timer on a controller <controller name> <point name> <value> (enabled?)
+    edit_timer_mode :       \t Change the mode of a timer on a controller <controller name> <point name> <mode> (See Arduino manual for timer operating modes)
+    list_dcs_interrupt :    \t List all interrupts on a controller <controller name>
+    edit_int_enable :       \t Enable or Disable an interrupt on a controller <controller name> <point name> <value> (enabled?)
+    edit_int_mode :         \t Change the mode of an interrupt on a controller <controller name> <point name> <mode> (Pin: LOW, CHANGE, RISING, FALLING, HIGH; Timer: OVF, MATCH)
     """
     return help_text
 
@@ -210,18 +225,25 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "edit_pin_pwm":       return {"ok": True, "result": dcs_dict_utils.change_pin_pwm(current_dict[args[0]]["pin_config"],args[1], current_dict[args[0]]["pin_config"], args[2])}
             if cmd == "edit_pin_int":       return {"ok": True, "result": dcs_dict_utils.change_pin_int(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]))}
 
-            if cmd == "list_dcs_points":        return {"ok": True, "dict": dcs_dict_utils.list_points(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"])}
+            if cmd == "list_dcs_points":        return {"ok": True, "dict": dcs_dict_utils.list_points(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], current_dict[args[0]]["timers"])}
             if cmd == "add_dcs_point":          return {"ok": True, "result": dcs_dict_utils.add_point(current_dict[args[0]]["software_points"], args[1])}
             if cmd == "rem_dcs_point":          return {"ok": True, "result": dcs_dict_utils.rem_point(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1])}
             if cmd == "rename_dcs_point":       return {"ok": True, "result": dcs_dict_utils.change_point_name(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2])}
-            if cmd == "edit_point_type":        return {"ok": True, "result": dcs_dict_utils.change_point_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2])}
-            if cmd == "edit_point_def":         return {"ok": True, "result": dcs_dict_utils.change_point_def(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
+            if cmd == "edit_point_type":        return {"ok": True, "result": dcs_dict_utils.change_point_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2], False)}
+            if cmd == "edit_point_def":         return {"ok": True, "result": dcs_dict_utils.change_point_def(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
             if cmd == "edit_point_hold_enable": return {"ok": True, "result": dcs_dict_utils.change_point_hold_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
-            if cmd == "edit_point_hold":        return {"ok": True, "result": dcs_dict_utils.change_point_hold_val(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
+            if cmd == "edit_point_hold":        return {"ok": True, "result": dcs_dict_utils.change_point_hold_val(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
             if cmd == "edit_point_min_enable":  return {"ok": True, "result": dcs_dict_utils.change_point_min_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
-            if cmd == "edit_point_min":         return {"ok": True, "result": dcs_dict_utils.change_point_min(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
+            if cmd == "edit_point_min":         return {"ok": True, "result": dcs_dict_utils.change_point_min(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
             if cmd == "edit_point_max_enable":  return {"ok": True, "result": dcs_dict_utils.change_point_max_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
-            if cmd == "edit_point_max":         return {"ok": True, "result": dcs_dict_utils.change_point_max(current_dict[args[0]]["software_points"], args[1], float(args[2]))}
+            if cmd == "edit_point_max":         return {"ok": True, "result": dcs_dict_utils.change_point_max(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
+
+            if cmd == "list_dcs_timers":        return {"ok": True, "dict": current_dict[args[0]]["timers"]}
+            if cmd == "edit_timer_enable":      return {"ok": True, "result": dcs_dict_utils.set_timer_enable(current_dict[args[0]]["timers"], args[1], eval_bool(args[2]))}
+            if cmd == "edit_timer_mode":        return {"ok": True, "result": dcs_dict_utils.set_timer_mode(current_dict[args[0]]["timers"], args[1], args[2])}
+            if cmd == "list_dcs_interrupts":    return {"ok": True, "dict": current_dict[args[0]]["int_config"]}
+            if cmd == "edit_int_enable":        return {"ok": True, "result": dcs_dict_utils.set_int_enable(current_dict[args[0]]["int_config"], args[1], eval_bool(args[2]))}
+            if cmd == "edit_int_mode":          return {"ok": True, "result": dcs_dict_utils.set_int_mode(current_dict[args[0]]["int_config"], args[1], args[2])}
 
         except Exception as e:
             app.logger.error(f"CMD [{cmd}] raised: {e}")

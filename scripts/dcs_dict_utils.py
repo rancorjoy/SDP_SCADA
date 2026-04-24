@@ -72,21 +72,46 @@ def get_software_point():   # The defualt software point is always the same
         "max_en" : False,   # is the value held at or below a value? (not available for bool)
         "min" : 0,          # minimum value (not available for bool)
         "max" : 1,          # maximum value (not available for bool)
-        "hardware" : False  # is this pin tied to hardware? (cannot be removed)
+        "hardware" : False, # is this pin tied to hardware? (cannot be removed)
+        "volatile" : False, # is the variable volatile? (will be set if used in ISR)
+        "constant" : False  # has this point been determined as a constant?
     }
 
 # Returns a list of software points that correlate with each pin
-def get_hardware_points(pin_map):
+def get_hardware_points(pin_map, tim_map):
 
     point_map = {}                  # Point map that will be returned
 
+    # Get hardware points for pins
     for key, val in pin_map.items():
         new_point = get_software_point()
         new_point["type"] = "bool"
         new_point["hardware"] = True
 
         point_map[key] = new_point
-    
+
+    # Get hardware points for timer registers
+    for key, val in tim_map.items():
+        
+        new_point = get_software_point()        # prescaler
+        new_point["type"] = "int"
+        new_point["default"] = 0
+        new_point["hardware"] = True
+        point_map[f"{key}_Prescaler"] = new_point
+
+        new_point = get_software_point()        # preloaded value
+        new_point["type"] = "int"
+        new_point["default"] = 0
+        new_point["hardware"] = True
+        point_map[f"{key}_Preload"] = new_point
+
+        for k in val["channels"]:
+            new_point = get_software_point()    # channel comparisons
+            new_point["type"] = "int"
+            new_point["default"] = 0
+            new_point["hardware"] = True
+            point_map[f"{key}_CH{k}_Comp"] = new_point
+
     return point_map                # This map is populated with all needed hardware points
 
 # Returns Arduino UNO Default Pin Map
@@ -116,18 +141,38 @@ def uno_pin_map():
 # Returns Arduino UNO Interrupt Map
 def uno_int_map():
     int_dict = {
-        "2": {
+        "DP2": {
             "ISR_name": "ISR2",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
         },
-        "3": {
+        "DP3": {
             "ISR_name": "ISR3",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
-        }
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer0": {
+            "ISR_name": "ISR_Timer0",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer1": {
+            "ISR_name": "ISR_Timer1",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2": {
+            "ISR_name": "ISR_Timer2",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
     }
     return int_dict
 
@@ -167,44 +212,140 @@ def mega_pin_map():
 # Returns Arduino MEGA Interrupt Map
 def mega_int_map():
     int_dict = {
-        "2": {
+        "DP2": {
             "ISR_name": "ISR2",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
         },
-        "3": {
+        "DP3": {
             "ISR_name": "ISR3",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
         },
-        "18": {
+        "DP18": {
             "ISR_name": "ISR18",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
         },
-        "19": {
+        "DP19": {
             "ISR_name": "ISR19",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
         },
-        "20": {
+        "DP20": {
             "ISR_name": "ISR20",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
         },
-        "21": {
+        "DP21": {
             "ISR_name": "ISR21",
-            "Mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
-            "High": False,          # HIGH is not available on this board
-            "Enabled": False
+            "mode": "LOW",          # LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
+            "high": False,          # HIGH is not available on this board
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer0": {
+            "ISR_name": "ISR_Timer0",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer1": {
+            "ISR_name": "ISR_Timer1",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2": {
+            "ISR_name": "ISR_Timer2",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer3": {
+            "ISR_name": "ISR_Timer3",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer4": {
+            "ISR_name": "ISR_Timer4",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer5": {
+            "ISR_name": "ISR_Timer5",
+            "mode": "OVF",          # OVF, MATCH
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
         }
     }
     return int_dict
+
+# Returns the template for a timer
+def get_timer(timer_name, size_bits, channels, valid_modes, note=None):
+    return {
+        "name": timer_name,
+        "size_bits": size_bits,           # 8 or 16 - defines max count (255 or 65535)
+        "enabled": False,
+        "prescaler": 0,                   # 0 = stopped, valid: 1, 8, 64, 256, 1024
+        "mode": valid_modes[0],           # current selected mode
+        "valid_modes": valid_modes,       # UI dropdown + codegen validation
+        "channels": {
+            ch: {"compare_value": 0}
+            for ch in channels
+        },
+        "preload": 0,                     # written to TCNTn to offset count start
+        "note" : note
+    }
+
+# Returns the timer dictionary for an uno
+def uno_timer_map():
+    return {
+        "Timer0": get_timer("Timer0", 8,  ["A", "B"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
+                    note="Used by millis()/delay() - modify with caution"),
+        "Timer1": get_timer("Timer1", 16, ["A", "B"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM", "INPUT_CAPTURE"],
+                    note="16-bit - good for precise timing"),
+        "Timer2": get_timer("Timer2", 8,  ["A", "B"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
+                    note="Used by tone()"),
+    }
+
+# Returns the timer dictionary for a mega
+def mega_timer_map():
+    return {
+        "Timer0": get_timer("Timer0", 8,  ["A", "B"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
+                    note="Used by millis()/delay() — modify with caution"),
+        "Timer1": get_timer("Timer1", 16, ["A", "B", "C"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM", "INPUT_CAPTURE"],
+                    note="16-bit"),
+        "Timer2": get_timer("Timer2", 8,  ["A", "B"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
+                    note="Used by tone()"),
+        "Timer3": get_timer("Timer3", 16, ["A", "B", "C"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM", "INPUT_CAPTURE"],
+                    note="16-bit"),
+        "Timer4": get_timer("Timer4", 16, ["A", "B", "C"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM", "INPUT_CAPTURE"],
+                    note="16-bit"),
+        "Timer5": get_timer("Timer5", 16, ["A", "B", "C"],
+                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM", "INPUT_CAPTURE"],
+                    note="16-bit"),
+    }
 
 # Check if there exists a matching dcs JSON for given controller
 def check_saved(data_path, port):
@@ -237,10 +378,12 @@ def init_dcs(data_path, port, current_dict, current_dict_lock):
     if dcs_type == "UNO":                       # If the board is an UNO, assign the pin and interrupt maps for UNO
         pin_map = uno_pin_map()
         int_map = uno_int_map()
+        tim_map = uno_timer_map()
         fqbn = "arduino:avr:uno"
     elif dcs_type == "MEGA":                    # If the board is an MEGA, assign the pin and interrupt maps for MEGA
         pin_map = mega_pin_map()
         int_map = mega_int_map()
+        tim_map = mega_timer_map()
         fqbn = "arduino:avr:mega"
     else:                                       # If the port is not an arduino board...
         return False                            # The DCS JSON was not made (there is no target)
@@ -263,8 +406,12 @@ def init_dcs(data_path, port, current_dict, current_dict_lock):
     "name": controller_name,
     "fqbn": fqbn,
     "pin_config": pin_map,
-    "software_points": get_hardware_points(pin_map),
-    "int_config": int_map
+    "software_points": get_hardware_points(pin_map, tim_map),
+    "int_config": int_map,
+    "timers" : tim_map,
+    "preamble_blocks" : [], # Code blocks for different parts of the program
+    "setup_blocks" : [],
+    "loop_blocks" : []
     }
 
     try:                                                                        # Try to write this JSON as a file
@@ -524,7 +671,13 @@ def change_pin_type(pin_dict, point_dict, pin, analog):
     if pin_dict[pin]["analog_capable"]:
         if analog:
             change_pin_dir(pin_dict, pin, "INPUT")
-            change_point_type(pin_dict, point_dict, pin, "int")
+            change_point_type(pin_dict, point_dict, pin, "int", True)
+            pin_dict[pin]["min_en"] = True
+            pin_dict[pin]["max_en"] = True
+            pin_dict[pin]["max"] = 0
+            pin_dict[pin]["max"] = 1023
+        else:
+            change_point_type(pin_dict, point_dict, pin, "bool", True)
         pin_dict[pin]["analog_set"] = analog
         return True
     return False
@@ -549,6 +702,10 @@ def change_pin_pwm(pin_dict, pin, point_dict, point):
         if point not in point_dict:
             return False
         change_pin_dir(pin_dict, pin, "OUTPUT")
+        pin_dict[pin]["min_en"] = True
+        pin_dict[pin]["max_en"] = True
+        pin_dict[pin]["max"] = 0
+        pin_dict[pin]["max"] = 255
         pin_dict[pin]["pwm_set"] = {point: point_dict[point]}
     else:
         pin_dict[pin]["pwm_set"] = None
@@ -565,6 +722,33 @@ def change_pin_int(pin_dict, pin, int):
 
 
 # === Functions to change point settings ===
+
+# Ensure if a point's value is being changed, it does not break prescalers!
+def val_prescale(point_name, value):
+    if "Prescaler" in point_name:
+        if value in [0, 1, 8, 64, 256, 1024]:
+            return True
+        return False
+    return True
+
+# Ensure if a point's value is being changed, it does not break timer registers!
+def val_timer_reg(point_name, value, tim_dict):
+    # Only applies to compare and preload values, not prescaler
+    if "Prescaler" in point_name:
+        return True
+    
+    # Extract timer name, first token before underscore e.g. "Timer1" from "Timer1_CHA_Comp"
+    timer_name = point_name.split('_')[0]
+    
+    if timer_name not in tim_dict:
+        return True                  
+    
+    max_val = (2 ** tim_dict[timer_name]["size_bits"]) - 1
+    return 0 <= value <= max_val
+
+# Run both timer checks
+def val_timer(point_name, value, tim_dict):
+    return val_prescale(point_name, value) and val_timer_reg(point_name, value, tim_dict)
 
 def change_point_name(pin_dict, point_dict, old_name, new_name): 
     if point_dict[old_name]["hardware"]:                            # Do not change hardware pin names!
@@ -597,8 +781,12 @@ def rem_point(pin_dict, point_dict, name):
         return True
     return False
 
-def change_point_type(pin_dict, point_dict, point, type):
+def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change hardware point type - DO NOT GIVE TO USER
     if point in point_dict:
+
+        if auth == False and point_dict[point]["hardware"]:
+            return False
+
         if type in ["int", "float", "bool"]:
             point_dict[point]["type"] = type
             if type == "bool":
@@ -625,8 +813,11 @@ def change_point_type(pin_dict, point_dict, point, type):
             return True
     return False
 
-def change_point_def(point_dict, point, value):
+def change_point_def(point_dict, point, value, tim_dict):
     if point not in point_dict:
+        return False
+    
+    if val_timer(point, value, tim_dict) == False:
         return False
     
     point_type = point_dict[point]["type"]
@@ -652,10 +843,13 @@ def change_point_def(point_dict, point, value):
     point_dict[point]["default"] = value
     return True
 
-def change_point_hold_val(point_dict, point, value):
+def change_point_hold_val(point_dict, point, value, tim_dict):
     if point not in point_dict:
         return False
     
+    if val_timer(point, value, tim_dict) == False:
+        return False
+
     point_type = point_dict[point]["type"]
     
     if point_type == "bool":
@@ -692,6 +886,8 @@ def change_point_hold_en(point_dict, point, value):
 def change_point_min_en(point_dict, point, value):
     if not isinstance(value, bool):
         return False
+    if point_dict[point]["hardware"] == True:   # User cannot change hardware settings
+        return False
     if point in point_dict:
         if point_dict[point]["type"] == "bool":
             return False
@@ -702,6 +898,8 @@ def change_point_min_en(point_dict, point, value):
 def change_point_max_en(point_dict, point, value):
     if not isinstance(value, bool):
         return False
+    if point_dict[point]["hardware"] == True:   # User cannot change hardware settings
+        return False
     if point in point_dict:
         if point_dict[point]["type"] == "bool":
             return False
@@ -709,10 +907,16 @@ def change_point_max_en(point_dict, point, value):
         return True
     return False
 
-def change_point_min(point_dict, point, value):
+def change_point_min(point_dict, point, value, tim_dict):
     if point not in point_dict:
         return False
+    
+    if val_timer(point, value, tim_dict) == False:
+        return False
+
     if point_dict[point]["type"] == "bool":
+        return False
+    if point_dict[point]["hardware"] == True:   # User cannot change hardware settings
         return False
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return False
@@ -723,10 +927,16 @@ def change_point_min(point_dict, point, value):
         point_dict[point]["min"] = int(value)
     return True
 
-def change_point_max(point_dict, point, value):
+def change_point_max(point_dict, point, value, tim_dict):
     if point not in point_dict:
         return False
+    
+    if val_timer(point, value, tim_dict) == False:
+        return False
+
     if point_dict[point]["type"] == "bool":
+        return False
+    if point_dict[point]["hardware"] == True:   # User cannot change hardware settings
         return False
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         return False
@@ -737,7 +947,8 @@ def change_point_max(point_dict, point, value):
         point_dict[point]["max"] = int(value)
     return True
 
-def list_pins(pin_dict, active): # Returns point_dict, only enabled pins if active is true
+# Returns point_dict, only enabled pins if active is true
+def list_pins(pin_dict, active):
     if active:
         active_dict = {}
         for key in pin_dict:
@@ -747,13 +958,81 @@ def list_pins(pin_dict, active): # Returns point_dict, only enabled pins if acti
     else:
         return pin_dict
     
-def list_points(pin_dict, point_dict): # Returns all software points and active hardware points
+# Returns all software points and active hardware points
+def list_points(pin_dict, point_dict, tim_dict):
     active_dict = {}
-    for key in point_dict:
-        if point_dict[key]["hardware"] == False:
-            active_dict[key] = point_dict[key]
-        elif pin_dict[key]["enabled"]:
-            active_dict[key] = point_dict[key]
+    for key, val in point_dict.items():
+
+        if not val["hardware"]:                     # software point are always active
+            active_dict[key] = val
+
+        elif key in pin_dict:                       # pin hardware point
+            if pin_dict[key]["enabled"]:
+                active_dict[key] = val
+
+        else:                                       # timer hardware point
+            timer_name = key.split('_')[0]
+            if timer_name in tim_dict and tim_dict[timer_name]["enabled"]:
+                active_dict[key] = val
+            
     return active_dict
 
+
+# === Timer Setting Functions ===
+
+def set_timer_enable(tim_dict, timer_name, value):
+    if not isinstance(value, bool):
+        return False
+
+    if timer_name not in tim_dict:
+        return False
+    
+    timer = tim_dict[timer_name]
+    timer["enabled"] = value
+    return True
+
+# Allows timer mode to be changed
+def set_timer_mode(tim_dict, timer_name, mode):
+    if timer_name not in tim_dict:
+        return False
+    
+    timer = tim_dict[timer_name]
+    
+    if mode not in timer["valid_modes"]:
+        return False
+    
+    timer["mode"] = mode
+    return True
+
+
+# === Interrupt Setting Functions ===
+
+def set_int_enable(int_config, int_name, value):
+    if not isinstance(value, bool):
+        return False
+
+    if int_name not in int_config:
+        return False
+    
+    int_config[int_name]["enabled"] = value
+    return True
+
+def set_int_mode(int_config, int_name, mode):
+    if int_name not in int_config:
+        return False
+    
+    intr = int_config[int_name]
+
+    if int_name.startswith("DP"):   # If the interrupt is from a digital pin
+        if mode in ["LOW", "CHANGE", "RISING", "FALLING"]:
+            intr["enabled"] = mode
+            return True
+        elif mode == "HIGH" and intr["high"]:    # Check if the board supports this interrupt mode
+            intr["enabled"] = mode
+            return True
+
+    elif int_name.startswith("Timer"):  # If the interrupt is from a timer
+        if mode in ["OVF", "MATCH"]:
+            intr["enabled"] = mode
+            return True
 
