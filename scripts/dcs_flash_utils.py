@@ -26,24 +26,24 @@ def init_code_path(data_path):
     except FileExistsError:                                 # If the folder exists and is blocking verification
         return True                                         # The folder was initialized before (just in case)
     except Exception as e:                                  # Handle other potential errors like permission issues
-        print(f"An error occurred: {e}")                    # Print error information
+        print_log.pL("Flash", "Error", "An unexpected error has occured", "System", True, {e})
         return False                                        # The folder was not initialized
     
 def compile_sketch(sketch_dir, fqbn):
-    print_log.pL("Flash", "Event", "Compiling Sketch {sketch_dir}.", "System", True, None)
+    print_log.pL("Flash", "Event", f"Compiling Sketch.", "System", True, None)
     result = subprocess.run(
         [ARDUINO_CLI, "compile", "--fqbn", fqbn, sketch_dir],
         capture_output=True,
         text=True
     )
     if result.returncode != 0:
-        print(f"[!] Compilation failed:\n{result.stderr}")
+        print_log.pL("Flash", "Error", "Compilation Failed", "System", True, None)
         return False
-    print("[+] Compilation successful.")
+    print_log.pL("Flash", "Event", "Compilation Sucsessful", "System", True, None)
     return True
 
 def upload_sketch(sketch_dir, fqbn, port):
-    print_log.pL("Flash", "Event", "Uploading Sketch {sketch_dir} to {port}.", "System", True, None)
+    print_log.pL("Flash", "Event", f"Uploading Sketch to {port}.", "System", True, None)
     result = subprocess.run(
         [ARDUINO_CLI, "upload", "--fqbn", fqbn, "--port", port, sketch_dir, "-v"],
         capture_output=True,
@@ -51,12 +51,12 @@ def upload_sketch(sketch_dir, fqbn, port):
         timeout=30
     )
     if result.returncode != 0:
-        print_log.pL("Flash", "Error", "Uploading Failed.", "System", True, None)
+        print_log.pL("Flash", "Error", "Upload Failed.", "System", True, None)
         return False
     print_log.pL("Flash", "Event", "Upload Successul.", "System", True, None)
     return True
 
-# Common Arduino VID/PID → FQBN mappings
+# Common Arduino VID/PID - FQBN mappings
 FQBN_MAP = {
     ("0x2341", "0x0043"): "arduino:avr:uno",
     ("0x2341", "0x0001"): "arduino:avr:uno",
@@ -82,5 +82,13 @@ def resolve_fqbn(port):
                 return boards[0]["fqbn"]
     return None
 
-
+def program_controller(current_dcs, name, flash_queue, flash_lock):
+    if name in current_dcs:
+        with flash_lock:
+            flash_queue.put({
+            "port":             current_dcs[name]["port"],
+            "script_name":      name
+            })
+            return True
+    return False
 

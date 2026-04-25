@@ -12,72 +12,68 @@ import pickle   # Allows Dictionary to be saved to JSON
 from . import print_log
 
 # Function to create an ino script for a controller
-def create_Script(data_path, name):
+def create_Script(data_path, name, code_str):
     data_path = pathlib.Path(data_path)                              # Ensure data path is a path (works for path and string inputs)
     script_path = data_path / pathlib.Path("dcs_scripts") / name     # Assign dcs_path to data_path/dcs_info (name of folder)
     
     folder_made = False                                              # Keeps track of whether the folder has been made
 
     try:
-        script_path.mkdir(parents=True, exist_ok=False)
+        script_path.mkdir(parents=True, exist_ok=True)
         folder_made = True
         
     except FileExistsError:
-        # print_log.pL("System", "Error", f"The script folder {name} already exists.", "System", True, None)
-        return # This prevents the already exists error from appearing when this is used in the rename script :)
+        return False
     except PermissionError:
         print_log.pL("System", "Error", f"Permission denied when creating script folder {name}.", "System", True, None)
+        return False
     except OSError as e:
         print_log.pL("System", "Error", f"An unexpected error has occured.", "System", True, {e})
+        return False
 
     # If that worked, attempt to make an ino file - this could be done in same try catch but I wanted to separate them for error logging purposes :)
     if folder_made:
-        def_code = f"""
-            void setup() {{
-            // put your setup code here, to run once:
-            }}
-
-            void loop() {{
-            // put your main code here, to run repeatedly:
-            }}
-            """
         try:
-            pathlib.Path(script_path / f"{name}.ino").write_text(def_code)
+            pathlib.Path(script_path / f"{name}.ino").write_text(code_str)
+            return True
         except PermissionError:
             print_log.pL("System", "Error", f"Permission denied when creating ino sctipt {name}", "System", True, None)
+            return False
         except OSError as e:
             print_log.pL("System", "Error", f"An unexpected error has occured.", "System", True, {e})
+            return False
 
 
 # Function to rename an ino script for a controller
 def rename_Script(data_path, old_name, new_name):
-    data_path = pathlib.Path(data_path)                                 # Ensure data path is a path (works for path and string inputs)
-    script_path = data_path / pathlib.Path("dcs_scripts") / old_name    # Assign dcs_path to data_path/dcs_info (name of folder)
-    new_path = data_path / pathlib.Path("dcs_scripts") / new_name    
+    data_path = pathlib.Path(data_path)
+    script_path = data_path / "dcs_scripts" / old_name
+    new_path = data_path / "dcs_scripts" / new_name
 
-    renamed = False                                                     # Keeps track of whether ino has been renamed
+    if not script_path.exists():
+        print_log.pL("System", "Error", f"Script folder {old_name} not found.", "System", True, None)
+        return False
+
+    if new_path.exists():
+        print_log.pL("System", "Error", f"Script folder {new_name} already exists.", "System", True, None)
+        return False
 
     try:
-        pathlib.Path(script_path / f"{old_name}.ino").rename(pathlib.Path(script_path / f"{new_name}.ino"))
-        renamed = True
+        # Rename folder first
+        script_path.rename(new_path)
 
-    # Attempt to rename the ino file
-    except FileNotFoundError:
-        print_log.pL("System", "Error", f"DCS ino file {old_name} not found.", "System", True, None)
-    except PermissionError:
-        print_log.pL("System", "Error", f"Permission denied for {old_name} ino file.", "System", True, None)
+        # Then rename ino file inside
+        old_ino = new_path / f"{old_name}.ino"
+        new_ino = new_path / f"{new_name}.ino"
+
+        if old_ino.exists():
+            old_ino.rename(new_ino)
+
+        return True
+
     except Exception as e:
-        print_log.pL("System", "Error", f"An unexpected error occurred.", "System", True, {e})
-
-    # If that worked, attempt to rename folder - this could be done in same try catch but I wanted to separate them for error logging purposes :)
-    if renamed:
-        try:
-            script_path.rename(new_path)
-    
-        except FileNotFoundError:
-            print_log.pL("System", "Error", f"Script folder {old_name} not found.", "System", True, None)
-        except OSError as e:
-            print_log.pL("System", "Error", f"An unexpected error occurred.", "System", True, {e})
+        print_log.pL("System", "Error", "An unexpected error occurred.", "System", True, {e})
+        return False
 
 # Function to remove an ino script for a controller
 def remove_Script(data_path, name):

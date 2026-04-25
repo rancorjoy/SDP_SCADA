@@ -19,6 +19,8 @@ from . import data_path_utils                   # Import the data_path_utils scr
 from . import dcs_dict_utils                    # Import the dcs_dict_utils script (current) folder
 from . import scan_serial                       # Import the scan_serial script (current) folder
 from . import dcs_flash_utils                   # Import the dcs_flash_utils script
+from . import dcs_script_utils
+from . import ino_utils
 from . import print_log                
 from scripts.current_state import CurrentState
 
@@ -45,6 +47,8 @@ COMMANDS = {
     "delete_dcs":    (1,   1,   "delete_dcs <controller name>"),
     "save_dcs":      (1,   1,   "save_dcs <controller name>"),
     "reset_dcs":     (1,   1,   "reset_dcs <controller name>"),
+    "compile_dcs":   (1,   1,   "compile_dcs <controller name>"),
+    "program_dcs":   (1,   1,   "program_dcs <controller name>"),
 
     "list_dcs_pins":    (2,   2,    "list_dcs_pins <controller name> <bool> (active only?)"),
     "edit_pin_enable":  (3,   3,    "edit_pin_enable <controller name> <pin name> <bool> (enabled?)"),
@@ -131,13 +135,15 @@ def get_help():
     list_serial : \t Lists all detected serial connections to the SCADA server
 
     Controller General Commands:
-    list_dcs :     \t List all known DCS Controllers
+    list_dcs :     \t List all connected DCS Controllers
     rename_dcs :   \t Rename a DCS Controller <old controller name> <new controller name>
     unload_dcs :   \t Remove a DCS from the current list <controller name>
     load_dcs :     \t Add a DCS from to current list (from file) <controller name>
     delete_dcs :   \t Delete a DCS Controller <controller name>
     save_dcs :     \t Save Changes to a DCS Controller <controller name>
     reset_dcs :    \t Undo Changes to a DCS Controller, reload from saved file <controller name>
+    compile_dcs :  \t Regenerate code for a DCS Controller based on saved state <controller name>
+    program_dcs :  \t Reprogram a DCS Controller based on generated code <controller name>
 
     Controller Pin Commands:
     list_dcs_pins :     \t List all physical pins on a controller <controller name> <bool> (enabled only?)
@@ -165,10 +171,10 @@ def get_help():
     Timer and Interrupt Commands:
     list_dcs_timers :       \t List all timers on a controller <controller name>
     edit_timer_enable :     \t Enable or Disable a timer on a controller <controller name> <point name> <value> (enabled?)
-    edit_timer_mode :       \t Change the mode of a timer on a controller <controller name> <point name> <mode> (See Arduino manual for timer operating modes)
+    edit_timer_mode :       \t Change the mode of a timer on a controller <controller name> <point name> <mode> (8-bit: OVF, CTC, FAST_PWM, PHASE_CORRECT_PWM ; 16-bit: INPUT_CAPTURE)
     list_dcs_interrupt :    \t List all interrupts on a controller <controller name>
     edit_int_enable :       \t Enable or Disable an interrupt on a controller <controller name> <point name> <value> (enabled?)
-    edit_int_mode :         \t Change the mode of an interrupt on a controller <controller name> <point name> <mode> (Pin: LOW, CHANGE, RISING, FALLING, HIGH; Timer: OVF, MATCH)
+    edit_int_mode :         \t Change the mode of an interrupt on a controller <controller name> <point name> <mode> (LOW, CHANGE, RISING, FALLING, HIGH)
     """
     return help_text
 
@@ -181,6 +187,8 @@ def flask_loop(CurrentState):                               # Method is ran in e
     dcs_list = CurrentState.current_dcs
     current_dict = CurrentState.current_dict
     current_dict_lock = CurrentState.current_dict_lock
+    flash_queue = CurrentState.flash_queue
+    flash_lock = CurrentState.flash_lock
 
     app = flask.Flask(__name__)                             # Runs Flask Thread for Command Inputs
 
@@ -214,7 +222,9 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "unload_dcs": return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
             if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list,  current_dict, current_dict_lock)}
             if cmd == "save_dcs":   return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
-            if cmd == "reset_dcs":  return {"ok": True, "result": dcs_dict_utils.reset_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
+            if cmd == "reset_dcs":      return {"ok": True, "result": dcs_dict_utils.reset_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
+            if cmd == "compile_dcs":    return {"ok": True, "result": dcs_script_utils.create_Script(get_path(), args[0], ino_utils.get_code(get_path(), args[0]))}
+            if cmd == "program_dcs":    return {"ok": True, "result": dcs_flash_utils.program_controller(dcs_list, args[0], flash_queue, flash_lock)}
             
 
             if cmd == "list_dcs_pins":      return {"ok": True, "dict": dcs_dict_utils.list_pins(current_dict[args[0]]["pin_config"],eval_bool(args[1]))}
@@ -239,8 +249,8 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "edit_point_max":         return {"ok": True, "result": dcs_dict_utils.change_point_max(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
 
             if cmd == "list_dcs_timers":        return {"ok": True, "dict": current_dict[args[0]]["timers"]}
-            if cmd == "edit_timer_enable":      return {"ok": True, "result": dcs_dict_utils.set_timer_enable(current_dict[args[0]]["timers"], args[1], eval_bool(args[2]))}
-            if cmd == "edit_timer_mode":        return {"ok": True, "result": dcs_dict_utils.set_timer_mode(current_dict[args[0]]["timers"], args[1], args[2])}
+            if cmd == "edit_timer_enable":      return {"ok": True, "result": dcs_dict_utils.set_timer_enable(current_dict[args[0]]["timers"], args[1], eval_bool(args[2]), current_dict[args[0]]["int_config"])}
+            if cmd == "edit_timer_mode":        return {"ok": True, "result": dcs_dict_utils.set_timer_mode(current_dict[args[0]]["timers"], args[1], args[2], current_dict[args[0]]["int_config"])}
             if cmd == "list_dcs_interrupts":    return {"ok": True, "dict": current_dict[args[0]]["int_config"]}
             if cmd == "edit_int_enable":        return {"ok": True, "result": dcs_dict_utils.set_int_enable(current_dict[args[0]]["int_config"], args[1], eval_bool(args[2]))}
             if cmd == "edit_int_mode":          return {"ok": True, "result": dcs_dict_utils.set_int_mode(current_dict[args[0]]["int_config"], args[1], args[2])}

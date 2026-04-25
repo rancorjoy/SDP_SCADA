@@ -34,6 +34,7 @@ def main():                                                         # Main Metho
 
     serial_queue = queue.Queue()                            # Create an event queue for the serial monitoring thread
     flash_queue = queue.Queue()                             # Create an event queue for flashing DCS controllers
+    flash_lock = threading.Lock()                           # Create a lock for the flash thread
     
     current_dcs = {}                                        # Array for current dcs connections
 
@@ -52,7 +53,7 @@ def main():                                                         # Main Metho
         monitor_thread.start()                                  # Start the new thread
 
         # Data structure being passed to the FLASK server with current state of system (pass by reference)
-        thisState = CurrentState(current_dcs,current_dict, current_dict_lock) 
+        thisState = CurrentState(current_dcs,current_dict, current_dict_lock, flash_queue, flash_lock) 
 
                                                                 # Create a thread that runs flask_thread.flask_loop
         server_thread = threading.Thread(target=flask_thread.flask_loop, args=(thisState,)) 
@@ -61,7 +62,7 @@ def main():                                                         # Main Metho
 
                                                                 # Create a thread that runs flash_thread.flash_loop
                                                                 # Pass the thread the event flash so results can be used in main thread
-        write_thread = threading.Thread(target=flash_thread.flash_loop, args=(flash_queue,path,is_sp))
+        write_thread = threading.Thread(target=flash_thread.flash_loop, args=(flash_queue,flash_lock, path,is_sp))
         write_thread.daemon = True                              # Dies when main program dies
         write_thread.start()                                    # Start the new thread
 
@@ -83,10 +84,7 @@ def main():                                                         # Main Metho
                     for device in devices.values():
                         if device not in previous_devices.values():
                             is_saved = dcs_dict_utils.init_dcs(path, device, current_dict, current_dict_lock)
-                            #flash_queue.put({
-                            #"port":             device["port"],
-                            #"script_name":      "uc0"
-                            #})
+                            
                             if is_saved:
                                 is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs, current_dict, current_dict_lock)
 

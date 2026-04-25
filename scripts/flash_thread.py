@@ -16,41 +16,47 @@ from . import print_log
 flash_locks = {}                                            # Port -> Lock mapping
 
 # Constantly running loop that checks for queued flash calls and flashes controllers when queued
-def flash_loop(event_queue, datapath, is_init):
+def flash_loop(event_queue, lock, datapath, is_init):
 
     data_path = pathlib.Path(datapath)                      # Ensure data path is a path (works for path and string inputs)
     code_path = data_path / pathlib.Path("dcs_scripts")     # Assign dcs_path to data_path/dcs_scripts (name of folder)
 
     if(is_init):                                            # If the scripts folder exists and has been initialized
-        while True:
-            event = event_queue.get()
+            while True:
+                event = event_queue.get()
+                port        = event["port"]
+                script_name = event["script_name"]
+                fqbn = dcs_flash_utils.resolve_fqbn(port)
 
-            port        = event["port"]
-            script_name = event["script_name"]
-            fqbn = dcs_flash_utils.resolve_fqbn(port)
-            if fqbn is None:
-                print_log.pL("Flash", "Error", "Could not detect board type on {port}, aborting.", "System", True, None)
-                event_queue.task_done()
-                continue
+                if fqbn is None:
+                    print_log.pL("Flash", "Error", f"Could not detect board type on {port}, aborting.", "System", True, None)
+                    with lock:
+                        event_queue.task_done()
+                    continue
+                
+                if port not in flash_locks:
+                    flash_locks[port] = threading.Lock()
 
-            if port not in flash_locks:                     # Create a lock for this port if one doesn't exist
-                flash_locks[port] = threading.Lock()
+                if flash_locks[port].locked():                  # If this port is already being flashed, skip
+                    print_log.pL("Flash", "Error", f"Flash already in progress on {port}, skipping.", "System", True, None)
+                    with lock:
+                        event_queue.task_done()
+                    continue
 
-            if flash_locks[port].locked():                  # If this port is already being flashed, skip
-                print_log.pL("Flash", "Error", "Flash already in progress on {port}, skipping.", "System", True, None)
-                event_queue.task_done()
-                continue
+                ino_path = code_path / pathlib.Path(script_name)
+                if not ino_path.exists():
+                    print_log.pL("Flash", "Error", f"Script {script_name} not found", "System", True, None)
+                    with lock:
+                        event_queue.task_done()
+                    continue
 
-            ino_path = code_path / pathlib.Path(script_name)
-            if not ino_path.exists():
-                print(f"[!] Script not found: {ino_path}")
-                event_queue.task_done()
-                continue
+                with flash_locks[port]:
+                    if dcs_flash_utils.compile_sketch(ino_path, fqbn):
+                        dcs_flash_utils.upload_sketch(ino_path, fqbn, port)
+                    else:
+                        print_log.pL("Flash", "Event", f"Skipping upload for {port} due to compile failure.", "System", True, None)
 
-            with flash_locks[port]:
-                dcs_flash_utils.compile_sketch(ino_path, fqbn)                        # pass path, not code
-                dcs_flash_utils.upload_sketch(ino_path, fqbn, port)                   # pass path, not code
-
-            event_queue.task_done()
+                with lock:
+                    event_queue.task_done()
 
     return

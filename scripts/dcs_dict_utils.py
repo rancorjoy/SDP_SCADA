@@ -8,9 +8,21 @@ import json     # JSON File Management
 import shutil   # Shell Utilities (High Level File Operations)
 import argparse # Allows Console Use of Functions with Variables
 import pickle   # Allows Dictionary to be saved to JSON
+import textwrap # Allows Arduino C++ code blocks to be dedented
 
 from . import dcs_script_utils
 from . import print_log
+
+# Empty Arduino code for initial flashing event(s)
+def_code = textwrap.dedent(f"""                    
+            void setup() {{
+            // put your setup code here, to run once:
+            }}
+
+            void loop() {{
+            // put your main code here, to run repeatedly:
+            }}
+            """)
 
 # Initialize dcs folder inside persistent data path
 def init_dcs_path(data_path):
@@ -119,7 +131,8 @@ def uno_pin_map():
     pin_dict = {}
 
     for i in range(14):
-      pin_dict[f"DP{i}"] = get_pin(f"DP{i}", False, False, False, None)
+      if i > 1:         # Exclude digital pins 0 and 1 as these are needed by the thread worker!
+        pin_dict[f"DP{i}"] = get_pin(f"DP{i}", False, False, False, None)
     
     for i in [3, 5, 6, 9, 10, 11]:
           pin_dict[f"DP{i}"]["pwm_capable"] = True                
@@ -130,13 +143,15 @@ def uno_pin_map():
     for i in range(6):
         pin_dict[f"AP{i}"] = get_pin(f"AP{i}", False, True, False, None)
           
-    pin_dict["DP0"]["note"] = "RX - reserved for serial"
-    pin_dict["DP1"]["note"] = "TX - reserved for serial"
+    #pin_dict["DP0"]["note"] = "RX - reserved for serial"   # Exclude digital pins 0 and 1 as these are needed by the thread worker!
+    #pin_dict["DP1"]["note"] = "TX - reserved for serial"
     pin_dict["DP13"]["note"] = "built-in LED"
     pin_dict["AP4"]["note"] = "SDA - reserved if using I2C"
     pin_dict["AP5"]["note"] = "SCL - reserved if using I2C"
 
     return pin_dict
+
+
 
 # Returns Arduino UNO Interrupt Map
 def uno_int_map():
@@ -155,21 +170,53 @@ def uno_int_map():
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer0": {
-            "ISR_name": "ISR_Timer0",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer0_OVF": {
+            "ISR_name": "TIMER0_OVF_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer1": {
-            "ISR_name": "ISR_Timer1",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer0_COMPA": {
+            "ISR_name": "TIMER0_COMPA_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer2": {
-            "ISR_name": "ISR_Timer2",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer0_COMPB": {
+            "ISR_name": "TIMER0_COMPB_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer1_OVF": {
+            "ISR_name": "TIMER1_OVF_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer1_COMPA": {
+            "ISR_name": "TIMER1_COMPA_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer1_COMPB": {
+            "ISR_name": "TIMER1_COMPB_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer1_CAPT": {
+            "ISR_name": "TIMER1_CAPT_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2_OVF": {
+            "ISR_name": "TIMER2_OVF_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2_COMPA": {
+            "ISR_name": "TIMER2_COMPA_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2_COMPB": {
+            "ISR_name": "TIMER2_COMPB_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
@@ -181,7 +228,8 @@ def mega_pin_map():
     pin_dict = {}
 
     for i in range(54):
-      pin_dict[f"DP{i}"] = get_pin(f"DP{i}", False, False, False, None)
+      if i > 1:             # Exclude digital pins 0 and 1 as these are needed by the thread worker!
+        pin_dict[f"DP{i}"] = get_pin(f"DP{i}", False, False, False, None)
     
     for i in range(2, 14):
             pin_dict[f"DP{i}"]["pwm_capable"] = True 
@@ -195,8 +243,8 @@ def mega_pin_map():
     for i in range(16):
         pin_dict[f"AP{i}"] = get_pin(f"AP{i}", False, True, False, None)
           
-    pin_dict["DP0"]["note"] = "RX0 - reserved for serial"
-    pin_dict["DP1"]["note"] = "TX0 - reserved for serial"
+    #pin_dict["DP0"]["note"] = "RX0 - reserved for serial"  # Exclude digital pins 0 and 1 as these are needed by the thread worker!
+    #pin_dict["DP1"]["note"] = "TX0 - reserved for serial"
     pin_dict["DP13"]["note"] = "built-in LED"
     pin_dict["DP14"]["note"] = "TX3 - reserved for serial"
     pin_dict["DP15"]["note"] = "RX3 - reserved for serial"
@@ -254,42 +302,136 @@ def mega_int_map():
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer0": {
-            "ISR_name": "ISR_Timer0",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer0_OVF": {
+            "ISR_name": "TIMER0_OVF_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer1": {
-            "ISR_name": "ISR_Timer1",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer0_COMPA": {
+            "ISR_name": "TIMER0_COMPA_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer2": {
-            "ISR_name": "ISR_Timer2",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer0_COMPB": {
+            "ISR_name": "TIMER0_COMPB_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer3": {
-            "ISR_name": "ISR_Timer3",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer1_OVF": {
+            "ISR_name": "TIMER1_OVF_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer4": {
-            "ISR_name": "ISR_Timer4",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer1_COMPA": {
+            "ISR_name": "TIMER1_COMPA_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer5": {
-            "ISR_name": "ISR_Timer5",
-            "mode": "OVF",          # OVF, MATCH
+        "Timer1_COMPB": {
+            "ISR_name": "TIMER1_COMPB_vect",
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
-        }
+        },
+        "Timer1_COMPC": {
+            "ISR_name": "TIMER1_COMPC_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer1_CAPT": {
+            "ISR_name": "TIMER1_CAPT_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2_OVF": {
+            "ISR_name": "TIMER2_OVF_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2_COMPA": {
+            "ISR_name": "TIMER2_COMPA_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer2_COMPB": {
+            "ISR_name": "TIMER2_COMPB_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer3_OVF": {
+            "ISR_name": "TIMER3_OVF_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer3_COMPA": {
+            "ISR_name": "TIMER3_COMPA_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer3_COMPB": {
+            "ISR_name": "TIMER3_COMPB_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer3_COMPC": {
+            "ISR_name": "TIMER3_COMPC_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer3_CAPT": {
+            "ISR_name": "TIMER3_CAPT_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer4_OVF": {
+            "ISR_name": "TIMER4_OVF_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer4_COMPA": {
+            "ISR_name": "TIMER4_COMPA_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer4_COMPB": {
+            "ISR_name": "TIMER4_COMPB_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer4_COMPC": {
+            "ISR_name": "TIMER4_COMPC_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer4_CAPT": {
+            "ISR_name": "TIMER4_CAPT_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer5_OVF": {
+            "ISR_name": "TIMER5_OVF_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer5_COMPA": {
+            "ISR_name": "TIMER5_COMPA_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer5_COMPB": {
+            "ISR_name": "TIMER5_COMPB_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer5_COMPC": {
+            "ISR_name": "TIMER5_COMPC_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
+        "Timer5_CAPT": {
+            "ISR_name": "TIMER5_CAPT_vect",
+            "enabled": False,
+            "blocks": []        # List of code blocks assigned to this ISR
+        },
     }
     return int_dict
 
@@ -409,17 +551,18 @@ def init_dcs(data_path, port, current_dict, current_dict_lock):
     "software_points": get_hardware_points(pin_map, tim_map),
     "int_config": int_map,
     "timers" : tim_map,
-    "preamble_blocks" : [], # Code blocks for different parts of the program
-    "setup_blocks" : [],
+    "setup_blocks" : [],                # Code blocks for different parts of the program
     "loop_blocks" : []
     }
 
+    # A copy of the Arduino Default code so the controller can be flashed initially
+    
     try:                                                                        # Try to write this JSON as a file
         file_path = data_path / "dcs_info" / f"{controller_name}.json"          # File path to dcs JSON files
         with open(file_path, 'w') as dcs_file:                                  # Open the file path and write
             json.dump(dcs_dict, dcs_file, indent=4)                             # JSON dump the dictionary for this controller
         
-        dcs_script_utils.create_Script(data_path, controller_name)
+        dcs_script_utils.create_Script(data_path, controller_name, def_code)
         with current_dict_lock:
             add_current_dict(current_dict, data_path, controller_name)
 
@@ -495,7 +638,7 @@ def load_dcs(data_path, port, current_dcs, current_dict, current_dict_lock):
 
             script_path = data_path / "dcs_scripts" / current_name
             if not script_path.exists():
-                dcs_script_utils.create_Script(data_path, current_name)
+                dcs_script_utils.create_Script(data_path, current_name, def_code)
 
             with current_dict_lock:
                 add_current_dict(current_dict, data_path, current_name)
@@ -528,9 +671,9 @@ def rename_dcs(data_path, old_name, new_name, current_dcs, current_dict, current
           print_log.pL("System", "Error", f"Could not find port for '{old_name}'.", "System", True, None)            
           return False                                                        # The controller's name was not changed
         
-        was_loaded = False                                                    # Was the controller loaded?
-        if old_name in current_dcs:                                           # If the controller was loaded
-            unload_dcs(data_path, port, current_dcs);                         # Unload the old (defunct) data-structure
+        was_loaded = old_name in current_dcs
+        if was_loaded:
+            unload_dcs(data_path, port, current_dcs)                          # Unload the old (defunct) data-structure
 
         file_path.rename(new_path)                                            # Rename the old file to the new files
         with open(new_path, 'r') as f:                                        # Open the renamed file as f (read only)
@@ -539,11 +682,10 @@ def rename_dcs(data_path, old_name, new_name, current_dcs, current_dict, current
         with open(new_path, 'w') as f:                                        # With the new file open (write) as f
           json.dump(dcs, f, indent=4)                                         # Write dcs to f, this ensures the file updates
 
-        if was_loaded:                                                        # If the controller was loaded when the name was changed...
-            load_dcs(data_path, port, current_dcs);                           # Load in the new data-structure
-
-        dcs_script_utils.create_Script(data_path, old_name)                
         dcs_script_utils.rename_Script(data_path, old_name, new_name)
+
+        if was_loaded:                                                                  # If the controller was loaded when the name was changed...
+            load_dcs(data_path, port, current_dcs, current_dict, current_dict_lock);    # Load in the new data-structure
 
         with current_dict_lock:
             current_dict[new_name] = current_dict[old_name]                   # Copy data to new key
@@ -564,6 +706,20 @@ def get_pin_from_name(pin_dict, name):
 
 
 # === Functions to managed loaded and saved JSON files
+
+# Get a saved JSON file from directory
+def get_dict(data_path, name):
+    
+    json_file = pathlib.Path(data_path) / "dcs_info" / f"{name}.json"
+    
+    if not json_file.exists():
+        print_log.pL("System", "Error", f"JSON file '{name}' not found.", "System", True, None)
+        return None
+    
+    with json_file.open("r", encoding="utf-8") as f:
+        return json.load(f)
+    
+    return None
 
 # Returns the current dictionary that contains all JSON files in the info folder
 def init_current_dict(data_path):
@@ -980,7 +1136,7 @@ def list_points(pin_dict, point_dict, tim_dict):
 
 # === Timer Setting Functions ===
 
-def set_timer_enable(tim_dict, timer_name, value):
+def set_timer_enable(tim_dict, timer_name, value, int_dict):
     if not isinstance(value, bool):
         return False
 
@@ -989,20 +1145,62 @@ def set_timer_enable(tim_dict, timer_name, value):
     
     timer = tim_dict[timer_name]
     timer["enabled"] = value
+
+    if value:
+        set_timer_ints(tim_dict, timer_name, timer["mode"], int_dict)   # ensure the interrupts get updated when the clock is enabled
+    else: 
+        for key in int_dict:
+            if key.startswith(timer_name):
+                int_dict[key]["enabled"] = False                        # Disable vectors if timer is disabled (so they do not clutter code space)
+
     return True
 
 # Allows timer mode to be changed
-def set_timer_mode(tim_dict, timer_name, mode):
+# 8-bit: OVF, CTC, FAST_PWM, PHASE_CORRECT_PWM ; 16-bit: INPUT_CAPTURE
+def set_timer_mode(tim_dict, timer_name, mode, int_dict):
     if timer_name not in tim_dict:
         return False
     
+    if tim_dict[timer_name]["enabled"] == False:
+        return False
+
     timer = tim_dict[timer_name]
     
     if mode not in timer["valid_modes"]:
         return False
     
     timer["mode"] = mode
+    set_timer_ints(tim_dict, timer_name, mode, int_dict)
     return True
+
+# Manages enable/disable state for timer interrupts
+def set_timer_ints(tim_dict, timer_name, mode, int_dict):
+    if mode == "OVF":
+        for key in int_dict:
+            if key == f"{timer_name}_OVF":
+                int_dict[key]["enabled"] = True
+            elif key.startswith(f"{timer_name}_COMP"):
+                int_dict[key]["enabled"] = False
+            elif key.startswith(f"{timer_name}_CAPT"):
+                int_dict[key]["enabled"] = False
+    elif mode == "CTC":
+        for key in int_dict:
+            if key == f"{timer_name}_OVF":
+                int_dict[key]["enabled"] = False
+            elif key.startswith(f"{timer_name}_COMP"):
+                int_dict[key]["enabled"] = True
+            elif key.startswith(f"{timer_name}_CAPT"):
+                int_dict[key]["enabled"] = False
+    elif mode == "INPUT_CAPTURE":
+        for key in int_dict:
+            if key == f"{timer_name}_CAPT":
+                int_dict[key]["enabled"] = True
+            elif key.startswith(timer_name):
+                int_dict[key]["enabled"] = False
+    else:  # FAST_PWM, PHASE_CORRECT_PWM
+        for key in int_dict:
+            if key.startswith(timer_name):
+                int_dict[key]["enabled"] = True
 
 
 # === Interrupt Setting Functions ===
@@ -1014,8 +1212,9 @@ def set_int_enable(int_config, int_name, value):
     if int_name not in int_config:
         return False
     
-    int_config[int_name]["enabled"] = value
-    return True
+    if int_name.startswith("DP"):                   # Only change interrupt enable if its a pin triggered interrupt!
+        int_config[int_name]["enabled"] = value
+        return True
 
 def set_int_mode(int_config, int_name, mode):
     if int_name not in int_config:
@@ -1023,16 +1222,13 @@ def set_int_mode(int_config, int_name, mode):
     
     intr = int_config[int_name]
 
-    if int_name.startswith("DP"):   # If the interrupt is from a digital pin
+    if int_name.startswith("DP"):                           # If the interrupt is from a digital pin
         if mode in ["LOW", "CHANGE", "RISING", "FALLING"]:
             intr["enabled"] = mode
             return True
-        elif mode == "HIGH" and intr["high"]:    # Check if the board supports this interrupt mode
+        elif mode == "HIGH" and intr["high"]:               # Check if the board supports this interrupt mode
             intr["enabled"] = mode
             return True
 
-    elif int_name.startswith("Timer"):  # If the interrupt is from a timer
-        if mode in ["OVF", "MATCH"]:
-            intr["enabled"] = mode
-            return True
+    return False
 
