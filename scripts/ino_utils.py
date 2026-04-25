@@ -13,6 +13,9 @@ import textwrap # Allows Arduino C++ code blocks to be dedented
 from . import dcs_dict_utils
 from . import print_log
 
+# Get code block equivelent (can be used anywhere)
+#def get
+
 # Get interrupt function for an interrupt (ISR)
 # Interrupt Modes: LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
 def get_int_func(int_name, cont):
@@ -62,8 +65,13 @@ def get_ISRs(cont):
 # Get a block of code to define a single software point at the top of the script
 def get_var(cont, point_name):
     point = cont["software_points"][point_name]
-    code_str = textwrap.dedent(f"Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false}};\n")
-    return code_str
+
+    if point["type"] == "int" and point["int_type"] != "":
+        code_str = textwrap.dedent(f"Point<{point["int_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false}};\n")
+        return code_str
+    else:
+        code_str = textwrap.dedent(f"Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false}};\n")
+        return code_str
 
 # Get a block of Arduino code (at the top) that adds all software points
 def get_vars(cont):
@@ -125,6 +133,7 @@ def get_timer_config(timer_name, cont):
         code_str += f"TCCR{timer_num}A = 0; TCCR{timer_num}B = 0; TCNT{timer_num} = 0;\n"
     else:                       # The timer is 16-bit
         code_str += f"TCCR{timer_num}A = 0; TCCR{timer_num}B = 0; TCCR{timer_num}C = 0; TCNT{timer_num} = 0;\n"
+
     code_str += f"TCNT{timer_num}  = (uint{timer_size}_t)getPoint(Timer{timer_num}_Preload);\n"
 
     for ch in timer["channels"]:
@@ -178,6 +187,11 @@ def get_timer_configs(cont_name, cont):
 
     return code_str
 
+
+
+
+
+
 def get_code(data_path, cont_name):
     cont = dcs_dict_utils.get_dict(data_path, cont_name)
 
@@ -198,6 +212,7 @@ struct Point {{
 // ISR methods - do not touch
 {get_ISRs(cont)}
 
+
 // SCADA required methods - do not touch
 
 // Get the current value of a point based on hold_en
@@ -207,6 +222,7 @@ T getPoint(const volatile Point<T>& p) {{
 }}
 
 void setup() {{
+cli(); // Disable interrupts
 
 {get_pin_modes(cont)}
 
@@ -214,6 +230,7 @@ void setup() {{
 {get_int_funcs(cont)}
 
 {get_timer_configs(cont_name, cont)}
+sei(); // Re-enable interrupts
 }}
 
 void loop() {{

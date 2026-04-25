@@ -85,8 +85,7 @@ def get_software_point():   # The defualt software point is always the same
         "min" : 0,          # minimum value (not available for bool)
         "max" : 1,          # maximum value (not available for bool)
         "hardware" : False, # is this pin tied to hardware? (cannot be removed)
-        "volatile" : False, # is the variable volatile? (will be set if used in ISR)
-        "constant" : False  # has this point been determined as a constant?
+        "int_type" : ""     # This specifies what kind of int an int is (eg long int)
     }
 
 # Returns a list of software points that correlate with each pin
@@ -109,12 +108,14 @@ def get_hardware_points(pin_map, tim_map):
         new_point["type"] = "int"
         new_point["default"] = 0
         new_point["hardware"] = True
+        new_point["int_type"] = "uint8_t"
         point_map[f"{key}_Prescaler"] = new_point
 
         new_point = get_software_point()        # preloaded value
         new_point["type"] = "int"
         new_point["default"] = 0
         new_point["hardware"] = True
+        new_point["int_type"] = f"uint{tim_map[key]["size_bits"]}_t"
         point_map[f"{key}_Preload"] = new_point
 
         for k in val["channels"]:
@@ -122,6 +123,7 @@ def get_hardware_points(pin_map, tim_map):
             new_point["type"] = "int"
             new_point["default"] = 0
             new_point["hardware"] = True
+            new_point["int_type"] = f"uint{tim_map[key]["size_bits"]}_t"
             point_map[f"{key}_CH{k}_Comp"] = new_point
 
     return point_map                # This map is populated with all needed hardware points
@@ -170,21 +172,21 @@ def uno_int_map():
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer0_OVF": {
-            "ISR_name": "TIMER0_OVF_vect",
-            "enabled": False,
-            "blocks": []        # List of code blocks assigned to this ISR
-        },
-        "Timer0_COMPA": {
-            "ISR_name": "TIMER0_COMPA_vect",
-            "enabled": False,
-            "blocks": []        # List of code blocks assigned to this ISR
-        },
-        "Timer0_COMPB": {
-            "ISR_name": "TIMER0_COMPB_vect",
-            "enabled": False,
-            "blocks": []        # List of code blocks assigned to this ISR
-        },
+        #"Timer0_OVF": {
+        #    "ISR_name": "TIMER0_OVF_vect",
+        #    "enabled": False,
+        #    "blocks": []        # List of code blocks assigned to this ISR
+        #},
+        #"Timer0_COMPA": {
+        #    "ISR_name": "TIMER0_COMPA_vect",
+        #    "enabled": False,
+        #    "blocks": []        # List of code blocks assigned to this ISR
+        #},
+        #"Timer0_COMPB": {
+        #    "ISR_name": "TIMER0_COMPB_vect",
+        #    "enabled": False,
+        #    "blocks": []        # List of code blocks assigned to this ISR
+        #},
         "Timer1_OVF": {
             "ISR_name": "TIMER1_OVF_vect",
             "enabled": False,
@@ -302,21 +304,21 @@ def mega_int_map():
             "enabled": False,
             "blocks": []        # List of code blocks assigned to this ISR
         },
-        "Timer0_OVF": {
-            "ISR_name": "TIMER0_OVF_vect",
-            "enabled": False,
-            "blocks": []        # List of code blocks assigned to this ISR
-        },
-        "Timer0_COMPA": {
-            "ISR_name": "TIMER0_COMPA_vect",
-            "enabled": False,
-            "blocks": []        # List of code blocks assigned to this ISR
-        },
-        "Timer0_COMPB": {
-            "ISR_name": "TIMER0_COMPB_vect",
-            "enabled": False,
-            "blocks": []        # List of code blocks assigned to this ISR
-        },
+        #"Timer0_OVF": {
+        #    "ISR_name": "TIMER0_OVF_vect",
+        #    "enabled": False,
+        #    "blocks": []        # List of code blocks assigned to this ISR
+        #},
+        #"Timer0_COMPA": {
+        #    "ISR_name": "TIMER0_COMPA_vect",
+        #    "enabled": False,
+        #    "blocks": []        # List of code blocks assigned to this ISR
+        #},
+        #"Timer0_COMPB": {
+        #    "ISR_name": "TIMER0_COMPB_vect",
+        #    "enabled": False,
+        #    "blocks": []        # List of code blocks assigned to this ISR
+        #},
         "Timer1_OVF": {
             "ISR_name": "TIMER1_OVF_vect",
             "enabled": False,
@@ -455,9 +457,9 @@ def get_timer(timer_name, size_bits, channels, valid_modes, note=None):
 # Returns the timer dictionary for an uno
 def uno_timer_map():
     return {
-        "Timer0": get_timer("Timer0", 8,  ["A", "B"],
-                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
-                    note="Used by millis()/delay() - modify with caution"),
+        #"Timer0": get_timer("Timer0", 8,  ["A", "B"],
+        #            ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
+        #            note="Used by millis()/delay() - modify with caution"),
         "Timer1": get_timer("Timer1", 16, ["A", "B"],
                     ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM", "INPUT_CAPTURE"],
                     note="16-bit - good for precise timing"),
@@ -469,9 +471,9 @@ def uno_timer_map():
 # Returns the timer dictionary for a mega
 def mega_timer_map():
     return {
-        "Timer0": get_timer("Timer0", 8,  ["A", "B"],
-                    ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
-                    note="Used by millis()/delay() — modify with caution"),
+        #"Timer0": get_timer("Timer0", 8,  ["A", "B"],
+        #            ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM"],
+        #            note="Used by millis()/delay() - modify with caution"),
         "Timer1": get_timer("Timer1", 16, ["A", "B", "C"],
                     ["OVF", "CTC", "FAST_PWM", "PHASE_CORRECT_PWM", "INPUT_CAPTURE"],
                     note="16-bit"),
@@ -920,6 +922,112 @@ def change_point_name(pin_dict, point_dict, old_name, new_name):
         return True
     return False
 
+# Change the int type of a point
+def set_point_int_type(point_dict, point_name, str):
+    if point_dict[point_name]["type"] == "int":         # This can only be set if the point is an integer
+        if is_int_type(str):
+            point_dict[point_name]["int_type"] = str
+            return True
+    return False
+
+# Display a formatted string of all int types (for the help menu)
+def show_int_types():
+    return f"""
+    An Extremely Incomplete list of C++ Integer Types (for reference)
+
+    Standard Int Types (Signed and Unsigned):
+    int
+    signed / signed int
+    unsigned / unsigned int
+    short / short int
+    long / long int
+    long long / long long int
+
+    Fixed-Width Int Types:
+    int8_t / uint8_t (byte)
+    int16_t / uint16_t (word)
+    int32_t / uint32_t
+    int64_t / uint64_t
+
+    Special and Utility Int Types:
+    char / wchar_t
+    size_t
+    ptrdiff_t
+    """
+
+# Determines if a string (eg "uint8_t") is a valid int type
+def is_int_type(s):
+    tokens = s.strip().split()
+
+    if not tokens:
+        return False
+
+    # Single-token special / typedef types
+    single_types = {
+        "int", "char", "wchar_t",
+        "int8_t", "int16_t", "int32_t", "int64_t",
+        "uint8_t", "uint16_t", "uint32_t", "uint64_t",
+        "ptrdiff_t", "size_t",
+        "byte", "word"
+    }
+
+    if len(tokens) == 1:
+        return tokens[0] in single_types or tokens[0] in {"signed", "unsigned"}
+
+    # Allowed specifiers
+    sign = {"signed", "unsigned"}
+    size = {"short", "long"}
+    base = {"int"}
+
+    sign_count = 0
+    short_count = 0
+    long_count = 0
+    int_count = 0
+
+    for t in tokens:
+        if t in sign:
+            sign_count += 1
+        elif t == "short":
+            short_count += 1
+        elif t == "long":
+            long_count += 1
+        elif t == "int":
+            int_count += 1
+        else:
+            return False  # unknown token
+
+    # Rules based on C++ specifiers:
+
+    # Only one sign allowed
+    if sign_count > 1:
+        return False
+
+    # Can't mix short and long
+    if short_count > 0 and long_count > 0:
+        return False
+
+    # short appears at most once
+    if short_count > 1:
+        return False
+
+    # long can appear once or twice (long long)
+    if long_count > 2:
+        return False
+
+    # If long appears twice, it's "long long"
+    if long_count == 2 and short_count > 0:
+        return False
+
+    # int can appear at most once
+    if int_count > 1:
+        return False
+
+    # At least one meaningful type specifier must exist
+    if short_count == 0 and long_count == 0 and int_count == 0:
+        return False
+
+    return True
+
 def add_point(point_dict, name):
     if name in point_dict:  # dict membership checks keys directly
         return False
@@ -946,6 +1054,7 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
         if type in ["int", "float", "bool"]:
             point_dict[point]["type"] = type
             if type == "bool":
+                point_dict[point]["int_type"] = {}
                 if pin_dict[point]["analog_set"]:
                     return False
                 point_dict[point]["min_en"] = False
@@ -961,6 +1070,7 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
                 point_dict[point]["min"] = int(point_dict[point]["min"])
                 point_dict[point]["max"] = int(point_dict[point]["max"])
             if type == "float":
+                point_dict[point]["int_type"] = {}
                 if pin_dict[point]["analog_set"]:
                     return False
                 point_dict[point]["hold_val"] = float(point_dict[point]["hold_val"])

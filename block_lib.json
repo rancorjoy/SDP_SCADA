@@ -1,0 +1,13 @@
+{
+    "assign_blk": {
+        "input_points": {
+            "left": "num",
+            "right": "num"
+        },
+        "output_points": {},
+        "condition": null,
+        "type": "Arithmetic",
+        "dep_list": [],
+        "code_str": "\n[[left]] = [[right]];\n"
+    }
+}

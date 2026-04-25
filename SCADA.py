@@ -19,6 +19,7 @@ from scripts import dcs_flash_utils
 from scripts import flask_thread
 from scripts import flash_thread
 from scripts import serial_thread
+from scripts import create_block_lib
 from scripts import print_log
 from scripts.current_state import CurrentState
 
@@ -31,6 +32,7 @@ def main():                                                         # Main Metho
     path = data_path_utils.get_data_path()          # Get Current Data Path
     is_info = dcs_dict_utils.init_dcs_path(path)    # Initialize DCS Info Path
     is_sp = dcs_flash_utils.init_code_path(path)    # Initialize DCS Code Path
+    is_bl = create_block_lib.initialize_block_lib() # Initialize Code Block Library in main path (persistent)
 
     serial_queue = queue.Queue()                            # Create an event queue for the serial monitoring thread
     flash_queue = queue.Queue()                             # Create an event queue for flashing DCS controllers
@@ -45,7 +47,7 @@ def main():                                                         # Main Metho
     devices = {}                                            # Array for current devices (USB connections)
     previous_devices = {}                                   # Array for previous devices (USB connections)
 
-    if is_path:                                                 # If the data path is initialized (if not, nothing can/should run)
+    if is_path and is_bl:                                       # If the data path is initialized and code blocks are initialized (if not, nothing can/should run)
                                                                 # Create a thread that runs serial_thread.serial_loop
                                                                 # Pass the thread the event queue so results can be used in main thread
         monitor_thread = threading.Thread(target=serial_thread.serial_loop, args=(serial_queue,is_info))
@@ -84,7 +86,7 @@ def main():                                                         # Main Metho
                     for device in devices.values():
                         if device not in previous_devices.values():
                             is_saved = dcs_dict_utils.init_dcs(path, device, current_dict, current_dict_lock)
-                            
+
                             if is_saved:
                                 is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs, current_dict, current_dict_lock)
 
