@@ -68,7 +68,7 @@ def get_pin(pin_name, is_pwm, is_analog, is_int, note):
         "analog_capable": is_analog,
         "interrupt_capable": is_int,
         "analog_set" : False,                   # Is the pin currently analog?
-        "pwm_set" : None,                       # Give the PWM value a software point as its value
+        "pwm_set" : False,                      # Output PWM from software point?
         "int_set" : False,                      # Is the interrupt being used?
         "note": note
     }
@@ -850,23 +850,26 @@ def change_pin_dir(pin_dict, pin, dir):
         return True
     return False
 
-def change_pin_pwm(pin_dict, pin, point_dict, point):
-    if point == None or point == "None":                # If PWM is being disabled (point is None)
-        pin_dict[pin]["pwm_set"] = None                 # Remove the PWM point and don't replace it
-        return True
+def change_pin_pwm(pin_dict, pin, point_dict, enable):
     if not pin_dict[pin]["pwm_capable"]:
         return False
-    if point is not None:
-        if point not in point_dict:
-            return False
+
+    if enable:
         change_pin_dir(pin_dict, pin, "OUTPUT")
-        pin_dict[pin]["min_en"] = True
-        pin_dict[pin]["max_en"] = True
-        pin_dict[pin]["max"] = 0
-        pin_dict[pin]["max"] = 255
-        pin_dict[pin]["pwm_set"] = {point: point_dict[point]}
+        change_point_type(pin_dict, point_dict, pin, "int", True)
+        point_dict[pin]["min_en"] = True
+        point_dict[pin]["max_en"] = True
+        point_dict[pin]["max"] = 0
+        point_dict[pin]["max"] = 255
+        point_dict[pin]["pwm_set"] = True
     else:
-        pin_dict[pin]["pwm_set"] = None
+        change_pin_dir(pin_dict, pin, "INPUT")
+        change_point_type(pin_dict, point_dict, pin, "bool", True)
+        point_dict[pin]["min_en"] = False
+        point_dict[pin]["max_en"] = False
+        point_dict[pin]["max"] = 0
+        point_dict[pin]["max"] = 1
+        point_dict[pin]["pwm_set"] = False
     return True
 
 def change_pin_int(pin_dict, pin, int):
@@ -916,9 +919,6 @@ def change_point_name(pin_dict, point_dict, old_name, new_name):
             return False
         point_dict[new_name] = point_dict[old_name]
         del point_dict[old_name]
-        for key, val in pin_dict.items():
-            if val["pwm_set"] is not None and old_name in val["pwm_set"]:
-                val["pwm_set"] = {new_name: point_dict[new_name]}
         return True
     return False
 
@@ -1039,9 +1039,6 @@ def rem_point(pin_dict, point_dict, name):
         return False
     if point_dict[name]["hardware"] == False: #Stops key deletion if key is hardware, disabled pins will not print to SQL but will have points!
         del point_dict[name]
-        for key, val in pin_dict.items():
-            if val["pwm_set"] is not None and name in val["pwm_set"]:
-                val["pwm_set"] = None
         return True
     return False
 

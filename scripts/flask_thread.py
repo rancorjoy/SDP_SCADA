@@ -21,6 +21,7 @@ from . import scan_serial                       # Import the scan_serial script 
 from . import dcs_flash_utils                   # Import the dcs_flash_utils script
 from . import dcs_script_utils
 from . import ino_utils
+from . import code_block_utils
 from . import print_log                
 from scripts.current_state import CurrentState
 
@@ -45,8 +46,10 @@ COMMANDS = {
     "unload_dcs":    (1,   1,   "unload_dcs <controller name>"),
     "load_dcs":      (1,   1,   "load_dcs <controller name>"),
     "delete_dcs":    (1,   1,   "delete_dcs <controller name>"),
+    
     "save_dcs":      (1,   1,   "save_dcs <controller name>"),
     "reset_dcs":     (1,   1,   "reset_dcs <controller name>"),
+    "validate_dcs":  (1,   1,   "validate_dcs <controller name>"),
     "compile_dcs":   (1,   1,   "compile_dcs <controller name>"),
     "program_dcs":   (1,   1,   "program_dcs <controller name>"),
 
@@ -55,7 +58,7 @@ COMMANDS = {
     "edit_pin_name":    (3,   3,    "edit_pin_name <controller name> <old pin name> <new pin name>"),
     "edit_pin_type":    (3,   3,    "edit_pin_type <controller name> <pin name> <bool> (analog?)"),
     "edit_pin_dir":     (3,   3,    "edit_pin_dir <controller name> <pin name> <type> (INPUT, INPUT_PULLUP, OUTPUT)"),
-    "edit_pin_pwm":     (3,   3,    "edit_pin_pwm <controller name> <pin name> <point name>"),
+    "edit_pin_pwm":     (3,   3,    "edit_pin_pwm <controller name> <pin name> <bool> (enable PWM?)"),
     "edit_pin_int":     (3,   3,    "edit_pin_int <controller name> <pin name> <bool> (interrupt enabled?)"),
 
     "list_dcs_points":          (1,   1,    "list_dcs_points <controller name>"),
@@ -77,6 +80,24 @@ COMMANDS = {
     "list_dcs_interrupts":      (1,   1,    "list_dcs_interrupts <controller name>"),
     "edit_int_enable":          (3,   3,    "edit_int_enable <controller name> <point name> <value> (enabled?)"),
     "edit_int_mode":            (3,   3,    "edit_int_mode <controller name> <point name> <mode> (Pin: LOW, CHANGE, RISING, FALLING, HIGH; Timer: OVF, MATCH)"),
+
+    "list_dcs_blk_lists" :      (1,   1,    "list_dcs_blk_lists <controller name>"),
+    "add_block_top":            (3,   3,    "add_block_top <controller name> <list name> <block type>"),
+    "add_block_bottom":         (3,   3,    "add_block_bottom <controller name> <list name> <block type>"),
+    "add_block_index":          (4,   4,    "add_block_index <controller name> <list name> <block type> <index>"),
+    "move_block_up" :           (3,   3,    "move_block_up <controller name> <list name> <index>"),
+    "move_block_down" :         (3,   3,    "move_block_down <controller name> <list name> <index>"),
+    "swap_blocks" :             (4,   4,    "swap_blocks <controller name> <list name> <index1> <index2>"),
+    "remove_block" :            (3,   3,    "remove_block <controller name> <list name> <index>"),
+
+    "add_input_point" :         (5,   5,    "add_input_point <controller name> <list name> <index> <key> <point>"),
+    "rem_input_point" :         (4,   4,    "rem_input_point <controller name> <list name> <index> <key>"),
+    "add_output_point" :        (5,   5,    "add_output_point <controller name> <list name> <index> <key> <point>"),
+    "rem_output_point" :        (4,   4,    "rem_output_point <controller name> <list name> <index> <key>"),
+
+    "list_block_types" :        (0,   0,    "list_block_types"),
+    "current_block_config" :    (1,   1,    "current_block_config <controller name>"),
+    "saved_block_config" :      (1,   1,    "saved_block_config <controller name>"),
 }
 
 def get_path():                                                 # Derives the data path when a function needs it from Pointer.json
@@ -140,9 +161,12 @@ def get_help():
     unload_dcs :   \t Remove a DCS from the current list <controller name>
     load_dcs :     \t Add a DCS from to current list (from file) <controller name>
     delete_dcs :   \t Delete a DCS Controller <controller name>
+
+    Controlller Program Pipeline Commands:
     save_dcs :     \t Save Changes to a DCS Controller <controller name>
     reset_dcs :    \t Undo Changes to a DCS Controller, reload from saved file <controller name>
-    compile_dcs :  \t Regenerate code for a DCS Controller based on saved state <controller name>
+    compile_dcs :  \t Validate controller configuration based on coding rules <controller name>
+    compile_dcs :  \t Regenerate code for a DCS Controller based on saved state if valid <controller name>
     program_dcs :  \t Reprogram a DCS Controller based on generated code <controller name>
 
     Controller Pin Commands:
@@ -151,7 +175,7 @@ def get_help():
     edit_pin_name :     \t Change the name of a pin <controller name> <pin old name> <pin new name>
     edit_pin_type :     \t Change the analog behavior of a pin <controller name> <pin name> <bool> (analog?)
     edit_pin_dir :      \t Change the direction of a pin <controller name> <pin name> <type> (INPUT, INPUT_PULLUP, OUTPUT)
-    edit_pin_pwm :      \t Tie the pin to output PWM from a software point <controller name> <pin name> <point name> (None to disable PWM)
+    edit_pin_pwm :      \t Set a pin to output PWM (will set pin as OUTPUT, int) <controller name> <pin name> <bool> (enable PWM?)
     edit_pin_int:       \t Enable or Disable the ISR for this pin <controller name> <pin name> <bool> (enable?)
 
     Controller Point Commands:
@@ -175,6 +199,27 @@ def get_help():
     list_dcs_interrupt :    \t List all interrupts on a controller <controller name>
     edit_int_enable :       \t Enable or Disable an interrupt on a controller <controller name> <point name> <value> (enabled?)
     edit_int_mode :         \t Change the mode of an interrupt on a controller <controller name> <point name> <mode> (LOW, CHANGE, RISING, FALLING, HIGH)
+
+    Code Block Commands:
+    list_dcs_blk_lists :      \t List all current block lists for a controller <controller name>
+    add_block_top :           \t Add a code block to top of a block list <controller name> <list name> <block type>
+    add_block_bottom :        \t Add a code block to bottom of a block list <controller name> <list name> <block type>
+    add_block_index :         \t Add a code block to index position of block list <controller name> <list name> <block type> <index>
+    move_block_up :           \t Move a block up in a block list <controller name> <list name> <index>
+    move_block_down :         \t Move a block down in a block list <controller name> <list name> <index>
+    swap_blocks :             \t Swap two blocks in a block list <controller name> <list name> <index1> <index2>
+    remove_block :            \t Remove a block from a block list <controller name> <list name> <index>
+
+    Code Block Point Commands:
+    add_input_point :         \t Add a point to block input (key) <controller name> <list name> <index> <key> <point>
+    rem_input_point :         \t Remove a point from block input (key) <controller name> <list name> <index> <key>
+    add_output_point :        \t Add a point to block output (key) <controller name> <list name> <index> <key> <point>
+    rem_output_point :        \t Remove a point from block output (key) <controller name> <list name> <index> <key>
+
+    Code Block Utility Commands:
+    list_block_types :        \t List all available block types and details
+    current_block_config :    \t See block order in each list (current state) <controller name>
+    saved_block_config :      \t See block order in each list (saved state) <controller name>
     """
     return help_text
 
@@ -189,6 +234,7 @@ def flask_loop(CurrentState):                               # Method is ran in e
     current_dict_lock = CurrentState.current_dict_lock
     flash_queue = CurrentState.flash_queue
     flash_lock = CurrentState.flash_lock
+    block_lib = CurrentState.block_lib
 
     app = flask.Flask(__name__)                             # Runs Flask Thread for Command Inputs
 
@@ -221,9 +267,12 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "load_dcs":   return {"ok": True, "result": dcs_dict_utils.load_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list,  current_dict, current_dict_lock)}
             if cmd == "unload_dcs": return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
             if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list,  current_dict, current_dict_lock)}
+            
+            
             if cmd == "save_dcs":   return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
             if cmd == "reset_dcs":      return {"ok": True, "result": dcs_dict_utils.reset_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
-            if cmd == "compile_dcs":    return {"ok": True, "result": dcs_script_utils.create_Script(get_path(), args[0], ino_utils.get_code(get_path(), args[0]))}
+            if cmd == "validate_dcs":         return {"ok": True, "message": code_block_utils.print_validation(get_path(), args[0], block_lib)}
+            if cmd == "compile_dcs":    return {"ok": True, "result": code_block_utils.check_compile(get_path(), args[0])}
             if cmd == "program_dcs":    return {"ok": True, "result": dcs_flash_utils.program_controller(dcs_list, args[0], flash_queue, flash_lock)}
             
 
@@ -232,7 +281,7 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "edit_pin_name":      return {"ok": True, "result": dcs_dict_utils.change_pin_name(current_dict[args[0]]["pin_config"],args[1], args[2])}
             if cmd == "edit_pin_type":      return {"ok": True, "result": dcs_dict_utils.change_pin_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
             if cmd == "edit_pin_dir":       return {"ok": True, "result": dcs_dict_utils.change_pin_dir(current_dict[args[0]]["pin_config"],args[1], args[2])}
-            if cmd == "edit_pin_pwm":       return {"ok": True, "result": dcs_dict_utils.change_pin_pwm(current_dict[args[0]]["pin_config"],args[1], current_dict[args[0]]["pin_config"], args[2])}
+            if cmd == "edit_pin_pwm":       return {"ok": True, "result": dcs_dict_utils.change_pin_pwm(current_dict[args[0]]["pin_config"],args[1], current_dict[args[0]]["software_points"], args[2])}
             if cmd == "edit_pin_int":       return {"ok": True, "result": dcs_dict_utils.change_pin_int(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]))}
 
             if cmd == "list_dcs_points":        return {"ok": True, "dict": dcs_dict_utils.list_points(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], current_dict[args[0]]["timers"])}
@@ -254,6 +303,24 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "list_dcs_interrupts":    return {"ok": True, "dict": current_dict[args[0]]["int_config"]}
             if cmd == "edit_int_enable":        return {"ok": True, "result": dcs_dict_utils.set_int_enable(current_dict[args[0]]["int_config"], args[1], eval_bool(args[2]))}
             if cmd == "edit_int_mode":          return {"ok": True, "result": dcs_dict_utils.set_int_mode(current_dict[args[0]]["int_config"], args[1], args[2])}
+
+            if cmd == "list_dcs_blk_lists":     return {"ok": True, "message": code_block_utils.display_lists(current_dict, args[0])}
+            if cmd == "add_block_top":          return {"ok": True, "result": code_block_utils.add_block_top(current_dict, args[0], args[1], args[2], block_lib)}
+            if cmd == "add_block_bottom":       return {"ok": True, "result": code_block_utils.add_block_bot(current_dict, args[0], args[1], args[2], block_lib)}
+            if cmd == "add_block_index":        return {"ok": True, "result": code_block_utils.add_block_index(current_dict, args[0], args[1], args[2], int(args[3]), block_lib)}
+            if cmd == "move_block_up":          return {"ok": True, "result": code_block_utils.block_list_move_up(current_dict, args[0], args[1], int(args[2]))}
+            if cmd == "move_block_down":        return {"ok": True, "result": code_block_utils.block_list_move_down(current_dict, args[0], args[1], int(args[2]))}
+            if cmd == "swap_blocks":            return {"ok": True, "result": code_block_utils.block_list_swap(current_dict, args[0], args[1], int(args[2]), int(args[3]))}
+            if cmd == "remove_block":           return {"ok": True, "result": code_block_utils.remove_block_index(current_dict, args[0], args[1], int(args[2]))}
+
+            if cmd == "add_input_point":        return {"ok": True, "result": code_block_utils.add_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3], current_dict[args[0]]["software_points"][args[4]])}
+            if cmd == "rem_input_point":        return {"ok": True, "result": code_block_utils.remove_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3])}
+            if cmd == "add_output_point":       return {"ok": True, "result": code_block_utils.add_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3], current_dict[args[0]]["software_points"][args[4]])}
+            if cmd == "rem_output_point":       return {"ok": True, "result": code_block_utils.remove_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3])}
+
+            if cmd == "list_block_types":     return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct
+            if cmd == "current_block_config": return {"ok": True, "message": code_block_utils.display_current_config(current_dict, args[0], block_lib)}
+            if cmd == "saved_block_config":   return {"ok": True, "message": code_block_utils.display_saved_config(get_path(), args[0], block_lib)}
 
         except Exception as e:
             app.logger.error(f"CMD [{cmd}] raised: {e}")

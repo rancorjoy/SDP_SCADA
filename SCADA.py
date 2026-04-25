@@ -33,6 +33,7 @@ def main():                                                         # Main Metho
     is_info = dcs_dict_utils.init_dcs_path(path)    # Initialize DCS Info Path
     is_sp = dcs_flash_utils.init_code_path(path)    # Initialize DCS Code Path
     is_bl = create_block_lib.initialize_block_lib() # Initialize Code Block Library in main path (persistent)
+    blk_lib = create_block_lib.open_block_lib()     # Open a copy of the block library
 
     serial_queue = queue.Queue()                            # Create an event queue for the serial monitoring thread
     flash_queue = queue.Queue()                             # Create an event queue for flashing DCS controllers
@@ -55,7 +56,7 @@ def main():                                                         # Main Metho
         monitor_thread.start()                                  # Start the new thread
 
         # Data structure being passed to the FLASK server with current state of system (pass by reference)
-        thisState = CurrentState(current_dcs,current_dict, current_dict_lock, flash_queue, flash_lock) 
+        thisState = CurrentState(current_dcs,current_dict, current_dict_lock, flash_queue, flash_lock, blk_lib) 
 
                                                                 # Create a thread that runs flask_thread.flask_loop
         server_thread = threading.Thread(target=flask_thread.flask_loop, args=(thisState,)) 

@@ -11,3 +11,4 @@ class CurrentState:
     current_dict_lock : threading.Lock
     flash_queue : queue
     flash_lock : threading.Lock
+    block_lib   : dict

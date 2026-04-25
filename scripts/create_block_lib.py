@@ -26,7 +26,16 @@ def initialize_block_lib():
     except Exception as e:                              # Throw an exception if this fails and return false
         print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
         return False  
+
+# Open a copy of the library to save in the current state at run time
+def open_block_lib():
+    file_path = pathlib.Path("block_lib.json")          # Determine the file path and check for existance
     
+    with file_path.open("r", encoding="utf-8") as f:
+        return json.load(f)
+    
+    return None
+
 # Define code blocks and add them to library
 def create_block_lib(block_lib):
 
@@ -38,27 +47,197 @@ def create_block_lib(block_lib):
     assign_blk["output_points"] = {}                                # Block Outputs
     assign_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
     assign_blk["dep_list"] = []                                     # List of dependancies saved as strings
-                                                                    # Logical code using [[point]] to represent points
+                                                                    # Logical code using point to represent points
     assign_blk["code_str"] = textwrap.dedent(
     f"""               
-    [[left]] = [[right]];
+    left = right;
     """)
-    assign_blk["description"] = "Performs assignment left = right"
+    assign_blk["description"] = "Performs assignment left = right."
     block_lib["assign_blk"] = assign_blk                            # Store the new block in the block library
 
     #  Increment Block
-    inrement_blk = code_block_utils.get_block_type()
-    inrement_blk["input_points"] = {"point" : "num"}                  # Block Inputs
-    inrement_blk["output_points"] = {}                                # Block Outputs
-    inrement_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
-    inrement_blk["dep_list"] = []                                     # List of dependancies saved as strings
-                                                                      # Logical code using [[point]] to represent points
-    inrement_blk["code_str"] = textwrap.dedent(
+    increment_blk = code_block_utils.get_block_type()
+    increment_blk["input_points"] = {"point" : "num"}                  # Block Inputs
+    increment_blk["output_points"] = {}                                # Block Outputs
+    increment_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
+    increment_blk["dep_list"] = []                                     # List of dependancies saved as strings
+                                                                       # Logical code using point to represent points
+    increment_blk["code_str"] = textwrap.dedent(
     f"""               
-    [[point]] += 1;
+    point += 1;
     """)
-    inrement_blk["description"] = "Performs assignment left = right"
-    block_lib["inrement_blk"] = inrement_blk                          # Store the new block in the block library
+    increment_blk["description"] = "Increments the value of point by 1."
+    block_lib["inrement_blk"] = increment_blk                          # Store the new block in the block library
+
+    #  Decrement Block
+    decrement_blk = code_block_utils.get_block_type()
+    decrement_blk["input_points"] = {"point" : "num"}                  # Block Inputs
+    decrement_blk["output_points"] = {}                                # Block Outputs
+    decrement_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
+    decrement_blk["dep_list"] = []                                     # List of dependancies saved as strings
+                                                                        # Logical code using point to represent points
+    decrement_blk["code_str"] = textwrap.dedent(
+    f"""               
+    point -= 1;
+    """)
+    decrement_blk["description"] = "Decrements the value of point by 1."
+    block_lib["decrement_blk"] = decrement_blk                          # Store the new block in the block library
+
+    #  Addition Block
+    add_blk = code_block_utils.get_block_type()
+    add_blk["input_points"] = {"add1" : "num", "add2" : "num"}   # Block Inputs
+    add_blk["output_points"] = {"sum" : "num"}                   # Block Outputs
+    add_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
+    add_blk["dep_list"] = []                                     # List of dependancies saved as strings
+                                                                 # Logical code using point to represent points
+    add_blk["code_str"] = textwrap.dedent(
+    f"""               
+    sum = add1 + add2;
+    """)
+    add_blk["description"] = "Adds add1 + add2 and returns sum."
+    block_lib["add_blk"] = add_blk                              # Store the new block in the block library
+
+    #  Subtraction Block
+    sub_blk = code_block_utils.get_block_type()
+    sub_blk["input_points"] = {"minuend" : "num", "subtrahend" : "num"}     # Block Inputs
+    sub_blk["output_points"] = {"diff" : "num"}                             # Block Outputs
+    sub_blk["type"] = "Arithmetic"                                          # Meta-Data to help with organizing
+    sub_blk["dep_list"] = []                                                # List of dependancies saved as strings
+                                                                            # Logical code using point to represent points
+    sub_blk["code_str"] = textwrap.dedent(
+    f"""               
+    difference = minuend + subtrahend;
+    """)
+    sub_blk["description"] = "Subtracts minuend - subtrahend and returns difference."
+    block_lib["sub_blk"] = sub_blk                                          # Store the new block in the block library
+
+    #  Multiplication Block
+    mul_blk = code_block_utils.get_block_type()
+    mul_blk["input_points"] = {"factor1" : "num", "factor2" : "num"}    # Block Inputs
+    mul_blk["output_points"] = {"product" : "num"}                      # Block Outputs
+    mul_blk["type"] = "Arithmetic"                                      # Meta-Data to help with organizing
+    mul_blk["dep_list"] = []                                            # List of dependancies saved as strings
+                                                                        # Logical code using point to represent points
+    mul_blk["code_str"] = textwrap.dedent(
+    f"""               
+    product = factor1 * factor2;
+    """)
+    mul_blk["description"] = "Multiplies factor1 * factor2 and returns product."
+    block_lib["mul_blk"] = mul_blk                                      # Store the new block in the block library
+
+    #  Division Block
+    div_blk = code_block_utils.get_block_type()
+    div_blk["input_points"] = {"dividend" : "num", "divisor" : "num"}   # Block Inputs
+    div_blk["output_points"] = {"quotient" : "num"}                     # Block Outputs
+    div_blk["type"] = "Arithmetic"                                      # Meta-Data to help with organizing
+    div_blk["dep_list"] = []                                            # List of dependancies saved as strings
+                                                                        # Logical code using point to represent points
+    div_blk["code_str"] = textwrap.dedent(
+    f"""               
+    quotient = dividend / divisor;
+    """)
+    div_blk["description"] = "Divides dividend / divisor and returns quotient."
+    block_lib["div_blk"] = div_blk                                      # Store the new block in the block library
+
+    #  Euclidean Division Block
+    ediv_blk = code_block_utils.get_block_type()
+    ediv_blk["input_points"] = {"dividend" : "int", "divisor" : "int"}       # Block Inputs
+    ediv_blk["output_points"] = {"quotient" : "int", "remainder" : "int"}    # Block Outputs
+    ediv_blk["type"] = "Arithmetic"                                          # Meta-Data to help with organizing
+    ediv_blk["dep_list"] = []                                                # List of dependancies saved as strings
+                                                                             # Logical code using point to represent points
+    ediv_blk["code_str"] = textwrap.dedent(
+    f"""               
+    if (divisor == 0) {{
+        quotient = 0;
+        remainder = dividend;  // preserves a = bq + r
+    }} 
+    else {{
+        remainder = dividend % divisor;
+        if (remainder < 0) {{
+            remainder += abs(divisor);
+        }}
+        quotient = (dividend - remainder) / divisor;
+    }}
+    """)
+    ediv_blk["description"] = "Divides (Euclidean) dividend / divisor and returns quotient and remainder."
+    block_lib["ediv_blk"] = ediv_blk                                          # Store the new block in the block library
+
+
+
+
+
+    ### LOGICAL BLOCKS ###
+
+    # Equivelence
+    equal_blk = code_block_utils.get_block_type()
+    equal_blk["input_points"] = {"argument1" : "any", "argument2" : "any"}  # Block Inputs
+    equal_blk["output_points"] = {"result" : "bool"}                        # Block Outputs
+    equal_blk["type"] = "Logical"                                           # Meta-Data to help with organizing
+    equal_blk["dep_list"] = []                                              # List of dependancies saved as strings
+                                                                            # Logical code using point to represent points
+    equal_blk["code_str"] = textwrap.dedent(
+    f"""               
+    argument1 == argument2 ? result = true : result = false;
+    """)
+    equal_blk["description"] = "Checks if argument1 and argument2 are equal and returns result."
+    block_lib["equal_blk"] = equal_blk                                      # Store the new block in the block library
+
+    # Greater Than
+    greater_blk = code_block_utils.get_block_type()
+    greater_blk["input_points"] = {"argument1" : "any", "argument2" : "any"}    # Block Inputs
+    greater_blk["output_points"] = {"result" : "bool"}                          # Block Outputs
+    greater_blk["type"] = "Logical"                                             # Meta-Data to help with organizing
+    greater_blk["dep_list"] = []                                                # List of dependancies saved as strings
+                                                                                # Logical code using point to represent points
+    greater_blk["code_str"] = textwrap.dedent(
+    f"""               
+    argument1 > argument2 ? result = true : result = false;
+    """)
+    greater_blk["description"] = "Checks if argument1 > argument2 are equal and returns result."
+    block_lib["greater_blk"] = greater_blk                                      # Store the new block in the block library
+
+    # Greater Than or Equal
+    greater_equal_blk = code_block_utils.get_block_type()
+    greater_equal_blk["input_points"] = {"argument1" : "any", "argument2" : "any"}  # Block Inputs
+    greater_equal_blk["output_points"] = {"result" : "bool"}                        # Block Outputs
+    greater_equal_blk["type"] = "Logical"                                           # Meta-Data to help with organizing
+    greater_equal_blk["dep_list"] = []                                              # List of dependancies saved as strings
+                                                                                    # Logical code using point to represent points
+    greater_equal_blk["code_str"] = textwrap.dedent(
+    f"""               
+    argument1 >= argument2 ? result = true : result = false;
+    """)
+    greater_equal_blk["description"] = "Checks if argument1 >= argument2 are equal and returns result."
+    block_lib["greater_equal_blk"] = greater_equal_blk                              # Store the new block in the block library
+
+    # Lesser Than
+    lesser_blk = code_block_utils.get_block_type()
+    lesser_blk["input_points"] = {"argument1" : "any", "argument2" : "any"}    # Block Inputs
+    lesser_blk["output_points"] = {"result" : "bool"}                          # Block Outputs
+    lesser_blk["type"] = "Logical"                                             # Meta-Data to help with organizing
+    lesser_blk["dep_list"] = []                                                # List of dependancies saved as strings
+                                                                                # Logical code using point to represent points
+    lesser_blk["code_str"] = textwrap.dedent(
+    f"""               
+    argument1 < argument2 ? result = true : result = false;
+    """)
+    lesser_blk["description"] = "Checks if argument1 < argument2 are equal and returns result."
+    block_lib["lesser_blk"] = lesser_blk                                      # Store the new block in the block library
+
+    # Lesser Than or Equal
+    lesser_equal_blk = code_block_utils.get_block_type()
+    lesser_equal_blk["input_points"] = {"argument1" : "any", "argument2" : "any"}  # Block Inputs
+    lesser_equal_blk["output_points"] = {"result" : "bool"}                        # Block Outputs
+    lesser_equal_blk["type"] = "Logical"                                           # Meta-Data to help with organizing
+    lesser_equal_blk["dep_list"] = []                                              # List of dependancies saved as strings
+                                                                                    # Logical code using point to represent points
+    lesser_equal_blk["code_str"] = textwrap.dedent(
+    f"""               
+    argument1 <= argument2 ? result = true : result = false;
+    """)
+    lesser_equal_blk["description"] = "Checks if argument1 =< argument2 are equal and returns result."
+    block_lib["lesser_equal_blk"] = lesser_equal_blk                              # Store the new block in the block library
 
 
 

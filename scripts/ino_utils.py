@@ -13,8 +13,23 @@ import textwrap # Allows Arduino C++ code blocks to be dedented
 from . import dcs_dict_utils
 from . import print_log
 
-# Get code block equivelent (can be used anywhere)
-#def get
+
+# Get all interupt points
+# Then also get all block types used
+# Then use block types used to get all dependencies
+
+# Get code block equivelent (defined before setup for each detected block type)
+def get_block_code(block_type):
+
+    code_str = f""
+
+
+
+
+
+
+
+    return True
 
 # Get interrupt function for an interrupt (ISR)
 # Interrupt Modes: LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
@@ -67,10 +82,10 @@ def get_var(cont, point_name):
     point = cont["software_points"][point_name]
 
     if point["type"] == "int" and point["int_type"] != "":
-        code_str = textwrap.dedent(f"Point<{point["int_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false}};\n")
+        code_str = textwrap.dedent(f"Point<{point["int_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {point["min_en"]}, {point["max"]}, {point["max_en"]}}};\n")
         return code_str
     else:
-        code_str = textwrap.dedent(f"Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false}};\n")
+        code_str = textwrap.dedent(f"Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {point["min_en"]}, {point["max"]}, {point["max_en"]}}};\n")
         return code_str
 
 # Get a block of Arduino code (at the top) that adds all software points
@@ -116,6 +131,57 @@ def get_pin_modes(cont):
     for key in cont["pin_config"]:
         if cont["pin_config"][key]["enabled"]:
             code_str += get_pin_mode(key, cont)
+    
+    return code_str
+
+# Get a code block for a pin being read (start of loop)
+def get_pin_read(pin_id, cont):
+
+    code_str = f""
+    pin_num = pin_id[2:]
+
+    if cont["pin_config"][pin_id]["direction"] != "OUTPUT" and cont["pin_config"][pin_id]["enabled"]:
+        if pin_id.startswith("AP"):
+            code_str = f"{pin_id}.val = analogRead({pin_num});"
+        else:
+            code_str = f"{pin_id}.val = digitalRead({pin_num});"
+
+    return code_str
+
+# Get a code block for all pin reads (start of loop)
+def get_pin_reads(cont):
+
+    code_str = f"// Read all input pins\n"
+    for key in cont["pin_config"]:
+        code_str += get_pin_read(key, cont)
+        code_str += "\n"
+    
+    return code_str
+
+# Get a code block for a pin being written (end of loop)
+def get_pin_write(pin_id, cont):
+
+    code_str = f""
+    pin_num = pin_id[2:]
+
+    if cont["pin_config"][pin_id]["direction"] == "OUTPUT" and cont["pin_config"][pin_id]["enabled"]:
+        if pin_id.startswith("DP"):
+            if cont["pin_config"][pin_id]["pwm_set"] != None:
+                code_str = f"analogWrite({pin_num}, getPoint({pin_id}));"
+            else:
+                code_str = f"digitalWrite({pin_num}, getPoint({pin_id}));"
+        elif cont["pin_config"][pin_id]["analog_set"] == False:
+            code_str = f"digitalWrite({pin_num}, getPoint({pin_id}));"
+
+    return code_str
+
+# Get a code block for all pin writes (end of loop)
+def get_pin_writes(cont):
+
+    code_str = f"// Read all input pins\n"
+    for key in cont["pin_config"]:
+        code_str += get_pin_write(key, cont)
+        code_str += "\n"
     
     return code_str
 
@@ -203,6 +269,10 @@ struct Point {{
     T val;
     T hold_val;
     bool hold_en;
+    T min;
+    bool min_en;
+    T max;
+    bool max_en;
 }};
                                
 
@@ -221,7 +291,24 @@ T getPoint(const volatile Point<T>& p) {{
     return p.hold_en ? p.hold_val : p.val;
 }}
 
+// Set the current value of a point with min/max checking
+template <typename T>
+void setPoint(volatile Point<T>& p, T new_val) {{
+    T constrained = new_val;
+
+    if (p.min_en && constrained < p.min_val) {{
+        constrained = p.min_val;
+    }}
+
+    if (p.max_en && constrained > p.max_val) {{
+        constrained = p.max_val;
+    }}
+
+    p.val = constrained;
+}}
+
 void setup() {{
+Serial.begin(9600); // Initialize serial communication
 cli(); // Disable interrupts
 
 {get_pin_modes(cont)}
@@ -234,7 +321,9 @@ sei(); // Re-enable interrupts
 }}
 
 void loop() {{
+{get_pin_reads(cont)}
 
+{get_pin_writes(cont)}
 }}
 """).strip()
     return def_code
