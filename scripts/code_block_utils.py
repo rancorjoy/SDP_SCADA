@@ -21,6 +21,7 @@ def get_block_type():
     return {
         "input_points"  : {},           # Stores dictionaries of points, {key} : {val} -> {name} : {type}
         "output_points" : {},           # Type can be int, float, bool, num (int or float), any
+        "output_type_case" : {},        # Generic output typecase based on inputs - for compiler
         "type" : "Input",               # What kind of block is this (categorically)?
         "description" : "",             # Description of the block (what does it do?)
         "dep_list" : [],                # Store dependancies in a list so they can be added together at end
@@ -190,50 +191,55 @@ def get_inst(curr_dict, controller_name, block_list_str, index):
     return block_list[index]
 
 # Add point to input of block
-def add_point_input(block_inst, var_name, point):
+def add_point_input(block_inst, var_name, point, block_lib):
      
     if block_inst == None:
         return False
 
-    if block_inst["input_points"][var_name]:                            # The variable is already assigned!
-          return False
+    if var_name in block_inst["input_points"]:                          # already assigned
+        return False
      
+    blk_type = block_lib[block_inst["block_type"]]
+
     required_type = []                                                  # Get a list of possible types the function can accept for this point/variable
-    if block_inst["block_type"]["input_points"][var_name] == "bool":
+    if blk_type["input_points"][var_name] == "bool":
         required_type = ["bool"]
-    elif block_inst["block_type"]["input_points"][var_name] == "int":
+    elif blk_type["input_points"][var_name] == "int":
          required_type = ["int"]
-    elif block_inst["block_type"]["input_points"][var_name] == "float":
+    elif blk_type["input_points"][var_name] == "float":
          required_type = ["float"]
-    elif block_inst["block_type"]["input_points"][var_name] == "num":
+    elif blk_type["input_points"][var_name] == "num":
          required_type = ["float", "int"]
-    elif block_inst["block_type"]["input_points"][var_name] == "any":
+    elif blk_type["input_points"][var_name] == "any":
          required_type = ["float", "int", "bool"]
 
     if point["type"] not in required_type:                              # The point is none of the needed types
         return False
     
     block_inst["input_points"][var_name] = point                        # Correct variable and empty spot -> assigned!
+    return True
 
 # Add point to output of block
-def add_point_output(block_inst, var_name, point):
+def add_point_output(block_inst, var_name, point, block_lib):
 
     if block_inst == None:
         return False
      
-    if block_inst["output_points"][var_name]:                            # The variable is already assigned!
-          return False
+    if var_name in block_inst["output_points"]:                          # already assigned
+        return False
      
+    blk_type = block_lib[block_inst["block_type"]]
+
     required_type = []                                                  # Get a list of possible types the function can accept for this point/variable
-    if block_inst["block_type"]["output_points"][var_name] == "bool":
+    if blk_type["output_points"][var_name] == "bool":
         required_type = ["bool"]
-    elif block_inst["block_type"]["output_points"][var_name] == "int":
+    elif blk_type["output_points"][var_name] == "int":
          required_type = ["int"]
-    elif block_inst["block_type"]["output_points"][var_name] == "float":
+    elif blk_type["output_points"][var_name] == "float":
          required_type = ["float"]
-    elif block_inst["block_type"]["output_points"][var_name] == "num":
+    elif blk_type["output_points"][var_name] == "num":
          required_type = ["float", "int"]
-    elif block_inst["block_type"]["output_points"][var_name] == "any":
+    elif blk_type["output_points"][var_name] == "any":
          required_type = ["float", "int", "bool"]
 
     if point["type"] not in required_type:                              # The point is none of the needed types
@@ -307,11 +313,11 @@ def display_current_config(curr_dict, controller_name, block_lib):
             struc_str = f"{blk_inst['block_type']}"  # use the name string, not the dict
             for key in blk_type["input_points"]:
                 val = blk_inst["input_points"].get(key, "")
-                struc_str += f" <{val}>"
+                struc_str += f" <{get_point_name(curr_dict, controller_name, val)}>"
             struc_str += " :"
             for key in blk_type["output_points"]:
                 val = blk_inst["output_points"].get(key, "")
-                struc_str += f" <{val}>"
+                struc_str += f" <{get_point_name(curr_dict, controller_name, val)}>"
             struc_str += "\n"
             ret_str += struc_str
 
@@ -353,15 +359,30 @@ def display_saved_config(data_path, controller_name, block_lib):
             struc_str = f"{blk_inst['block_type']}"
             for key in blk_type["input_points"]:
                 val = blk_inst["input_points"].get(key, "")
-                struc_str += f" <{val}>"
+                struc_str += f" <{get_point_name_by_value(curr_dict, controller_name, val)}>"
             struc_str += " :"
             for key in blk_type["output_points"]:
                 val = blk_inst["output_points"].get(key, "")
-                struc_str += f" <{val}>"
+                struc_str += f" <{get_point_name_by_value(curr_dict, controller_name, val)}>"
             struc_str += "\n"
             ret_str += struc_str
 
     return ret_str
+
+# Get a list of used block types for code compiler (ino utils)
+def block_types_used(data_path, controller_name):
+
+    cont = dcs_dict_utils.get_dict(data_path, controller_name)
+    curr_dict = {controller_name: cont}
+    block_lists = find_lists(curr_dict, controller_name)
+
+    block_types_used = []
+    for list_key in block_lists:
+        for blk_inst in block_lists[list_key]:
+            if blk_inst["block_type"] not in block_types_used:
+                block_types_used.append(blk_inst["block_type"])
+    
+    return block_types_used
 
 # Validate that the "code" saved has no obvious errors and log warnings:
 def validate_config(data_path, controller_name):
@@ -371,8 +392,8 @@ def validate_config(data_path, controller_name):
     # Validation checks add errors and warnings, warnings are shown but ignored
     # Warnings and errors are lists [] NOT dicts []
 
-    warnings.append(f"Test Warning")
-    errors.append(f"Test Error")
+    #warnings.append(f"Test Warning")
+    #errors.append(f"Test Error")
 
     return {"warnings" : warnings, "errors" : errors}   # Return warnings and errors
 
@@ -406,11 +427,22 @@ def print_validation(data_path, controller_name, block_lib):
 # if cmd == "compile_dcs":    return {"ok": True, "result": dcs_script_utils.create_Script(get_path(), args[0], ino_utils.get_code(get_path(), args[0]))}
 
 # Compile pipeline with validation
-def check_compile(data_path, controller_name):
+def check_compile(data_path, controller_name, block_lib, curr_dict):
 
     valid = valid_to_bool(validate_config(data_path, controller_name))
 
     if valid:
-        return dcs_script_utils.create_Script(data_path, controller_name, ino_utils.get_code(data_path, controller_name))
+        return dcs_script_utils.create_Script(data_path, controller_name, ino_utils.get_code(data_path, controller_name, block_lib, curr_dict))
     
     return False
+
+# Helper display functions to print point name
+# For in-memory (live) use - identity comparison is correct and fast
+def get_point_name(curr_dict, controller_name, point):
+    if not isinstance(point, dict):
+        return "?"
+    return point.get("_name", "?")
+
+# Legacy function, same as above
+def get_point_name_by_value(curr_dict, controller_name, point):
+    return get_point_name(curr_dict, controller_name, point)

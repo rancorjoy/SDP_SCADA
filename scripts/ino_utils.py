@@ -11,6 +11,7 @@ import pickle   # Allows Dictionary to be saved to JSON
 import textwrap # Allows Arduino C++ code blocks to be dedented
 
 from . import dcs_dict_utils
+from . import code_block_utils
 from . import print_log
 
 
@@ -18,18 +19,178 @@ from . import print_log
 # Then also get all block types used
 # Then use block types used to get all dependencies
 
+# Det list of all volatile points
+def get_vol_list(curr_dict, controller_name):
+    block_lists = code_block_utils.find_lists(curr_dict, controller_name)
+    vol_list = []
+    for list_key in block_lists:
+        if list_key != "setup_blocks" and list_key != "loop_blocks":
+            for blk in block_lists[list_key]:
+                for pt_key in blk["input_points"]:
+                    name = code_block_utils.get_point_name(curr_dict, controller_name, blk["input_points"][pt_key])
+                    if name != "?" and name not in vol_list:
+                        vol_list.append(name)
+                for pt_key in blk["output_points"]:
+                    name = code_block_utils.get_point_name(curr_dict, controller_name, blk["output_points"][pt_key])
+                    if name != "?" and name not in vol_list:
+                        vol_list.append(name)
+    return vol_list
+
+# Define all code blocks near top of script
+def define_code_blocks(data_path, cont_name, block_lib):
+    used_blocks = code_block_utils.block_types_used(data_path, cont_name)
+    code_str = f""
+
+    for block_type in used_blocks:
+        code_str += get_block_code(block_type, block_lib)
+
+    return code_str
+
 # Get code block equivelent (defined before setup for each detected block type)
-def get_block_code(block_type):
+def get_block_code(block_type, block_lib):
+
+    # Defaults to void return type
+    return_type_str = f"void "
+    return_str = f""
 
     code_str = f""
 
+    # If there are outputs, pain
+    if len(block_lib[block_type]["output_points"]) != 0:
+        code_str += f"template <"
 
+        for key in block_lib[block_type]["output_points"]:
+            code_str += f"typename {key}_t, "
+        
+        code_str = code_str[:-2] # Remove last comma and space
+        code_str += f">\n"
 
+        code_str += f"struct {block_type}_s\n"
+        code_str += f"{{\n"
 
+        for key in block_lib[block_type]["output_points"]:
+            code_str += f"\t{key}_t {key};\n"
 
+        code_str += f"}};\n"
 
+        return_str = f"return {{"
+        for key in block_lib[block_type]["output_points"]:
+            return_str += f"{key}, "
+        return_str = return_str[:-2] # Remove last comma and space
+        return_str += f"}};"
 
-    return True
+        return_type_str = f"{block_type}_s "
+        return_type_str += f"<"
+        for key in block_lib[block_type]["output_points"]:
+            return_type_str += f"{key}_t, "
+        return_type_str = return_type_str[:-2] # Remove last comma and space
+        return_type_str += f"> "
+    
+    code_str += f"template <"
+    for key in block_lib[block_type]["input_points"]:
+        code_str += f"typename {key}_t, "
+
+    for key in block_lib[block_type]["output_points"]:
+        code_str += f"typename {key}_t = {block_lib[block_type]["output_type_case"][key]}, "
+
+    code_str = code_str[:-2] # Remove last comma and space
+    code_str += f">\n"
+
+    code_str += f"{return_type_str}{block_type}({get_block_generic_inputs(block_type, block_lib)})\n"
+    code_str += f"{{\n"
+    code_str += textwrap.indent(get_block_sets(block_type, block_lib), "\t")
+    code_str += textwrap.indent(get_block_auto(block_type, block_lib), "\t")
+    code_str += textwrap.indent(block_lib[block_type]["code_str"], "\t")
+    code_str += textwrap.indent(return_str, "\t")
+    code_str += f"\n}}\n\n"
+    return code_str
+
+# Get list of code-block generic input arguments (for function)
+def get_block_generic_inputs(block_type, block_lib):
+
+    code_str = f""
+    for key in block_lib[block_type]["input_points"]:
+        code_str += f"{key}_t {key}_p, "
+    code_str = code_str[:-2]        # Remove last comma and space
+    return code_str
+
+# Get list of code-block generic output arguments (for function)
+def get_block_generic_outputs(block_type, block_lib):
+
+    code_str = f""
+    for key in block_lib[block_type]["output_points"]:
+        code_str += f"{key}_p, "
+    code_str = code_str[:-2]        # Remove last comma and space
+    return code_str
+
+# Get types for tupple string for code block
+def get_block_tupple_str(block_type, block_lib):
+
+    code_str = f""
+    for key, val in block_lib[block_type]["output_points"].items():
+        code_str += f"{val}, "
+    code_str = code_str[:-2]        # Remove last comma and space
+    return code_str
+
+# Get variable setting for code block function
+def get_block_sets(block_type, block_lib):
+    code_str = f""
+    for key in block_lib[block_type]["input_points"]:
+        code_str += f"{key}_t {key} = {key}_p;\n"
+    return code_str
+
+# Assign all output blocks auto type and arbitrary const 0 before calculations
+def get_block_auto(block_type, block_lib):
+    code_str = f""
+    for key in block_lib[block_type]["output_points"]:
+        code_str += f"auto {key} = 0;\n"
+    return code_str
+
+# Get code block instance usage, placed in a list location
+def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name):
+
+    code_str = f""
+
+    # If the block has outputs
+    if len(block_lib[block_inst["block_type"]]["output_points"]) != 0:
+
+        code_str += f"auto result = {block_inst["block_type"]}("
+        for key in block_inst["input_points"]:
+            point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["input_points"][key])
+            code_str += f"getPoint({point}), "
+
+        code_str = code_str[:-2] # Remove last comma and space
+        code_str += ");\n"
+
+        for key in block_inst["output_points"]:
+            point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["output_points"][key])
+            code_str += f"setPoint({point}, result.{key});\n"
+
+        code_str += "\n"
+        return code_str
+
+    # If the block has no outputs
+    else:
+
+        code_str += f"{block_inst["block_type"]}("
+        for key in block_inst["input_points"]:
+            point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["input_points"][key])
+            code_str += f"getPoint({point}), "
+
+        code_str = code_str[:-2] # Remove last comma and space
+        code_str += ");\n"
+
+        code_str += "\n"
+        return code_str
+    
+# Print a list of blocks
+def get_block_list(block_list, block_lib, curr_dict, cont_name):
+    code_str = f""
+
+    for block_inst in block_list:
+        code_str += get_block_inst_code(block_inst, block_lib, curr_dict, cont_name)
+
+    return code_str
 
 # Get interrupt function for an interrupt (ISR)
 # Interrupt Modes: LOW, CHANGE, RISING, FALLING, HIGH (on some boards)
@@ -50,46 +211,51 @@ def get_int_funcs(cont):
     return codestring
 
 # Get the interrupt ISR for an interrupt
-def get_ISR(int_name, cont):
+def get_ISR(int_name, cont, curr_dict, cont_name, block_lib):
 
     code_str = f""
     if int_name.startswith("DP"):       # Logic for digital interrupts
         code_str = textwrap.dedent(f"""
         // ISR for {int_name}
         void {cont["int_config"][int_name]["ISR_name"]}(){{
-
+            {get_block_list(cont["int_config"][int_name]["blocks"], block_lib, curr_dict, cont_name)}
         }}
         """)
     if int_name.startswith("Timer"):    # Logic for timer interrupts
         code_str = textwrap.dedent(f"""
         // ISR for {int_name}
         ISR({cont["int_config"][int_name]["ISR_name"]}){{
-
+            {get_block_list(cont["int_config"][int_name]["blocks"], block_lib, curr_dict, cont_name)}
         }}
         """)
     return code_str
 
 # Get all interrupt ISRs (before setup)
-def get_ISRs(cont):
+def get_ISRs(cont, curr_dict, cont_name, block_lib):
     codestring = f""
     for key in cont["int_config"]:
         if cont["int_config"][key]["enabled"]:
-            codestring += get_ISR(key, cont)
+            codestring += get_ISR(key, cont, curr_dict, cont_name, block_lib)
     return codestring
 
 # Get a block of code to define a single software point at the top of the script
-def get_var(cont, point_name):
+def get_var(cont, point_name, curr_dict, controller_name):
     point = cont["software_points"][point_name]
 
+    vol = f""
+    vol_list = get_vol_list(curr_dict, controller_name)
+    if point_name in vol_list:
+        vol = f"volatile "
+
     if point["type"] == "int" and point["int_type"] != "":
-        code_str = textwrap.dedent(f"Point<{point["int_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {point["min_en"]}, {point["max"]}, {point["max_en"]}}};\n")
+        code_str = textwrap.dedent(f"{vol}Point<{point["int_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
         return code_str
     else:
-        code_str = textwrap.dedent(f"Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {point["min_en"]}, {point["max"]}, {point["max_en"]}}};\n")
+        code_str = textwrap.dedent(f"{vol}Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
         return code_str
 
 # Get a block of Arduino code (at the top) that adds all software points
-def get_vars(cont):
+def get_vars(cont, curr_dict, controller_name):
     code_str = f""
 
     point_dict = cont["software_points"]
@@ -98,16 +264,16 @@ def get_vars(cont):
 
     for key, val in point_dict.items():
         if not val["hardware"]:                     # software point are always active
-            code_str += get_var(cont, key)
+            code_str += get_var(cont, key, curr_dict, controller_name)
 
         elif key in pin_dict:                       # pin hardware point
             if pin_dict[key]["enabled"]:
-                code_str += get_var(cont, key)
+                code_str += get_var(cont, key, curr_dict, controller_name)
 
         else:                                       # timer hardware point
             timer_name = key.split('_')[0]
             if timer_name in tim_dict and tim_dict[timer_name]["enabled"]:
-                code_str += get_var(cont, key)
+                code_str += get_var(cont, key, curr_dict, controller_name)
     return code_str
 
 # Get a block of Arduino code that sets the pin mode for a single pin
@@ -141,7 +307,7 @@ def get_pin_read(pin_id, cont):
     pin_num = pin_id[2:]
 
     if cont["pin_config"][pin_id]["direction"] != "OUTPUT" and cont["pin_config"][pin_id]["enabled"]:
-        if pin_id.startswith("AP"):
+        if cont["pin_config"][pin_id]["analog_set"]:
             code_str = f"{pin_id}.val = analogRead({pin_num});"
         else:
             code_str = f"{pin_id}.val = digitalRead({pin_num});"
@@ -166,7 +332,7 @@ def get_pin_write(pin_id, cont):
 
     if cont["pin_config"][pin_id]["direction"] == "OUTPUT" and cont["pin_config"][pin_id]["enabled"]:
         if pin_id.startswith("DP"):
-            if cont["pin_config"][pin_id]["pwm_set"] != None:
+            if cont["pin_config"][pin_id]["pwm_set"] == True:
                 code_str = f"analogWrite({pin_num}, getPoint({pin_id}));"
             else:
                 code_str = f"digitalWrite({pin_num}, getPoint({pin_id}));"
@@ -258,11 +424,10 @@ def get_timer_configs(cont_name, cont):
 
 
 
-def get_code(data_path, cont_name):
+def get_code(data_path, cont_name, block_lib, curr_dict):
     cont = dcs_dict_utils.get_dict(data_path, cont_name)
 
     def_code = textwrap.dedent(f"""\
-
 // Struct Definition for all Points
 template <typename T>
 struct Point {{
@@ -277,11 +442,7 @@ struct Point {{
                                
 
 // Instantiate all Points
-{get_vars(cont)}
-
-// ISR methods - do not touch
-{get_ISRs(cont)}
-
+{get_vars(cont, curr_dict, cont_name)}
 
 // SCADA required methods - do not touch
 
@@ -296,16 +457,22 @@ template <typename T>
 void setPoint(volatile Point<T>& p, T new_val) {{
     T constrained = new_val;
 
-    if (p.min_en && constrained < p.min_val) {{
-        constrained = p.min_val;
+    if (p.min_en && constrained < p.min) {{
+        constrained = p.min;
     }}
 
-    if (p.max_en && constrained > p.max_val) {{
-        constrained = p.max_val;
+    if (p.max_en && constrained > p.max) {{
+        constrained = p.max;
     }}
 
     p.val = constrained;
 }}
+
+// Code block functions
+{define_code_blocks(data_path, cont_name, block_lib)}
+
+// ISR methods - do not touch
+{get_ISRs(cont, curr_dict, cont_name, block_lib)}
 
 void setup() {{
 Serial.begin(9600); // Initialize serial communication
@@ -318,10 +485,15 @@ cli(); // Disable interrupts
 
 {get_timer_configs(cont_name, cont)}
 sei(); // Re-enable interrupts
+
+{get_block_list(curr_dict[cont_name]["setup_blocks"], block_lib, curr_dict, cont_name)}
+
 }}
 
 void loop() {{
 {get_pin_reads(cont)}
+
+{get_block_list(curr_dict[cont_name]["loop_blocks"], block_lib, curr_dict, cont_name)}
 
 {get_pin_writes(cont)}
 }}

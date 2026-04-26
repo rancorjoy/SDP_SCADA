@@ -5,30 +5,33 @@
             "right": "num"
         },
         "output_points": {},
+        "output_type_case": {},
         "type": "Arithmetic",
         "description": "Performs assignment left = right.",
         "dep_list": [],
-        "code_str": "\n[[left]] = [[right]];\n"
+        "code_str": "\nleft = right;\n"
     },
-    "inrement_blk": {
+    "increment_blk": {
         "input_points": {
             "point": "num"
         },
         "output_points": {},
+        "output_type_case": {},
         "type": "Arithmetic",
         "description": "Increments the value of point by 1.",
         "dep_list": [],
-        "code_str": "\n[[point]] += 1;\n"
+        "code_str": "\npoint += 1;\n"
     },
     "decrement_blk": {
         "input_points": {
             "point": "num"
         },
         "output_points": {},
+        "output_type_case": {},
         "type": "Arithmetic",
         "description": "Decrements the value of point by 1.",
         "dep_list": [],
-        "code_str": "\n[[point]] -= 1;\n"
+        "code_str": "\npoint -= 1;\n"
     },
     "add_blk": {
         "input_points": {
@@ -38,10 +41,13 @@
         "output_points": {
             "sum": "num"
         },
+        "output_type_case": {
+            "sum": "decltype(add1_t() + add2_t())"
+        },
         "type": "Arithmetic",
         "description": "Adds add1 + add2 and returns sum.",
         "dep_list": [],
-        "code_str": "\n[[sum]] = [[add1]] + [[add2]];\n"
+        "code_str": "\nsum = add1 + add2;\n"
     },
     "sub_blk": {
         "input_points": {
@@ -49,12 +55,15 @@
             "subtrahend": "num"
         },
         "output_points": {
-            "diff": "num"
+            "difference": "num"
+        },
+        "output_type_case": {
+            "difference": "decltype(minuend_t() - subtrahend_t())"
         },
         "type": "Arithmetic",
         "description": "Subtracts minuend - subtrahend and returns difference.",
         "dep_list": [],
-        "code_str": "\n[[difference]] = [[minuend]] + [[subtrahend]];\n"
+        "code_str": "\ndifference = minuend - subtrahend;\n"
     },
     "mul_blk": {
         "input_points": {
@@ -64,10 +73,13 @@
         "output_points": {
             "product": "num"
         },
+        "output_type_case": {
+            "product": "decltype(factor1_t() * factor2_t())"
+        },
         "type": "Arithmetic",
         "description": "Multiplies factor1 * factor2 and returns product.",
         "dep_list": [],
-        "code_str": "\n[[product]] = [[factor1]] * [[factor2]];\n"
+        "code_str": "\nproduct = factor1 * factor2;\n"
     },
     "div_blk": {
         "input_points": {
@@ -77,10 +89,13 @@
         "output_points": {
             "quotient": "num"
         },
+        "output_type_case": {
+            "quotient": "decltype(dividend_t() / divisor_t())"
+        },
         "type": "Arithmetic",
         "description": "Divides dividend / divisor and returns quotient.",
         "dep_list": [],
-        "code_str": "\n[[quotient]] = [[dividend]] / [[divisor]];\n"
+        "code_str": "\nquotient = dividend / divisor;\n"
     },
     "ediv_blk": {
         "input_points": {
@@ -91,10 +106,14 @@
             "quotient": "int",
             "remainder": "int"
         },
+        "output_type_case": {
+            "quotient": "decltype(dividend_t() / divisor_t())",
+            "remainder": "decltype(dividend_t() % divisor_t())"
+        },
         "type": "Arithmetic",
         "description": "Divides (Euclidean) dividend / divisor and returns quotient and remainder.",
         "dep_list": [],
-        "code_str": "\nif ([[divisor]] == 0) {\n    [[quotient]] = 0;\n    [[remainder]] = [[dividend]];  // preserves a = bq + r\n} \nelse {\n    [[remainder]] = [[dividend]] % [[divisor]];\n    if ([[remainder]] < 0) {\n        [[remainder]] += abs([[divisor]]);\n    }\n    [[quotient]] = ([[dividend]] - [[remainder]]) / [[divisor]];\n}\n"
+        "code_str": "\nif (divisor == 0) {{\n    quotient = 0;\n    remainder = dividend;  // preserves a = bq + r\n}} \nelse {{\n    remainder = dividend % divisor;\n    if (remainder < 0) {{\n        remainder += abs(divisor);\n    }}\n    quotient = (dividend - remainder) / divisor;\n}}\n"
     },
     "equal_blk": {
         "input_points": {
@@ -104,10 +123,13 @@
         "output_points": {
             "result": "bool"
         },
+        "output_type_case": {
+            "result": "bool"
+        },
         "type": "Logical",
         "description": "Checks if argument1 and argument2 are equal and returns result.",
         "dep_list": [],
-        "code_str": "\n[[argument1]] == [[argument2]] ? [[result]] = true : [[result]] = false;\n"
+        "code_str": "\nargument1 == argument2 ? result = true : result = false;\n"
     },
     "greater_blk": {
         "input_points": {
@@ -117,10 +139,13 @@
         "output_points": {
             "result": "bool"
         },
+        "output_type_case": {
+            "result": "bool"
+        },
         "type": "Logical",
         "description": "Checks if argument1 > argument2 are equal and returns result.",
         "dep_list": [],
-        "code_str": "\n[[argument1]] > [[argument2]] ? [[result]] = true : [[result]] = false;\n"
+        "code_str": "\nargument1 > argument2 ? result = true : result = false;\n"
     },
     "greater_equal_blk": {
         "input_points": {
@@ -130,10 +155,13 @@
         "output_points": {
             "result": "bool"
         },
+        "output_type_case": {
+            "result": "bool"
+        },
         "type": "Logical",
         "description": "Checks if argument1 >= argument2 are equal and returns result.",
         "dep_list": [],
-        "code_str": "\n[[argument1]] >= [[argument2]] ? [[result]] = true : [[result]] = false;\n"
+        "code_str": "\nargument1 >= argument2 ? result = true : result = false;\n"
     },
     "lesser_blk": {
         "input_points": {
@@ -143,10 +171,13 @@
         "output_points": {
             "result": "bool"
         },
+        "output_type_case": {
+            "result": "bool"
+        },
         "type": "Logical",
         "description": "Checks if argument1 < argument2 are equal and returns result.",
         "dep_list": [],
-        "code_str": "\n[[argument1]] < [[argument2]] ? [[result]] = true : [[result]] = false;\n"
+        "code_str": "\nargument1 < argument2 ? result = true : result = false;\n"
     },
     "lesser_equal_blk": {
         "input_points": {
@@ -156,9 +187,12 @@
         "output_points": {
             "result": "bool"
         },
+        "output_type_case": {
+            "result": "bool"
+        },
         "type": "Logical",
         "description": "Checks if argument1 =< argument2 are equal and returns result.",
         "dep_list": [],
-        "code_str": "\n[[argument1]] <= [[argument2]] ? [[result]] = true : [[result]] = false;\n"
+        "code_str": "\nargument1 <= argument2 ? result = true : result = false;\n"
     }
 }

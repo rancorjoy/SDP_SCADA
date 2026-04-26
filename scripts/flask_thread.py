@@ -272,7 +272,7 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "save_dcs":   return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
             if cmd == "reset_dcs":      return {"ok": True, "result": dcs_dict_utils.reset_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
             if cmd == "validate_dcs":         return {"ok": True, "message": code_block_utils.print_validation(get_path(), args[0], block_lib)}
-            if cmd == "compile_dcs":    return {"ok": True, "result": code_block_utils.check_compile(get_path(), args[0])}
+            if cmd == "compile_dcs":    return {"ok": True, "result": code_block_utils.check_compile(get_path(), args[0], block_lib, current_dict)}
             if cmd == "program_dcs":    return {"ok": True, "result": dcs_flash_utils.program_controller(dcs_list, args[0], flash_queue, flash_lock)}
             
 
@@ -313,10 +313,10 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "swap_blocks":            return {"ok": True, "result": code_block_utils.block_list_swap(current_dict, args[0], args[1], int(args[2]), int(args[3]))}
             if cmd == "remove_block":           return {"ok": True, "result": code_block_utils.remove_block_index(current_dict, args[0], args[1], int(args[2]))}
 
-            if cmd == "add_input_point":        return {"ok": True, "result": code_block_utils.add_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3], current_dict[args[0]]["software_points"][args[4]])}
-            if cmd == "rem_input_point":        return {"ok": True, "result": code_block_utils.remove_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3])}
-            if cmd == "add_output_point":       return {"ok": True, "result": code_block_utils.add_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3], current_dict[args[0]]["software_points"][args[4]])}
-            if cmd == "rem_output_point":       return {"ok": True, "result": code_block_utils.remove_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], args[2]), args[3])}
+            if cmd == "add_input_point":        return {"ok": True, "result": code_block_utils.add_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib)}
+            if cmd == "rem_input_point":        return {"ok": True, "result": code_block_utils.remove_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3])}
+            if cmd == "add_output_point":       return {"ok": True, "result": code_block_utils.add_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib)}
+            if cmd == "rem_output_point":       return {"ok": True, "result": code_block_utils.remove_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3])}
 
             if cmd == "list_block_types":     return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct
             if cmd == "current_block_config": return {"ok": True, "message": code_block_utils.display_current_config(current_dict, args[0], block_lib)}

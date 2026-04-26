@@ -98,6 +98,7 @@ def get_hardware_points(pin_map, tim_map):
         new_point = get_software_point()
         new_point["type"] = "bool"
         new_point["hardware"] = True
+        new_point["_name"] = key
 
         point_map[key] = new_point
 
@@ -109,6 +110,7 @@ def get_hardware_points(pin_map, tim_map):
         new_point["default"] = 0
         new_point["hardware"] = True
         new_point["int_type"] = "uint8_t"
+        new_point["_name"] = f"{key}_Prescaler"
         point_map[f"{key}_Prescaler"] = new_point
 
         new_point = get_software_point()        # preloaded value
@@ -116,6 +118,7 @@ def get_hardware_points(pin_map, tim_map):
         new_point["default"] = 0
         new_point["hardware"] = True
         new_point["int_type"] = f"uint{tim_map[key]["size_bits"]}_t"
+        new_point["_name"] = f"{key}_Preload"
         point_map[f"{key}_Preload"] = new_point
 
         for k in val["channels"]:
@@ -124,6 +127,7 @@ def get_hardware_points(pin_map, tim_map):
             new_point["default"] = 0
             new_point["hardware"] = True
             new_point["int_type"] = f"uint{tim_map[key]["size_bits"]}_t"
+            new_point["_name"] = f"{key}_CH{k}_Comp"
             point_map[f"{key}_CH{k}_Comp"] = new_point
 
     return point_map                # This map is populated with all needed hardware points
@@ -1032,6 +1036,7 @@ def add_point(point_dict, name):
     if name in point_dict:  # dict membership checks keys directly
         return False
     point_dict[name] = get_software_point()
+    point_dict[name]["_name"] = name
     return True
 
 def rem_point(pin_dict, point_dict, name):
