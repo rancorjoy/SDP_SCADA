@@ -85,7 +85,8 @@ def get_software_point():   # The defualt software point is always the same
         "min" : 0,          # minimum value (not available for bool)
         "max" : 1,          # maximum value (not available for bool)
         "hardware" : False, # is this pin tied to hardware? (cannot be removed)
-        "int_type" : ""     # This specifies what kind of int an int is (eg long int)
+        "int_type" : "",    # This specifies what kind of int an int is (eg long int)
+        "float_type" : ""   # This specifies what kind of float a float is (eg double) 
     }
 
 # Returns a list of software points that correlate with each pin
@@ -1057,6 +1058,7 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
             point_dict[point]["type"] = type
             if type == "bool":
                 point_dict[point]["int_type"] = {}
+                point_dict[point]["float_type"] = {}
                 if pin_dict[point]["analog_set"]:
                     return False
                 point_dict[point]["min_en"] = False
@@ -1068,6 +1070,7 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
                 if point_dict[point]["default"] > 0:
                     point_dict[point]["default"] = 1
             if type == "int":
+                point_dict[point]["float_type"] = {}
                 point_dict[point]["hold_val"] = int(point_dict[point]["hold_val"])
                 point_dict[point]["min"] = int(point_dict[point]["min"])
                 point_dict[point]["max"] = int(point_dict[point]["max"])

@@ -74,12 +74,18 @@ def resolve_fqbn(port):
         [ARDUINO_CLI, "board", "list", "--format", "json"],
         capture_output=True, text=True
     )
-    data = json.loads(result.stdout)
+    
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+
     for detected in data.get("detected_ports", []):
         if detected.get("port", {}).get("address") == port:
             boards = detected.get("matching_boards", [])
             if boards:
-                return boards[0]["fqbn"]
+                return boards["fqbn"]
+            
     return None
 
 def program_controller(current_dcs, name, flash_queue, flash_lock):

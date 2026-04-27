@@ -308,9 +308,9 @@ def get_pin_read(pin_id, cont):
 
     if cont["pin_config"][pin_id]["direction"] != "OUTPUT" and cont["pin_config"][pin_id]["enabled"]:
         if cont["pin_config"][pin_id]["analog_set"]:
-            code_str = f"{pin_id}.val = analogRead({pin_num});"
+            code_str = f"{pin_id}.val = analogRead({pin_num});\n"
         else:
-            code_str = f"{pin_id}.val = digitalRead({pin_num});"
+            code_str = f"{pin_id}.val = digitalRead({pin_num});\n"
 
     return code_str
 
@@ -320,7 +320,6 @@ def get_pin_reads(cont):
     code_str = f"// Read all input pins\n"
     for key in cont["pin_config"]:
         code_str += get_pin_read(key, cont)
-        code_str += "\n"
     
     return code_str
 
@@ -333,22 +332,21 @@ def get_pin_write(pin_id, cont):
     if cont["pin_config"][pin_id]["direction"] == "OUTPUT" and cont["pin_config"][pin_id]["enabled"]:
         if pin_id.startswith("DP"):
             if cont["pin_config"][pin_id]["pwm_set"] == True:
-                code_str = f"analogWrite({pin_num}, getPoint({pin_id}));"
+                code_str = f"analogWrite({pin_num}, getPoint({pin_id}));\n"
             else:
-                code_str = f"digitalWrite({pin_num}, getPoint({pin_id}));"
+                code_str = f"digitalWrite({pin_num}, getPoint({pin_id}));\n"
         elif cont["pin_config"][pin_id]["analog_set"] == False:
-            code_str = f"digitalWrite({pin_num}, getPoint({pin_id}));"
+            code_str = f"digitalWrite({pin_num}, getPoint({pin_id}));\n"
 
     return code_str
 
 # Get a code block for all pin writes (end of loop)
 def get_pin_writes(cont):
 
-    code_str = f"// Read all input pins\n"
+    code_str = f"// Write all output pins\n"
     for key in cont["pin_config"]:
         code_str += get_pin_write(key, cont)
-        code_str += "\n"
-    
+
     return code_str
 
 # Get a block of arduino code (in setup) to start one timer
@@ -419,11 +417,7 @@ def get_timer_configs(cont_name, cont):
 
     return code_str
 
-
-
-
-
-
+# Function that assembles generated code for Aduino
 def get_code(data_path, cont_name, block_lib, curr_dict):
     cont = dcs_dict_utils.get_dict(data_path, cont_name)
 
@@ -493,6 +487,7 @@ sei(); // Re-enable interrupts
 void loop() {{
 {get_pin_reads(cont)}
 
+// Run all instances of code blocks and store results
 {get_block_list(curr_dict[cont_name]["loop_blocks"], block_lib, curr_dict, cont_name)}
 
 {get_pin_writes(cont)}
