@@ -54,7 +54,7 @@ def flash_loop(event_queue, lock, datapath, is_init):
                     if dcs_flash_utils.compile_sketch(ino_path, fqbn):
                         dcs_flash_utils.upload_sketch(ino_path, fqbn, port)
                     else:
-                        print_log.pL("Flash", "Event", f"Skipping upload for {port} due to compile failure.", "System", True, None)
+                        print_log.pL("Flash", "Error", f"Skipping upload for {port} due to compile failure.", "System", True, None)
 
                 with lock:
                     event_queue.task_done()
