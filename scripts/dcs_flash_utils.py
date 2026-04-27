@@ -69,18 +69,17 @@ FQBN_MAP = {
     ("0x2341", "0x8057"): "arduino:samd:mkrwifi1010",
 }
 
-def resolve_fqbn(port: str):
+def resolve_fqbn(port):
     try:
         result = subprocess.run(
             [ARDUINO_CLI, "board", "list", "--format", "json"],
             capture_output=True,
             text=True,
-            timeout=10,
-            check=False
+            timeout=10
         )
-        
+
         if result.returncode != 0:
-            print_log.pL("Flash", "Error", f"arduino-cli board list failed: {result.stderr.strip()}", "System", True, None)
+            print_log.pL("Flash", "Error", f"arduino-cli failed: {result.stderr.strip()}", "System", True, None)
             return None
 
         data = json.loads(result.stdout)
@@ -88,23 +87,23 @@ def resolve_fqbn(port: str):
         for detected in data.get("detected_ports", []):
             port_info = detected.get("port", {})
             if port_info.get("address") == port:
-                # Support both old ("boards") and new ("matching_boards") CLI versions
+                # Support both current and older arduino-cli formats
                 board_list = detected.get("matching_boards") or detected.get("boards", [])
                 
                 if board_list:
-                    # Take the first one (usually the most specific)
                     fqbn = board_list[0].get("fqbn")
                     if fqbn:
+                        print_log.pL("Flash", "Info", f"Detected board on {port}: {board_list[0].get('name')} → {fqbn}", "System", True, None)
                         return fqbn
-                
-                # Optional: log when port is found but no matching board
-                print_log.pL("Flash", "Warning", f"Port {port} detected but no matching board. Available: {board_list}", "System", True, None)
+
+                print_log.pL("Flash", "Warning", f"Port {port} found but no matching board", "System", True, None)
                 return None
 
+        print_log.pL("Flash", "Warning", f"No port matching {port} found in arduino-cli output", "System", True, None)
         return None
 
-    except json.JSONDecodeError:
-        print_log.pL("Flash", "Error", "Failed to parse arduino-cli JSON output", "System", True, None)
+    except json.JSONDecodeError as e:
+        print_log.pL("Flash", "Error", f"Failed to parse JSON from arduino-cli: {e}", "System", True, None)
         return None
     except Exception as e:
         print_log.pL("Flash", "Error", f"Unexpected error in resolve_fqbn: {e}", "System", True, None)
