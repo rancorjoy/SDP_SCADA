@@ -96,3 +96,13 @@ def resolve_fqbn(port):
             
     return None
 
+def program_controller(current_dcs, name, flash_queue, flash_lock):
+    if name in current_dcs:
+        with flash_lock:
+            flash_queue.put({
+            "port":             current_dcs[name]["port"],
+            "script_name":      name
+            })
+            return True
+    return False
+
