@@ -83,18 +83,16 @@ def resolve_fqbn(port):
     for detected in data.get("detected_ports", []):
         if detected.get("port", {}).get("address") == port:
             boards = detected.get("matching_boards", [])
-            if boards:
+            
+            # FIX: Access the first element of the list
+            if isinstance(boards, list) and len(boards) > 0:
                 return boards["fqbn"]
             
+            # FALLBACK: Use your FQBN_MAP if the CLI didn't identify it (Common on Linux)
+            vid = detected.get("port", {}).get("vid")
+            pid = detected.get("port", {}).get("pid")
+            if vid and pid:
+                return FQBN_MAP.get((vid, pid))
+            
     return None
-
-def program_controller(current_dcs, name, flash_queue, flash_lock):
-    if name in current_dcs:
-        with flash_lock:
-            flash_queue.put({
-            "port":             current_dcs[name]["port"],
-            "script_name":      name
-            })
-            return True
-    return False
 
