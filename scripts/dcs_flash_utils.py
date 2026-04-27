@@ -11,6 +11,8 @@ import pickle     # Allows Dictionary to be saved to JSON
 import subprocess # Manages Extenral Programs (eg Arduino CLI)
 import sys        # Allows Python CLI Arguments to be run via code
 
+import serial.tools.list_ports
+
 from . import print_log
 
 ARDUINO_CLI = "arduino-cli"                                 # Define string
@@ -70,30 +72,46 @@ FQBN_MAP = {
 }
 
 def resolve_fqbn(port):
-    result = subprocess.run(
-        [ARDUINO_CLI, "board", "list", "--format", "json"],
-        capture_output=True, text=True
-    )
+    """
+    Resolves the FQBN by first attempting to match VID/PID against a known map,
+    falling back to arduino-cli board list if manual mapping fails.
+    """
+    # 1. Get detailed port information 
+    current_ports = serial.tools.list_ports.comports()
     
-    try:
-        data = json.loads(result.stdout)
-    except json.JSONDecodeError:
-        return None
+    target_vid = None
+    target_pid = None
+    
+    for p in current_ports:
+        if p.device == port:
+            # Convert to hex strings to match your FQBN_MAP format (e.g., 0x2341)
+            target_vid = f"0x{p.vid:04x}" if p.vid else None
+            target_pid = f"0x{p.pid:04x}" if p.pid else None
+            break
 
-    for detected in data.get("detected_ports", []):
-        if detected.get("port", {}).get("address") == port:
-            boards = detected.get("matching_boards", [])
-            
-            # CORRECTED: Use to access the first dictionary in the list
-            if isinstance(boards, list) and len(boards) > 0:
-                return boards["fqbn"] 
-            
-            # FALLBACK: Use your FQBN_MAP if the CLI didn't identify it
-            vid = detected.get("port", {}).get("vid")
-            pid = detected.get("port", {}).get("pid")
-            if vid and pid:
-                return FQBN_MAP.get((vid, pid))
-            
+    # 2. Try to resolve using manual FQBN_MAP first
+    if target_vid and target_pid:
+        mapped_fqbn = FQBN_MAP.get((target_vid, target_pid))
+        if mapped_fqbn:
+            return mapped_fqbn
+
+    # 3. Fallback to arduino-cli if mapping isn't found
+    try:
+        result = subprocess.run(
+            [ARDUINO_CLI, "board", "list", "--format", "json"],
+            capture_output=True, text=True
+        )
+        data = json.loads(result.stdout)
+        
+        for detected in data.get("detected_ports", []):
+            if detected.get("port", {}).get("address") == port:
+                boards = detected.get("matching_boards", [])
+                # Crucial Fix: Use to avoid the TypeError crash
+                if isinstance(boards, list) and len(boards) > 0:
+                    return boards["fqbn"]
+    except Exception as e:
+        print_log.pL("Flash", "Error", f"CLI Resolution failed: {e}", "System", True, None)
+        
     return None
 
 def program_controller(current_dcs, name, flash_queue, flash_lock):
