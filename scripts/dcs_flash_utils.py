@@ -84,11 +84,11 @@ def resolve_fqbn(port):
         if detected.get("port", {}).get("address") == port:
             boards = detected.get("matching_boards", [])
             
-            # FIX: Access the first element of the list
+            # CORRECTED: Use to access the first dictionary in the list
             if isinstance(boards, list) and len(boards) > 0:
-                return boards["fqbn"]
+                return boards["fqbn"] 
             
-            # FALLBACK: Use your FQBN_MAP if the CLI didn't identify it (Common on Linux)
+            # FALLBACK: Use your FQBN_MAP if the CLI didn't identify it
             vid = detected.get("port", {}).get("vid")
             pid = detected.get("port", {}).get("pid")
             if vid and pid:
