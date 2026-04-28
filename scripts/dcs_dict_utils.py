@@ -10,6 +10,7 @@ import argparse # Allows Console Use of Functions with Variables
 import pickle   # Allows Dictionary to be saved to JSON
 import textwrap # Allows Arduino C++ code blocks to be dedented
 
+from . import code_block_utils # Used in clear function at bottom
 from . import dcs_script_utils
 from . import print_log
 
@@ -73,6 +74,14 @@ def get_pin(pin_name, is_pwm, is_analog, is_int, note):
         "note": note
     }
 
+# Returns a Data Map for an array
+def get_array():   # The defualt software point is always the same
+    return {
+        "_name" :"",        # Array name, should be the same as key in array dictionary
+        "type": "int",      # int, float or bool, and special types (array cast type)
+        "size_point": None, # A const point to determine the array size
+    }
+
 # Returns a Data Map for a default software point
 def get_software_point():   # The defualt software point is always the same
     return {
@@ -86,7 +95,8 @@ def get_software_point():   # The defualt software point is always the same
         "max" : 1,          # maximum value (not available for bool)
         "hardware" : False, # is this pin tied to hardware? (cannot be removed)
         "int_type" : "",    # This specifies what kind of int an int is (eg long int)
-        "float_type" : ""   # This specifies what kind of float a float is (eg double) 
+        "float_type" : "",  # This specifies what kind of float a float is (eg double) 
+        "const" : False     # Is this point a constant?
     }
 
 # Returns a list of software points that correlate with each pin
@@ -558,6 +568,7 @@ def init_dcs(data_path, port, current_dict, current_dict_lock):
     "software_points": get_hardware_points(pin_map, tim_map),
     "int_config": int_map,
     "timers" : tim_map,
+    "arrays" : {},                      # By default there are no arrays on start-up, they can be added
     "setup_blocks" : [],                # Code blocks for different parts of the program
     "loop_blocks" : []
     }
@@ -1033,6 +1044,44 @@ def is_int_type(s):
 
     return True
 
+# Determines if a string (eg "long double") is a valid float type
+def is_float_type(s):
+    tokens = s.strip().split()
+
+    if not tokens:
+        return False
+
+    # Standard C++ floating point base types
+    # Arduino note: on most 8-bit Arduinos, 'double' is the same as 'float'
+    base_floats = {"float", "double"}
+
+    # 1. Handle single-token types
+    if len(tokens) == 1:
+        return tokens in base_floats
+
+    # 2. Handle multi-token types (e.g., "long double")
+    # Allowed specifiers for floats
+    long_count = 0
+    double_count = 0
+
+    for t in tokens:
+        if t == "long":
+            long_count += 1
+        elif t == "double":
+            double_count += 1
+        else:
+            # "signed", "unsigned", "short", or "int" are invalid for floats
+            return False 
+
+    # Rules based on C++ specifiers:
+    
+    # Only "long double" is a valid multi-token float type
+    if long_count == 1 and double_count == 1 and len(tokens) == 2:
+        return True
+    
+    # "long long double" or "long float" are not valid C++
+    return False
+
 def add_point(point_dict, name):
     if name in point_dict:  # dict membership checks keys directly
         return False
@@ -1047,6 +1096,27 @@ def rem_point(pin_dict, point_dict, name):
         del point_dict[name]
         return True
     return False
+
+def change_point_const(point_dict, point, value, array_dict):
+    if point in point_dict:
+
+        for key in array_dict:
+            if array_dict[key]["size_point"] is point:
+                return False
+
+        if point_dict[point]["hardware"]:
+            return False
+        
+        if value:
+            point_dict[point]["min_en"] = False
+            point_dict[point]["max_en"] = False
+            point_dict[point]["hold"] = False
+        
+        point_dict[point]["const"] = value
+        return True
+    
+    return False
+
 
 def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change hardware point type - DO NOT GIVE TO USER
     if point in point_dict:
@@ -1082,6 +1152,32 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
                 point_dict[point]["min"] = float(point_dict[point]["min"])
                 point_dict[point]["max"] = float(point_dict[point]["max"])
             return True
+    return False
+
+# Function that allows the special type (eg long long int) of a point to be changed
+def change_point_spec_type(point_dict, point, spec_type):
+    if point in point_dict:
+
+        if point_dict[point]["hardware"]:   # Do not allow hardware points to be assigned special types
+            return False
+
+        if spec_type == "None" or spec_type == "none" or spec_type == None:
+            point_dict[point]["int_type"] = ""
+            point_dict[point]["float_type"] = ""
+            return True
+
+        if point_dict[point]["type"] == "int":
+            if is_int_type(spec_type):
+               point_dict[point]["int_type"] = spec_type
+               point_dict[point]["float_type"] = ""
+               return True 
+
+        if point_dict[point]["type"] == "float":
+            if is_float_type(spec_type):
+               point_dict[point]["int_type"] = ""
+               point_dict[point]["float_type"] = spec_type
+               return True 
+             
     return False
 
 def change_point_def(point_dict, point, value, tim_dict):
@@ -1120,6 +1216,9 @@ def change_point_hold_val(point_dict, point, value, tim_dict):
     
     if val_timer(point, value, tim_dict) == False:
         return False
+    
+    if point_dict[point]["const"]:
+        return False
 
     point_type = point_dict[point]["type"]
     
@@ -1149,6 +1248,10 @@ def change_point_hold_val(point_dict, point, value, tim_dict):
 def change_point_hold_en(point_dict, point, value):
     if not isinstance(value, bool):
         return False
+    
+    if point_dict[point]["const"]:
+        return False
+
     if point in point_dict:
         point_dict[point]["hold"] = value
         return True
@@ -1159,6 +1262,10 @@ def change_point_min_en(point_dict, point, value):
         return False
     if point_dict[point]["hardware"] == True:   # User cannot change hardware settings
         return False
+    
+    if point_dict[point]["const"]:
+        return False
+
     if point in point_dict:
         if point_dict[point]["type"] == "bool":
             return False
@@ -1171,6 +1278,10 @@ def change_point_max_en(point_dict, point, value):
         return False
     if point_dict[point]["hardware"] == True:   # User cannot change hardware settings
         return False
+    
+    if point_dict[point]["const"]:
+        return False
+
     if point in point_dict:
         if point_dict[point]["type"] == "bool":
             return False
@@ -1182,6 +1293,9 @@ def change_point_min(point_dict, point, value, tim_dict):
     if point not in point_dict:
         return False
     
+    if point_dict[point]["const"]:
+        return False
+
     if val_timer(point, value, tim_dict) == False:
         return False
 
@@ -1202,6 +1316,9 @@ def change_point_max(point_dict, point, value, tim_dict):
     if point not in point_dict:
         return False
     
+    if point_dict[point]["const"]:
+        return False
+
     if val_timer(point, value, tim_dict) == False:
         return False
 
@@ -1347,3 +1464,84 @@ def set_int_mode(int_config, int_name, mode):
 
     return False
 
+
+def add_array(array_dict, name):
+    if name not in array_dict:
+        array_dict[name] = get_array()
+        array_dict[name]["_name"] = name
+        return True
+    return False
+
+def rem_array(array_dict, name):
+    if name in array_dict:
+        del array_dict[name]
+        return True
+    return False
+
+def ren_array(array_dict, old_name, new_name):
+    if new_name not in array_dict and old_name in array_dict:
+        array_dict[new_name] = array_dict[old_name]
+        array_dict[new_name]["_name"] = new_name
+        del array_dict[old_name]
+        return True
+    return False
+
+def edit_array_type(array_dict, name, type_str):
+    if name in array_dict:
+        if type in ["int", "bool", "float"]:
+            array_dict[name]["type"] = type_str
+            return True
+        elif is_float_type(type_str) or is_int_type(type_str):
+            array_dict[name]["type"] = type_str
+            return False
+        
+        return False
+    return False
+
+def add_array_const(array_dict, array_name, point_dict, point_name):
+    if array_name in array_dict and point_name in point_dict:
+        if array_dict[array_name]["size_point"] == None:
+            if point_dict[point_name]["const"]:
+                array_dict[array_name]["size_point"] = point_dict[point_name]
+                return True
+            return False
+        return False
+    return False
+
+def rem_array_const(array_dict, array_name):
+    if array_name in array_dict:
+        array_dict[array_name]["size_point"] = None
+        return True
+    return False
+
+# Clears the current state of the controller to (near) default state so that it can be procedurally allocated (by GUI)
+def clear_controller(current_dict, controller_name):
+
+    current_dict[controller_name]["arrays"].clear()                                     # Clear all arrays
+
+    block_lists = code_block_utils.find_lists(current_dict, controller_name)            # Find all block lists
+    for block_list in block_lists:                                                      # Clear all block lists
+        block_list.clear()                                                                  
+
+    for key in current_dict[controller_name]["pin_config"]:                             
+        current_dict[controller_name]["pin_config"][key]["enabled"] = False             # Disable all pins
+        current_dict[controller_name]["pin_config"][key]["direction"] = "INPUT"         # Set all  pins to default settings
+        current_dict[controller_name]["pin_config"][key]["analog_set"] = False
+        current_dict[controller_name]["pin_config"][key]["pwm_set"] = False
+        current_dict[controller_name]["pin_config"][key]["int_set"] = False
+
+    for key in current_dict[controller_name]["software_points"]:                        
+        if current_dict[controller_name]["software_points"][key]["hardware"] == False:
+            del current_dict[controller_name]["software_points"][key]                   # Delete all software points
+        else:
+            current_dict[controller_name]["software_points"][key]["type"] = "int"       # Reset all hardware points to original values
+            current_dict[controller_name]["software_points"][key]["default"] = 1
+            current_dict[controller_name]["software_points"][key]["hold"] = False
+            current_dict[controller_name]["software_points"][key]["hold_val"] = 1
+            current_dict[controller_name]["software_points"][key]["min_en"] = False
+            current_dict[controller_name]["software_points"][key]["max_en"] = False
+            current_dict[controller_name]["software_points"][key]["min"] = 0
+            current_dict[controller_name]["software_points"][key]["max"] = 1
+            current_dict[controller_name]["software_points"][key]["int_type"] = ""
+            current_dict[controller_name]["software_points"][key]["float_type"] = ""
+            current_dict[controller_name]["software_points"][key]["const"] = False

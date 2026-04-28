@@ -62,11 +62,14 @@ COMMANDS = {
     "edit_pin_int":     (3,   3,    "edit_pin_int <controller name> <pin name> <bool> (interrupt enabled?)"),
 
     "list_dcs_points":          (1,   1,    "list_dcs_points <controller name>"),
+    "list_integer_types":       (0,   0,    "list_integer_types"),
     "add_dcs_point":            (2,   2,    "add_dcs_point <controller name> <point name>"),
     "rem_dcs_point":            (2,   2,    "rem_dcs_point <controller name> <point name>"),
     "rename_dcs_point":         (3,   3,    "rem_dcs_point <controller name> <old point name> <new point name>"),
     "edit_point_type":          (3,   3,    "edit_point_type <controller name> <point name> <type> (int, float, bool)"),
+    "edit_point_spec_type":     (3,   3,    "edit_point_spec_type <controller name> <point name> <type> (eg long long int or double float)"),
     "edit_point_def":           (3,   3,    "edit_point_def <controller name> <point name> <value>"),
+    "edit_point_const":         (3,   3,    "edit_point_const <controller name> <point name> <value>"),
     "edit_point_hold_enable":   (3,   3,    "edit_point_hold_enable <controller name> <point name> <bool> (hold point?)"),
     "edit_point_hold":          (3,   3,    "edit_point_hold <controller name> <point name> <value>"),
     "edit_point_min_enable":    (3,   3,    "edit_point_min_enable <controller name> <point name> <bool> (enforce minimum?)"),
@@ -81,6 +84,13 @@ COMMANDS = {
     "edit_int_enable":          (3,   3,    "edit_int_enable <controller name> <point name> <value> (enabled?)"),
     "edit_int_mode":            (3,   3,    "edit_int_mode <controller name> <point name> <mode> (Pin: LOW, CHANGE, RISING, FALLING, HIGH; Timer: OVF, MATCH)"),
 
+    "list_dcs_arrays":          (1,   1,    "list_dcs_arrays <controller name>"),
+    "add_array":                (2,   2,    "add_array <controller name> <array name>"),
+    "rem_array":                (2,   2,    "rem_array <controller name> <array name>"),
+    "rename_array":             (3,   3,    "rename_array <controller name> <old array name> <new array name>"),
+    "add_array_const":          (3,   3,    "add_array_const <controller name> <array name> <software point>"),
+    "rem_array_const":          (2,   2,    "rem_array_const <controller name> <array name>"),
+
     "list_dcs_blk_lists" :      (1,   1,    "list_dcs_blk_lists <controller name>"),
     "add_block_top":            (3,   3,    "add_block_top <controller name> <list name> <block type>"),
     "add_block_bottom":         (3,   3,    "add_block_bottom <controller name> <list name> <block type>"),
@@ -91,8 +101,10 @@ COMMANDS = {
     "remove_block" :            (3,   3,    "remove_block <controller name> <list name> <index>"),
 
     "add_input_point" :         (5,   5,    "add_input_point <controller name> <list name> <index> <key> <point>"),
+    "add_input_array" :         (5,   5,    "add_input_array <controller name> <list name> <index> <key> <array>"),
     "rem_input_point" :         (4,   4,    "rem_input_point <controller name> <list name> <index> <key>"),
     "add_output_point" :        (5,   5,    "add_output_point <controller name> <list name> <index> <key> <point>"),
+    "add_output_array" :        (5,   5,    "add_input_array <controller name> <list name> <index> <key> <array>"),
     "rem_output_point" :        (4,   4,    "rem_output_point <controller name> <list name> <index> <key>"),
 
     "list_block_types" :        (0,   0,    "list_block_types"),
@@ -179,12 +191,15 @@ def get_help():
     edit_pin_int:       \t Enable or Disable the ISR for this pin <controller name> <pin name> <bool> (enable?)
 
     Controller Point Commands:
+    list_integer_types :    \t List the types of valid integer assignments in C++ (for special type assignment)
     list_dcs_points :       \t List all enabled/active points on a controller <controller name>
     add_dcs_point :         \t Add a software point to a controller <controller name> <point name>
     rem_dcs_point :         \t Remove a software point from a controller <controller name> <point name> (this cannot be undone)
     rename_dcs_point :      \t Rename a software point on a controller <controller name> <point name>
     edit_point_type :       \t Edit the data-type stored in a point <controller name> <point name> <type> (int, float, bool)
+    edit_point_spec_type :  \t Edit the data-type stored in a point <controller name> <point name> <type> (eg long long unsigned int) for an int or float. None for default type,
     edit_point_def :        \t Edit the default value of a point <controller name> <point name> <value>
+    edit_point_const :      \t Edit the constant value of a point <controller name> <point name> <value> (false by default, is the point a constant?)
     edit_point_hold_enable  \t Enable or Disable point hold on a controller <controller name> <point> <bool> (hold the point?)
     edit_point_hold         \t Edit the held value of a point on a controller <controller name> <point> <value>
     edit_point_min_enable   \t Enable or Disable point minimum value on a controller <controller name> <point> <bool> (enforce minimum value?)
@@ -200,6 +215,13 @@ def get_help():
     edit_int_enable :       \t Enable or Disable an interrupt on a controller <controller name> <point name> <value> (enabled?)
     edit_int_mode :         \t Change the mode of an interrupt on a controller <controller name> <point name> <mode> (LOW, CHANGE, RISING, FALLING, HIGH)
 
+    Array Commands:     
+    add_array :             \t Add an array to a controller <controller name> <array name>
+    rem_array :             \t Remove an array from a controller <controller name> <array name>
+    rename_array :          \t Rename an array in a controller <controller name> <old array name> <new array name>
+    add_array_const :       \t Add the constant point to an array to determine its size <controller name> <array name> <point name>
+    rem_array_const :       \t Remove the constant point from an array <controller name> <array name>
+
     Code Block Commands:
     list_dcs_blk_lists :      \t List all current block lists for a controller <controller name>
     add_block_top :           \t Add a code block to top of a block list <controller name> <list name> <block type>
@@ -212,9 +234,11 @@ def get_help():
 
     Code Block Point Commands:
     add_input_point :         \t Add a point to block input (key) <controller name> <list name> <index> <key> <point>
-    rem_input_point :         \t Remove a point from block input (key) <controller name> <list name> <index> <key>
+    add_input_array :         \t Add a array to block input (key) <controller name> <list name> <index> <key> <point>
+    rem_input_point :         \t Remove a point/array from block input (key) <controller name> <list name> <index> <key>
     add_output_point :        \t Add a point to block output (key) <controller name> <list name> <index> <key> <point>
-    rem_output_point :        \t Remove a point from block output (key) <controller name> <list name> <index> <key>
+    add_output_array :        \t Add a array to block output (key) <controller name> <list name> <index> <key> <point>
+    rem_output_point :        \t Remove a point/array from block output (key) <controller name> <list name> <index> <key>
 
     Code Block Utility Commands:
     list_block_types :        \t List all available block types and details
@@ -284,12 +308,15 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "edit_pin_pwm":       return {"ok": True, "result": dcs_dict_utils.change_pin_pwm(current_dict[args[0]]["pin_config"],args[1], current_dict[args[0]]["software_points"], args[2])}
             if cmd == "edit_pin_int":       return {"ok": True, "result": dcs_dict_utils.change_pin_int(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]))}
 
+            if cmd == "list_integer_types":     return {"ok": True, "message": dcs_dict_utils.show_int_types()}
             if cmd == "list_dcs_points":        return {"ok": True, "dict": dcs_dict_utils.list_points(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], current_dict[args[0]]["timers"])}
             if cmd == "add_dcs_point":          return {"ok": True, "result": dcs_dict_utils.add_point(current_dict[args[0]]["software_points"], args[1])}
             if cmd == "rem_dcs_point":          return {"ok": True, "result": dcs_dict_utils.rem_point(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1])}
             if cmd == "rename_dcs_point":       return {"ok": True, "result": dcs_dict_utils.change_point_name(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2])}
             if cmd == "edit_point_type":        return {"ok": True, "result": dcs_dict_utils.change_point_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2], False)}
+            if cmd == "edit_point_spec_type":   return {"ok": True, "result": dcs_dict_utils.change_point_spec_type(current_dict[args[0]]["software_points"], args[1], args[2])}
             if cmd == "edit_point_def":         return {"ok": True, "result": dcs_dict_utils.change_point_def(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
+            if cmd == "edit_point_const":       return {"ok": True, "result": dcs_dict_utils.change_point_const(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]), current_dict[args[0]]["arrays"])}
             if cmd == "edit_point_hold_enable": return {"ok": True, "result": dcs_dict_utils.change_point_hold_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
             if cmd == "edit_point_hold":        return {"ok": True, "result": dcs_dict_utils.change_point_hold_val(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
             if cmd == "edit_point_min_enable":  return {"ok": True, "result": dcs_dict_utils.change_point_min_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
@@ -304,6 +331,13 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "edit_int_enable":        return {"ok": True, "result": dcs_dict_utils.set_int_enable(current_dict[args[0]]["int_config"], args[1], eval_bool(args[2]))}
             if cmd == "edit_int_mode":          return {"ok": True, "result": dcs_dict_utils.set_int_mode(current_dict[args[0]]["int_config"], args[1], args[2])}
 
+            if cmd == "list_dcs_arrays":        return {"ok": True, "dict": current_dict[args[0]]["arrays"]}
+            if cmd == "add_array":              return {"ok": True, "result": dcs_dict_utils.add_array(current_dict[args[0]]["arrays"], args[1])}
+            if cmd == "rem_array":              return {"ok": True, "result": dcs_dict_utils.rem_array(current_dict[args[0]]["arrays"], args[1])}
+            if cmd == "rename_array":           return {"ok": True, "result": dcs_dict_utils.ren_array(current_dict[args[0]]["arrays"], args[1], args[2])}
+            if cmd == "add_array_const":        return {"ok": True, "result": dcs_dict_utils.add_array_const(current_dict[args[0]]["arrays"], args[1],current_dict[args[0]]["software_points"], args[2])}
+            if cmd == "rem_array_const":        return {"ok": True, "result": dcs_dict_utils.rem_array(current_dict[args[0]]["arrays"], args[1])}
+
             if cmd == "list_dcs_blk_lists":     return {"ok": True, "message": code_block_utils.display_lists(current_dict, args[0])}
             if cmd == "add_block_top":          return {"ok": True, "result": code_block_utils.add_block_top(current_dict, args[0], args[1], args[2], block_lib)}
             if cmd == "add_block_bottom":       return {"ok": True, "result": code_block_utils.add_block_bot(current_dict, args[0], args[1], args[2], block_lib)}
@@ -313,9 +347,11 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "swap_blocks":            return {"ok": True, "result": code_block_utils.block_list_swap(current_dict, args[0], args[1], int(args[2]), int(args[3]))}
             if cmd == "remove_block":           return {"ok": True, "result": code_block_utils.remove_block_index(current_dict, args[0], args[1], int(args[2]))}
 
-            if cmd == "add_input_point":        return {"ok": True, "result": code_block_utils.add_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib)}
+            if cmd == "add_input_point":        return {"ok": True, "result": code_block_utils.add_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib, current_dict[args[0]]["software_points"])}
+            if cmd == "add_input_array":        return {"ok": True, "result": code_block_utils.add_array_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["arrays"][args[4]], block_lib, current_dict[args[0]]["arrays"])}
             if cmd == "rem_input_point":        return {"ok": True, "result": code_block_utils.remove_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3])}
-            if cmd == "add_output_point":       return {"ok": True, "result": code_block_utils.add_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib)}
+            if cmd == "add_output_point":       return {"ok": True, "result": code_block_utils.add_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib, current_dict[args[0]]["software_points"])}
+            if cmd == "add_output_array":       return {"ok": True, "result": code_block_utils.add_array_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["arrays"][args[4]], block_lib, current_dict[args[0]]["arrays"])}
             if cmd == "rem_output_point":       return {"ok": True, "result": code_block_utils.remove_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3])}
 
             if cmd == "list_block_types":     return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct

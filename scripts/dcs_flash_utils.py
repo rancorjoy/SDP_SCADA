@@ -93,13 +93,13 @@ def resolve_fqbn(port):
                 if board_list:
                     fqbn = board_list[0].get("fqbn")
                     if fqbn:
-                        print_log.pL("Flash", "Info", f"Detected board on {port}: {board_list[0].get('name')} → {fqbn}", "System", True, None)
+                        print_log.pL("Flash", "Event", f"Detected board on {port}: {board_list[0].get('name')} → {fqbn}", "System", True, None)
                         return fqbn
 
-                print_log.pL("Flash", "Warning", f"Port {port} found but no matching board", "System", True, None)
+                print_log.pL("Flash", "Error", f"Port {port} found but no matching board", "System", True, None)
                 return None
 
-        print_log.pL("Flash", "Warning", f"No port matching {port} found in arduino-cli output", "System", True, None)
+        print_log.pL("Flash", "Error", f"No port matching {port} found in arduino-cli output", "System", True, None)
         return None
 
     except json.JSONDecodeError as e:

@@ -19,7 +19,7 @@ from . import print_log
 # Then also get all block types used
 # Then use block types used to get all dependencies
 
-# Det list of all volatile points
+# Get list of all volatile points
 def get_vol_list(curr_dict, controller_name):
     block_lists = code_block_utils.find_lists(curr_dict, controller_name)
     vol_list = []
@@ -241,14 +241,18 @@ def get_ISRs(cont, curr_dict, cont_name, block_lib):
 # Get a block of code to define a single software point at the top of the script
 def get_var(cont, point_name, curr_dict, controller_name):
     point = cont["software_points"][point_name]
-
     vol = f""
     vol_list = get_vol_list(curr_dict, controller_name)
     if point_name in vol_list:
         vol = f"volatile "
 
+    if point["const"]: vol = f"constexpr "
+
     if point["type"] == "int" and point["int_type"] != "":
         code_str = textwrap.dedent(f"{vol}Point<{point["int_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
+        return code_str
+    elif point["type"] == "float" and point["float_type"] != "":
+        code_str = textwrap.dedent(f"{vol}Point<{point["float_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
         return code_str
     else:
         code_str = textwrap.dedent(f"{vol}Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
@@ -417,6 +421,18 @@ def get_timer_configs(cont_name, cont):
 
     return code_str
 
+# Get block of code for one array instance
+def get_array(cont, array_name):
+    this_array = cont["arrays"][array_name]
+    code_str = f"{this_array["type"]} {this_array["_name"]}[{this_array["size_point"]["_name"]}.val];"
+    return code_str
+
+def get_arrays(cont):
+    code_str = f""
+    for key in cont["arrays"]:
+        code_str += get_array(cont, key)
+    return code_str
+
 # Function that assembles generated code for Aduino
 def get_code(data_path, cont_name, block_lib, curr_dict):
     cont = dcs_dict_utils.get_dict(data_path, cont_name)
@@ -461,6 +477,9 @@ void setPoint(volatile Point<T>& p, T new_val) {{
 
     p.val = constrained;
 }}
+
+// Instantiate all arrays
+{get_arrays(curr_dict[cont_name])}
 
 // Code block functions
 {define_code_blocks(data_path, cont_name, block_lib)}

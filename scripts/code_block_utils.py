@@ -20,7 +20,7 @@ from . import print_log
 def get_block_type():
     return {
         "input_points"  : {},           # Stores dictionaries of points, {key} : {val} -> {name} : {type}
-        "output_points" : {},           # Type can be int, float, bool, num (int or float), any
+        "output_points" : {},           # Type can be int, float, bool, num (int or float), arr (array), any (not array)
         "output_type_case" : {},        # Generic output typecase based on inputs - for compiler
         "type" : "Input",               # What kind of block is this (categorically)?
         "description" : "",             # Description of the block (what does it do?)
@@ -191,14 +191,17 @@ def get_inst(curr_dict, controller_name, block_list_str, index):
     return block_list[index]
 
 # Add point to input of block
-def add_point_input(block_inst, var_name, point, block_lib):
+def add_point_input(block_inst, var_name, point, block_lib, point_dict):
      
     if block_inst == None:
         return False
 
     if var_name in block_inst["input_points"]:                          # already assigned
         return False
-     
+    
+    if point not in point_dict:
+        return False
+
     blk_type = block_lib[block_inst["block_type"]]
 
     required_type = []                                                  # Get a list of possible types the function can accept for this point/variable
@@ -220,7 +223,7 @@ def add_point_input(block_inst, var_name, point, block_lib):
     return True
 
 # Add point to output of block
-def add_point_output(block_inst, var_name, point, block_lib):
+def add_point_output(block_inst, var_name, point, block_lib, point_dict):
 
     if block_inst == None:
         return False
@@ -228,6 +231,9 @@ def add_point_output(block_inst, var_name, point, block_lib):
     if var_name in block_inst["output_points"]:                          # already assigned
         return False
      
+    if point not in point_dict:
+        return False
+
     blk_type = block_lib[block_inst["block_type"]]
 
     required_type = []                                                  # Get a list of possible types the function can accept for this point/variable
@@ -248,14 +254,49 @@ def add_point_output(block_inst, var_name, point, block_lib):
     block_inst["output_points"][var_name] = point                       # Correct variable and empty spot -> assigned!
     return True
 
-# Remove point from input position
+# Add array to input of block
+def add_array_input(block_inst, var_name, arr, block_lib, array_dict):
+    if block_inst == None:
+        return False
+     
+    if var_name in block_inst["input_points"]:                         # already assigned
+        return False
+     
+    if arr not in array_dict:
+        return False
+
+    if block_lib[block_inst["type"]]["input_points"][var_name] != "arr":
+        return False
+     
+    block_inst["input_points"][var_name] = arr
+    return True
+
+# Add array to output of block
+def add_array_output(block_inst, var_name, arr, block_lib, array_dict):
+    if block_inst == None:
+        return False
+     
+    if var_name in block_inst["output_points"]:                         # already assigned
+        return False
+     
+    if arr not in array_dict:
+        return False
+    
+    if block_lib[block_inst["type"]]["output_points"][var_name] != "arr":
+        return False
+     
+    block_inst["input_points"][var_name] = arr
+    return True
+    
+
+# Remove point from input position - also works for arrays
 def remove_point_input(block_inst, var_name):
     if block_inst["input_points"][var_name]:                            # Check it exists first
          del block_inst["input_points"][var_name]                       # Delete it
          return True
     return False
 
-# Remove point from output position
+# Remove point from output position - also works for arrays
 def remove_point_output(block_inst, var_name):
     if block_inst["output_points"][var_name]:                           # Check it exists first
          del block_inst["output_points"][var_name]                      # Delete it
