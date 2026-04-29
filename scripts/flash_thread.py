@@ -16,22 +16,24 @@ from . import print_log
 flash_locks = {}                                            # Port -> Lock mapping
 
 # Constantly running loop that checks for queued flash calls and flashes controllers when queued
-def flash_loop(event_queue, lock, datapath, is_init):
+def flash_loop(event_queue, lock, datapath, is_init, worker_threads):
 
     data_path = pathlib.Path(datapath)                      # Ensure data path is a path (works for path and string inputs)
     code_path = data_path / pathlib.Path("dcs_scripts")     # Assign dcs_path to data_path/dcs_scripts (name of folder)
 
     if(is_init):                                            # If the scripts folder exists and has been initialized
             while True:
-                event = event_queue.get()
+                event = event_queue.get()                   # If a command is recieved...
                 port        = event["port"]
                 script_name = event["script_name"]
                 fqbn = dcs_flash_utils.resolve_fqbn(port)
+                worker_threads[port]["cmd_queue"].put({"command": "pause"})
 
                 if fqbn is None:
                     print_log.pL("Flash", "Error", f"Could not detect board type on {port}, aborting.", "System", True, None)
                     with lock:
                         event_queue.task_done()
+                        worker_threads[port]["cmd_queue"].put({"command": "continue"})
                     continue
                 
                 if port not in flash_locks:
@@ -41,6 +43,7 @@ def flash_loop(event_queue, lock, datapath, is_init):
                     print_log.pL("Flash", "Error", f"Flash already in progress on {port}, skipping.", "System", True, None)
                     with lock:
                         event_queue.task_done()
+                        worker_threads[port]["cmd_queue"].put({"command": "continue"})
                     continue
 
                 ino_path = code_path / pathlib.Path(script_name)
@@ -48,6 +51,7 @@ def flash_loop(event_queue, lock, datapath, is_init):
                     print_log.pL("Flash", "Error", f"Script {script_name} not found", "System", True, None)
                     with lock:
                         event_queue.task_done()
+                        worker_threads[port]["cmd_queue"].put({"command": "continue"})
                     continue
 
                 with flash_locks[port]:
@@ -58,5 +62,6 @@ def flash_loop(event_queue, lock, datapath, is_init):
 
                 with lock:
                     event_queue.task_done()
+                    worker_threads[port]["cmd_queue"].put({"command": "continue"})
 
     return

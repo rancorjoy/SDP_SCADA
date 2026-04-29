@@ -14,7 +14,7 @@ from . import worker_thread_utils
 # Function that defines a worker thread
 def worker(port, cmd_queue):
 
-    print_log.pL(f"Worker ({port})", "Event", "Worker thread initializing", "System", True, None)
+    print_log.pL(f"Worker ({port})", "Event", "Worker thread initializing, opening port", "System", True, None)
     ser = worker_thread_utils.connect(port)  # establish serial connection once at thread start
 
 
@@ -29,6 +29,18 @@ def worker(port, cmd_queue):
                 ser.close()                 # Close serial communication on the port
                 return                      # Kill this worker thread
             
+
+            # Pause Command
+            if cmd["command"] == "pause":   # If the pause command has been read...
+                print_log.pL(f"Worker ({port})", "Event", "Worker thread pausing, closing port", "System", True, None)
+                ser.close()                 # Close serial communication on the port
+
+            
+            # Continue Command
+            if cmd["command"] == "continue":            # If the comtinue command has been read...
+                print_log.pL(f"Worker ({port})", "Event", "Worker thread continuing, reopening port", "System", True, None)
+                ser = worker_thread_utils.connect(port) # Reopen port
+
 
             # Hold Enable Command
             elif cmd["command"].startswith("hold_en"):

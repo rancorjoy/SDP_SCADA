@@ -68,7 +68,7 @@ def main():                                                         # Main Metho
 
                                                                 # Create a thread that runs flash_thread.flash_loop
                                                                 # Pass the thread the event flash so results can be used in main thread
-        write_thread = threading.Thread(target=flash_thread.flash_loop, args=(flash_queue,flash_lock, path,is_sp))
+        write_thread = threading.Thread(target=flash_thread.flash_loop, args=(flash_queue,flash_lock, path, is_sp, worker_threads))
         write_thread.daemon = True                              # Dies when main program dies
         write_thread.start()                                    # Start the new thread
 

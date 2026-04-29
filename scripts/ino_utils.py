@@ -36,6 +36,24 @@ def get_vol_list(curr_dict, controller_name):
                         vol_list.append(name)
     return vol_list
 
+# Get all dependancies
+def get_depend(data_path, cont_name, block_lib):
+    used_blocks = code_block_utils.block_types_used(data_path, cont_name)
+    dep_list = []
+
+    print(used_blocks)
+
+    for block_type in used_blocks:
+        for dep in block_lib[block_type]["dep_list"]:
+            if dep not in dep_list:
+                dep_list.append(dep)
+
+    code_str = f""
+    for dep in dep_list:
+        code_str += textwrap.dedent(f"#include <{dep}.h>\n")
+
+    return code_str
+
 # Define all code blocks near top of script
 def define_code_blocks(data_path, cont_name, block_lib):
     used_blocks = code_block_utils.block_types_used(data_path, cont_name)
@@ -45,6 +63,7 @@ def define_code_blocks(data_path, cont_name, block_lib):
         code_str += get_block_code(block_type, block_lib)
 
     return code_str
+
 
 # Get code block equivelent (defined before setup for each detected block type)
 def get_block_code(block_type, block_lib):
@@ -494,11 +513,33 @@ def get_hold_en_points(cont):
 
     return code_str
 
+# Get block of code to transmit data out to SCADA
+def get_write_block(cont):
+    code_str = f""
+    
+    for key, val in cont["software_points"].items():
+        if not val["hardware"]:                             # software point are always active
+            code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.print(getPoint({key}));\n", "\t\t")
+
+        elif key in cont["pin_config"]:                     # pin hardware point
+            if cont["pin_config"][key]["enabled"]:
+                code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.print(getPoint({key}));\n", "\t\t")
+
+        else:                                               # timer hardware point
+            timer_name = key.split('_')[0]
+            if timer_name in cont["timers"] and cont["timers"][timer_name]["enabled"]:
+                code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.print(getPoint({key}));\n", "\t\t")
+
+    return code_str
+
 # Function that assembles generated code for Aduino
 def get_code(data_path, cont_name, block_lib, curr_dict):
     cont = dcs_dict_utils.get_dict(data_path, cont_name)
 
     def_code = textwrap.dedent(f"""\
+// Include Libraries if any needed
+{get_depend(data_path, cont_name, block_lib)}
+
 // Struct Definition for all Points
 template <typename T>
 struct Point {{
@@ -604,7 +645,11 @@ if (Serial.available()) {{
 // Run all instances of code blocks and store results
 {get_block_list(curr_dict[cont_name]["loop_blocks"], block_lib, curr_dict, cont_name)}
 
+// Write all output pin values
 {get_pin_writes(cont)}
+
+// Transmit all values to SCADA over serial connection
+{get_write_block(cont)}
 }}
 """).strip()
     return def_code
