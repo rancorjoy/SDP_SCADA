@@ -88,8 +88,8 @@ def get_software_point():   # The defualt software point is always the same
     return {
         "type": "int",      # int, float or bool
         "default" : 1,      # default value
-        "hold" : False,     # is the default value being overriden (serial)?
-        "hold_val" : 1,     # what is the hold value if being held?
+        #"hold" : False,     # is the default value being overriden (serial)?
+        #"hold_val" : 1,     # what is the hold value if being held?
         "min_en" : False,   # is the value held at or above a value? (not available for bool)
         "max_en" : False,   # is the value held at or below a value? (not available for bool)
         "min" : 0,          # minimum value (not available for bool)
@@ -1189,7 +1189,7 @@ def change_point_const(point_dict, point, value, array_dict):
         if value:
             point_dict[point]["min_en"] = False
             point_dict[point]["max_en"] = False
-            point_dict[point]["hold"] = False
+            #point_dict[point]["hold"] = False
         
         point_dict[point]["const"] = value
         return True
@@ -1214,20 +1214,20 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
                 point_dict[point]["max_en"] = False
                 point_dict[point]["max"] = 1
                 point_dict[point]["min"] = 0
-                if point_dict[point]["hold_val"] > 0:
-                    point_dict[point]["hold_val"] = 1
+                #if point_dict[point]["hold_val"] > 0:
+                #    point_dict[point]["hold_val"] = 1
                 if point_dict[point]["default"] > 0:
                     point_dict[point]["default"] = 1
             if type == "int":
                 point_dict[point]["float_type"] = {}
-                point_dict[point]["hold_val"] = int(point_dict[point]["hold_val"])
+                #point_dict[point]["hold_val"] = int(point_dict[point]["hold_val"])
                 point_dict[point]["min"] = int(point_dict[point]["min"])
                 point_dict[point]["max"] = int(point_dict[point]["max"])
             if type == "float":
                 point_dict[point]["int_type"] = {}
                 if pin_dict[point]["analog_set"]:
                     return False
-                point_dict[point]["hold_val"] = float(point_dict[point]["hold_val"])
+                #point_dict[point]["hold_val"] = float(point_dict[point]["hold_val"])
                 point_dict[point]["min"] = float(point_dict[point]["min"])
                 point_dict[point]["max"] = float(point_dict[point]["max"])
             return True
@@ -1289,52 +1289,52 @@ def change_point_def(point_dict, point, value, tim_dict):
     point_dict[point]["default"] = value
     return True
 
-def change_point_hold_val(point_dict, point, value, tim_dict):
-    if point not in point_dict:
-        return False
+# def change_point_hold_val(point_dict, point, value, tim_dict):
+#     if point not in point_dict:
+#         return False
     
-    if val_timer(point, value, tim_dict) == False:
-        return False
+#     if val_timer(point, value, tim_dict) == False:
+#         return False
     
-    if point_dict[point]["const"]:
-        return False
+#     if point_dict[point]["const"]:
+#         return False
 
-    point_type = point_dict[point]["type"]
+#     point_type = point_dict[point]["type"]
     
-    if point_type == "bool":
-        if not isinstance(value, bool) and value not in [0, 1]:
-            return False
-    elif point_type == "int":
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            return False
-        value = int(value)  # coerce float to int if needed
-    elif point_type == "float":
-        if not isinstance(value, (int, float)) or isinstance(value, bool):
-            return False
-        value = float(value)  # coerce int to float if needed
+#     if point_type == "bool":
+#         if not isinstance(value, bool) and value not in [0, 1]:
+#             return False
+#     elif point_type == "int":
+#         if not isinstance(value, (int, float)) or isinstance(value, bool):
+#             return False
+#         value = int(value)  # coerce float to int if needed
+#     elif point_type == "float":
+#         if not isinstance(value, (int, float)) or isinstance(value, bool):
+#             return False
+#         value = float(value)  # coerce int to float if needed
     
-    # Check min/max bounds if enabled
-    if point_dict[point].get("min_en") and value < point_dict[point]["min"]:
-        return False
-    if point_dict[point].get("max_en") and value > point_dict[point]["max"]:
-        return False
+#     # Check min/max bounds if enabled
+#     if point_dict[point].get("min_en") and value < point_dict[point]["min"]:
+#         return False
+#     if point_dict[point].get("max_en") and value > point_dict[point]["max"]:
+#         return False
     
-    point_dict[point]["hold_val"] = value
-    if point_dict[point]["type"] == "int":
-        point_dict[point]["hold_val"] = int(value)
-    return True
+#     point_dict[point]["hold_val"] = value
+#     if point_dict[point]["type"] == "int":
+#         point_dict[point]["hold_val"] = int(value)
+#     return True
 
-def change_point_hold_en(point_dict, point, value):
-    if not isinstance(value, bool):
-        return False
+# def change_point_hold_en(point_dict, point, value):
+#     if not isinstance(value, bool):
+#         return False
     
-    if point_dict[point]["const"]:
-        return False
+#     if point_dict[point]["const"]:
+#         return False
 
-    if point in point_dict:
-        point_dict[point]["hold"] = value
-        return True
-    return False
+#     if point in point_dict:
+#         point_dict[point]["hold"] = value
+#         return True
+#     return False
 
 def change_point_min_en(point_dict, point, value):
     if not isinstance(value, bool):
@@ -1767,8 +1767,8 @@ def clear_controller(current_dict, controller_name):
         else:
             current_dict[controller_name]["software_points"][key]["type"] = "int"       # Reset all hardware points to original values
             current_dict[controller_name]["software_points"][key]["default"] = 1
-            current_dict[controller_name]["software_points"][key]["hold"] = False
-            current_dict[controller_name]["software_points"][key]["hold_val"] = 1
+            #current_dict[controller_name]["software_points"][key]["hold"] = False
+            #current_dict[controller_name]["software_points"][key]["hold_val"] = 1
             current_dict[controller_name]["software_points"][key]["min_en"] = False
             current_dict[controller_name]["software_points"][key]["max_en"] = False
             current_dict[controller_name]["software_points"][key]["min"] = 0

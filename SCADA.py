@@ -20,19 +20,9 @@ from scripts import flask_thread
 from scripts import flash_thread
 from scripts import serial_thread
 from scripts import create_block_lib
+from scripts import worker_thread_utils
 from scripts import print_log
 from scripts.current_state import CurrentState
-
-def split_dcs_list(dcs_list):
-    cont_list = {}
-    prog_list = {}
-    for key in dcs_list:
-        if dcs_dict_utils.is_prog(dcs_list[key]):
-            print("Test Condition")
-            prog_list[key] = dcs_list[key]
-        else:
-            cont_list[key] = dcs_list[key]
-    return cont_list, prog_list
 
 def main():                                                         # Main Method - Program Entry Point
     
@@ -50,7 +40,8 @@ def main():                                                         # Main Metho
     flash_queue = queue.Queue()                             # Create an event queue for flashing DCS controllers
     flash_lock = threading.Lock()                           # Create a lock for the flash thread
     
-    current_dcs = {}                                        # Array for current dcs connections
+    current_dcs = {}                                        # Dictionary for current dcs connections
+    worker_threads = {}                                     # Dictionary for current worker threads (monitor connections)
 
     current_dict = {}                                                   # Dictionary for DCS details of each controller (current/unsaved versions)
     current_dict = dcs_dict_utils.init_current_dict(path)               # Get the (starting) current dictionary from previously learned devices
@@ -68,7 +59,7 @@ def main():                                                         # Main Metho
         monitor_thread.start()                                  # Start the new thread
 
         # Data structure being passed to the FLASK server with current state of system (pass by reference)
-        thisState = CurrentState(current_dcs,current_dict, current_dict_lock, flash_queue, flash_lock, blk_lib) 
+        thisState = CurrentState(current_dcs,current_dict, current_dict_lock, flash_queue, flash_lock, blk_lib, worker_threads) 
 
                                                                 # Create a thread that runs flask_thread.flask_loop
         server_thread = threading.Thread(target=flask_thread.flask_loop, args=(thisState,)) 
@@ -92,8 +83,6 @@ def main():                                                         # Main Metho
             
                 previous_devices = dict(devices)
 
-                cont_list, prog_list = split_dcs_list(current_dict)
-
                 with serial_thread.devices_lock:                    # Lock while reading
                     devices = dict(serial_thread.connected_devices) # Get list of all devices from the serial thread dictionary
                 
@@ -104,11 +93,13 @@ def main():                                                         # Main Metho
 
                             if is_saved:
                                 is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs, current_dict, current_dict_lock)
+                                worker_thread_utils.add_worker(device["port"], worker_threads)
 
                     # Disconnected devices
                     for device in previous_devices.values():
                         if device not in devices.values():
                             is_removed = dcs_dict_utils.unload_dcs(path, device["port"], current_dcs)
+                            worker_thread_utils.remove_worker(device["port"], worker_threads)
     
     else:                                               # If the data path is not initialized
         print_log.pL("System", "Error", "Data Path has failed to initialize", "System", True)

@@ -251,13 +251,13 @@ def get_var(cont, point_name, curr_dict, controller_name):
     if point["const"]: vol = f"constexpr "
 
     if point["type"] == "int" and point["int_type"] != "":
-        code_str = textwrap.dedent(f"{vol}Point<{point["int_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
+        code_str = textwrap.dedent(f"{vol}Point<{point["int_type"]}> {point_name} = {{{point["default"]}, 0, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
         return code_str
     elif point["type"] == "float" and point["float_type"] != "":
-        code_str = textwrap.dedent(f"{vol}Point<{point["float_type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
+        code_str = textwrap.dedent(f"{vol}Point<{point["float_type"]}> {point_name} = {{{point["default"]}, 0, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
         return code_str
     else:
-        code_str = textwrap.dedent(f"{vol}Point<{point["type"]}> {point_name} = {{{point["default"]}, {point["hold_val"]}, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
+        code_str = textwrap.dedent(f"{vol}Point<{point["type"]}> {point_name} = {{{point["default"]}, 0, false, {point["min"]}, {str(point["min_en"]).lower()}, {point["max"]}, {str(point["max_en"]).lower()}}};\n")
         return code_str
 
 # Get a block of Arduino code (at the top) that adds all software points
@@ -461,9 +461,17 @@ struct Point {{
 // Get the current value of a point based on hold_en
 template <typename T>
 T getPoint(const volatile Point<T>& p) {{
-    return p.hold_en ? p.hold_val : p.val;
-}}
+    T val = p.hold_en ? p.hold_val : p.val;
+    if (p.min_en && val < p.min) {{
+        val = p.min;
+    }}
 
+    if (p.max_en && val > p.max) {{
+        val = p.max;
+    }}
+    
+    return val;
+}}
 // Set the current value of a point with min/max checking
 template <typename T>
 void setPoint(volatile Point<T>& p, T new_val) {{

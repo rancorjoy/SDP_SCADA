@@ -22,6 +22,7 @@ from . import dcs_flash_utils                   # Import the dcs_flash_utils scr
 from . import dcs_script_utils
 from . import ino_utils
 from . import code_block_utils
+from . import worker_thread_utils
 from . import print_log                
 from scripts.current_state import CurrentState
 
@@ -281,6 +282,7 @@ def flask_loop(CurrentState):                               # Method is ran in e
     flash_queue = CurrentState.flash_queue
     flash_lock = CurrentState.flash_lock
     block_lib = CurrentState.block_lib
+    worker_threads = CurrentState.worker_threads
 
     app = flask.Flask(__name__)                             # Runs Flask Thread for Command Inputs
 
@@ -344,8 +346,8 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "edit_point_spec_type":   return {"ok": True, "result": dcs_dict_utils.change_point_spec_type(current_dict[args[0]]["software_points"], args[1], args[2])}
             if cmd == "edit_point_def":         return {"ok": True, "result": dcs_dict_utils.change_point_def(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
             if cmd == "edit_point_const":       return {"ok": True, "result": dcs_dict_utils.change_point_const(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]), current_dict[args[0]]["arrays"])}
-            if cmd == "edit_point_hold_enable": return {"ok": True, "result": dcs_dict_utils.change_point_hold_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
-            if cmd == "edit_point_hold":        return {"ok": True, "result": dcs_dict_utils.change_point_hold_val(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
+            if cmd == "edit_point_hold_enable": return {"ok": True, "result": worker_thread_utils.hold_en_worker(current_dict[args[0]]["port"], worker_threads, args[1], eval_bool(args[2]), current_dict, get_path())}
+            if cmd == "edit_point_hold":        return {"ok": True, "result": worker_thread_utils.hold_worker(current_dict[args[0]]["port"], worker_threads, args[1], args[2], current_dict, get_path())}
             if cmd == "edit_point_min_enable":  return {"ok": True, "result": dcs_dict_utils.change_point_min_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
             if cmd == "edit_point_min":         return {"ok": True, "result": dcs_dict_utils.change_point_min(current_dict[args[0]]["software_points"], args[1], float(args[2]), current_dict[args[0]]["timers"])}
             if cmd == "edit_point_max_enable":  return {"ok": True, "result": dcs_dict_utils.change_point_max_en(current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
