@@ -19,6 +19,7 @@ from scripts import dcs_flash_utils
 from scripts import flask_thread
 from scripts import flash_thread
 from scripts import serial_thread
+from scripts import sql_thread
 from scripts import create_block_lib
 from scripts import worker_thread_utils
 from scripts import print_log
@@ -42,6 +43,7 @@ def main():                                                         # Main Metho
     
     current_dcs = {}                                        # Dictionary for current dcs connections
     worker_threads = {}                                     # Dictionary for current worker threads (monitor connections)
+    sql_queue = queue.Queue()                               # Event queue to add to SQL database
 
     current_dict = {}                                                   # Dictionary for DCS details of each controller (current/unsaved versions)
     current_dict = dcs_dict_utils.init_current_dict(path)               # Get the (starting) current dictionary from previously learned devices
@@ -72,6 +74,12 @@ def main():                                                         # Main Metho
         write_thread.daemon = True                              # Dies when main program dies
         write_thread.start()                                    # Start the new thread
 
+                                                                # Create a thread that runs the SQL database
+                                                                # Pass the thread the SQL event queue so it can be scheduled
+        db_thread = threading.Thread(target=sql_thread.sql_worker, args=(path, sql_queue))
+        db_thread.daemon = True                                 # Dies when main program dies
+        db_thread.start()                                       # Start the new thread
+
         while True:                                             # Main Loop
         
                                                                         # Non-blocking check for new serial events
@@ -93,7 +101,11 @@ def main():                                                         # Main Metho
 
                             if is_saved:
                                 is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs, current_dict, current_dict_lock)
-                                worker_thread_utils.add_worker(device["port"], worker_threads)
+
+                                port = device["port"]
+                                cont_name = dcs_dict_utils.port_to_name(path, port)
+
+                                worker_thread_utils.add_worker(port, worker_threads, sql_queue, cont_name, current_dict)
 
                     # Disconnected devices
                     for device in previous_devices.values():

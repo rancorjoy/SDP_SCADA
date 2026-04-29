@@ -34,7 +34,7 @@ def get_block_type():
 # This function returns an instance of a block which should be added to a block list to be executed in order
 def get_block_inst(block_type):    # Block type dictionary, either "setup" "loop" or an ISR name, dicts of input points and output points
     return {
-        "block_type" : block_type,                  # Key in block types dictionary to get block type
+        "block_type" : "",                          # Key in block types dictionary to get block type
         "input_points" : {},                        # Should be key : point where key returns the type in the block_type
         "output_points" : {},
         "condition" : None                          # If this is set to a point (bool), the block will only run if True (adds condition)
@@ -450,7 +450,7 @@ def block_types_used(data_path, controller_name):
     return block_types_used
 
 # Validate that the "code" saved has no obvious errors and log warnings:
-def validate_config(data_path, controller_name):
+def validate_config(data_path, controller_name, block_lib):
     warnings = []
     errors = []
 
@@ -460,7 +460,67 @@ def validate_config(data_path, controller_name):
     #warnings.append(f"Test Warning")
     #errors.append(f"Test Error")
 
-    return {"warnings" : warnings, "errors" : errors}   # Return warnings and errors
+    # Get controller/program information
+    cont = dcs_dict_utils.get_dict(data_path, controller_name)
+    blk_lists = find_lists_saved(data_path, controller_name)
+
+    # Sort hardware points by input vs output and const
+    hw_out_points = []
+    hw_in_points = []
+    const_points = []
+    
+    for key in cont["software_points"]:
+        if cont["software_points"][key]["hardware"]:
+            if cont["pin_config"][key]["direction"] == "OUTPUT":
+                hw_out_points.append(cont["software_points"][key])
+            else:
+                hw_in_points.append(cont["software_points"][key])
+        elif cont["software_points"][key]["const"]:
+            const_points.append(cont["software_points"][key])
+
+    for blk_list in blk_lists:
+        for blk_inst in blk_list:
+            # Hardware inputs as block outputs check
+            for out_key in blk_inst["output_points"]:
+                for item in hw_in_points:
+                    if blk_inst["output_points"][out_key]["_name"] == item["_name"]:
+                        errors.append(f'Point {blk_inst["output_points"][out_key]["_name"]} configured as input, used as output of {blk_inst["block_type"]}')
+                # Const points as block outputs check
+                for item in const_points:
+                    if blk_inst["output_points"][out_key]["_name"] == item["_name"]:
+                        errors.append(f'Point {blk_inst["output_points"][out_key]["_name"]} configured as constant, used as output of {blk_inst["block_type"]}')
+            # Hardware outputs as block inputs check
+            for in_key in blk_inst["input_points"]:
+                for item in hw_out_points:
+                    if blk_inst["input_points"][in_key]["_name"] == item["_name"]:
+                        errors.append(f'Point {blk_inst["input_points"][in_key]["_name"]} configured as output, used as input of {blk_inst["block_type"]}')
+
+    # Empty block inputs check
+    for blk_list in blk_lists:
+        for blk_inst in blk_list:
+            for key in block_lib[blk_inst["block_type"]]["input_points"]:
+                if key not in blk_inst["input_points"]:
+                    errors.append(f'Block {blk_inst["block_type"]} missing input {key}')
+
+    # Empty block outputs check
+    for blk_list in blk_lists:
+        for blk_inst in blk_list:
+            for key in block_lib[blk_inst["block_type"]]["output_points"]:
+                if key not in blk_inst["output_points"]:
+                    errors.append(f'Block {blk_inst["block_type"]} missing output {key}')
+
+    # Output assigned multiple times check
+    output_list = []
+    for blk_list in blk_lists:
+        for blk_inst in blk_list:
+            for key in blk_inst["output_points"]:
+                point_name = blk_inst["output_points"][key]["_name"]
+                if point_name not in output_list:
+                    output_list.append(point_name)
+                else:
+                    errors.append(f'Point {point_name} assigned to multiple block outputs')
+
+    return {"warnings": warnings, "errors": errors}
 
 # Gets boolean result of validation  - only compile if true!
 def valid_to_bool(valid):

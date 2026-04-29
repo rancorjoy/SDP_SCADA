@@ -13,6 +13,7 @@ import serial                                   # Serial Communications over USB
 import serial.tools.list_ports                  # Serial communication tools for port detection
 import logging                                  # For custom server logging
 import sys                                      # Used at end to supress logging
+import threading                                # For shutdown command
 from dataclasses import dataclass               # Allows current state to be passed as a struct to FLASK thread
 
 from . import data_path_utils                   # Import the data_path_utils script (current) folder
@@ -33,6 +34,7 @@ COMMANDS = {
     #  cmd name        min  max  usage hint
     "help":                 (0,   0,   "help"),
     "status":               (0,   0,   "status"),
+    "shutdown":             (0,   0,   "shutdown"),
     "list_serial":          (0,   0,   "list_serial"),
     "list_conts":           (0,   0,   "list_conts"),
     "list_current_state":   (0,   0,   "list_current_state"),
@@ -43,11 +45,12 @@ COMMANDS = {
     "migrate":       (1,   1,   "migrate <relative path>"),
     "recover":       (1,   1,   "recover <relative path>"),
 
-    "list_dcs":      (0,   0,   "list_dcs"),
-    "rename_dcs":    (2,   2,   "rename_dcs <old controller name> <new controller name>"),
-    "unload_dcs":    (1,   1,   "unload_dcs <controller name>"),
-    "load_dcs":      (1,   1,   "load_dcs <controller name>"),
-    "delete_dcs":    (1,   1,   "delete_dcs <controller name>"),
+    "list_dcs":             (0,   0,   "list_dcs"),
+    "rename_dcs":           (2,   2,   "rename_dcs <old controller name> <new controller name>"),
+    "unload_dcs":           (1,   1,   "unload_dcs <controller name>"),
+    "load_dcs":             (1,   1,   "load_dcs <controller name>"),
+    "delete_dcs":           (1,   1,   "delete_dcs <controller name>"),
+    "change_sample_time":   (2,   2,   "change_sample_time <controller name> <sample time>"),
     
     "list_progs" :    (0,   0,   "list_progs"),
     "add_program" :   (0,   0,   "add_program"),
@@ -164,6 +167,7 @@ def get_help():
     help_text = f"""General Commands:
     help :              \t Displays a list of all valid commands
     status :            \t Displays the network status of the SCADA server
+    shutdown :          \t Exits the SCADA application and closes all threads
     list_serial :       \t Lists all detected serial connections to the SCADA server
     list_conts :        \t List all saved controllers
     list_current_state :\t Lists current state of SCADA system (all loaded control info)
@@ -176,11 +180,12 @@ def get_help():
     recover <path> :   \t Recovers the persistent data path at specified location <relative path>
 
     Controller General Commands:
-    list_dcs :     \t List all connected DCS Controllers
-    rename_dcs :   \t Rename a DCS Controller or program <old controller name> <new controller name>
-    unload_dcs :   \t Remove a DCS from the current list <controller name>
-    load_dcs :     \t Add a DCS from to current list (from file) <controller name>
-    delete_dcs :   \t Delete a DCS Controller or program <controller/program name>
+    list_dcs :          \t List all connected DCS Controllers
+    rename_dcs :        \t Rename a DCS Controller or program <old controller name> <new controller name>
+    unload_dcs :        \t Remove a DCS from the current list <controller name>
+    load_dcs :          \t Add a DCS from to current list (from file) <controller name>
+    delete_dcs :        \t Delete a DCS Controller or program <controller/program name>
+    change_sample_time :\t Change the time (in seconds) between SQL samples for a controller <controller name> <sample time>
 
     Controller Program Commands:
     list_progs :    \t List all saved programs (not inclusing connected DCS controllers)
@@ -303,6 +308,11 @@ def flask_loop(CurrentState):                               # Method is ran in e
         try:
             if cmd == "help":               return {"ok": True, "message": get_help()}
             if cmd == "status":             return {"ok": True, "message": "Running"}
+            
+            if cmd == "shutdown" :          
+                threading.Timer(0.5, sys.exit, args=[0]).start() 
+                return {"ok": True, "result": "shutting down"}
+            
             if cmd == "list_serial":        return {"ok": True, "dict": scan_serial.list_serial_ports()}
             if cmd == "list_conts":         return {"ok": True, "dict": split_dcs_list(current_dict)[0]}
             if cmd == "list_current_state": return {"ok": True, "dict": current_dict}
@@ -313,12 +323,13 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "migrate":        return {"ok": True, "result": data_path_utils.migrate(args[0])}
             if cmd == "recover":        return {"ok": True, "result": data_path_utils.recover(args[0])}
 
-            if cmd == "list_dcs":   return {"ok": True, "dict": dcs_list}
-            if cmd == "rename_dcs": return {"ok": True, "result": dcs_dict_utils.rename_dcs(get_path(), args[0], args[1], dcs_list, current_dict, current_dict_lock)}
-            if cmd == "load_dcs":   return {"ok": True, "result": dcs_dict_utils.load_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list,  current_dict, current_dict_lock)}
-            if cmd == "unload_dcs": return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
-            if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list,  current_dict, current_dict_lock)}
-            
+            if cmd == "list_dcs":           return {"ok": True, "dict": dcs_list}
+            if cmd == "rename_dcs":         return {"ok": True, "result": dcs_dict_utils.rename_dcs(get_path(), args[0], args[1], dcs_list, current_dict, current_dict_lock)}
+            if cmd == "load_dcs":           return {"ok": True, "result": dcs_dict_utils.load_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list,  current_dict, current_dict_lock)}
+            if cmd == "unload_dcs":         return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
+            if cmd == "delete_dcs":         return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list,  current_dict, current_dict_lock)}
+            if cmd == "change_sample_time": return {"ok": True, "result": dcs_dict_utils.change_sample_time(current_dict, args[0], args[1])}
+
             if cmd == "list_progs":         return {"ok": True, "dict": split_dcs_list(current_dict)[1]}
             if cmd == "add_program" :       return {"ok": True, "result": dcs_dict_utils.init_code_dcs(get_path(), current_dict, current_dict_lock)}
             if cmd == "load_program" :      return {"ok": True, "result": dcs_dict_utils.load_prog_to_cont(args[0], args[1], current_dict, get_path())}

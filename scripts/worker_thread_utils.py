@@ -47,11 +47,11 @@ def poll(self) -> dict:
 # FUNCTIONS CALLED FROM SCADA.py
 
 # Call to add a worker thread at a port
-def add_worker(port, worker_threads):
+def add_worker(port, worker_threads, sql_queue, cont_name, current_dict):
     cmd_queue = queue.Queue()
     t = threading.Thread(
         target = worker_thread.worker,
-        args=(port, cmd_queue)
+        args=(port, cmd_queue, sql_queue, cont_name, current_dict)
     )
     t.daemon = True
     t.start()
@@ -77,6 +77,9 @@ def hold_en_worker(port, worker_threads, point_name, value, current_dict, data_p
         return False
 
     if point_name not in current_dict[dcs_dict_utils.port_to_name(data_path, port)]["software_points"]:
+        return False
+    
+    if current_dict[dcs_dict_utils.port_to_name(data_path, port)]["software_points"][point_name]["const"]:  # DO NOT HOLD A CONST!!!
         return False
 
     if value == True:

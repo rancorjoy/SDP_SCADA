@@ -571,7 +571,8 @@ def init_dcs(data_path, port, current_dict, current_dict_lock):
     "timers" : tim_map,
     "arrays" : {},                      # By default there are no arrays on start-up, they can be added
     "setup_blocks" : [],                # Code blocks for different parts of the program
-    "loop_blocks" : []
+    "loop_blocks" : [],
+    "sample_time" : 1                   # Time between samples in seconds
     }
 
     # A copy of the Arduino Default code so the controller can be flashed initially
@@ -975,7 +976,19 @@ def change_pin_int(pin_dict, pin, int):
         return True
     return False
 
+def change_sample_time(current_dict, cont_name, sample_time):
 
+    if cont_name not in current_dict:
+        return False
+    
+    if is_prog(current_dict[cont_name]):
+        return False
+
+    try:
+        current_dict[cont_name]["sample_time"] = float(sample_time)
+        return True
+    except ValueError:
+        return False
 
 # === Functions to change point settings ===
 

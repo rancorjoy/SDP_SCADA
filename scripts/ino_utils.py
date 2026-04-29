@@ -41,8 +41,6 @@ def get_depend(data_path, cont_name, block_lib):
     used_blocks = code_block_utils.block_types_used(data_path, cont_name)
     dep_list = []
 
-    print(used_blocks)
-
     for block_type in used_blocks:
         for dep in block_lib[block_type]["dep_list"]:
             if dep not in dep_list:
@@ -519,16 +517,16 @@ def get_write_block(cont):
     
     for key, val in cont["software_points"].items():
         if not val["hardware"]:                             # software point are always active
-            code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.print(getPoint({key}));\n", "\t\t")
+            code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.println(getPoint({key}));\n", "\t\t")
 
         elif key in cont["pin_config"]:                     # pin hardware point
             if cont["pin_config"][key]["enabled"]:
-                code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.print(getPoint({key}));\n", "\t\t")
+                code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.println(getPoint({key}));\n", "\t\t")
 
         else:                                               # timer hardware point
             timer_name = key.split('_')[0]
             if timer_name in cont["timers"] and cont["timers"][timer_name]["enabled"]:
-                code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.print(getPoint({key}));\n", "\t\t")
+                code_str += textwrap.indent(f"Serial.print(\"{key} \");\nSerial.println(getPoint({key}));\n", "\t\t")
 
     return code_str
 
@@ -613,6 +611,8 @@ sei(); // Re-enable interrupts
 
 }}
 
+unsigned long lastSend_var = 0;
+
 void loop() {{
 {get_pin_reads(cont)}
 
@@ -648,8 +648,13 @@ if (Serial.available()) {{
 // Write all output pin values
 {get_pin_writes(cont)}
 
-// Transmit all values to SCADA over serial connection
+
+    if (millis() - lastSend_var >= 100) {{
+        // Transmit all values to SCADA over serial connection
 {get_write_block(cont)}
+        lastSend_var = millis();
+    }}
+
 }}
 """).strip()
     return def_code
