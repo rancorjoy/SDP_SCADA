@@ -53,6 +53,7 @@ COMMANDS = {
     "add_program" :   (0,   0,   "add_program"),
     "load_program" :  (2,   2,   "load_program <controller name> <program name>"),
     "unload_program": (2,   2,   "unload_program <controller name> <program name>"),
+    "clear_dcs":      (1,   1,   "clear_dcs <controller name>"),
 
     "save_dcs":      (1,   1,   "save_dcs <controller name>"),
     "reset_dcs":     (1,   1,   "reset_dcs <controller name>"),
@@ -185,7 +186,8 @@ def get_help():
     list_progs :    \t List all saved programs (not inclusing connected DCS controllers)
     add_program :   \t Create a new program
     load_program:   \t Load a saved program into a Controller's current state <controller name> <current name>
-    unload_program: \t Load a Controller's saved state into a program's current state <controller name> <current name>
+    unload_program :\t Load a Controller's saved state into a program's current state <controller name> <current name>
+    clear_dcs :     \t Clear controller current settings back to defaul <controller name>
 
     Controlller Program Pipeline Commands:
     save_dcs :     \t Save Changes to a DCS Controller or program <controller name>
@@ -321,6 +323,7 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "add_program" :       return {"ok": True, "result": dcs_dict_utils.init_code_dcs(get_path(), current_dict, current_dict_lock)}
             if cmd == "load_program" :      return {"ok": True, "result": dcs_dict_utils.load_prog_to_cont(args[0], args[1], current_dict, get_path())}
             if cmd == "unload_program" :    return {"ok": True, "result": dcs_dict_utils.load_cont_to_prog(get_path(), args[0], current_dict, args[1])}
+            if cmd == "clear_dcs" :         return {"ok": True, "result": dcs_dict_utils.clear_controller(current_dict, args[0])}
 
             if cmd == "save_dcs":       return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
             if cmd == "reset_dcs":      return {"ok": True, "result": dcs_dict_utils.reset_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}

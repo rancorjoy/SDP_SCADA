@@ -426,13 +426,72 @@ def get_timer_configs(cont_name, cont):
 # Get block of code for one array instance
 def get_array(cont, array_name):
     this_array = cont["arrays"][array_name]
-    code_str = f"{this_array["type"]} {this_array["_name"]}[{this_array["size_point"]["_name"]}.val];"
+    code_str = f"{this_array["type"]} {this_array["_name"]}[{this_array["size_point"]["_name"]}.val];\n"
     return code_str
 
+# Get block of code for all defined arrays
 def get_arrays(cont):
     code_str = f""
     for key in cont["arrays"]:
         code_str += get_array(cont, key)
+    return code_str
+
+# Get block of code to check hold_val for one point
+def get_hold_point(cont, point_name):
+    point = cont["software_points"][point_name]
+    g_type = point["type"]
+
+    if g_type == "bool":
+        return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = (bool)(val == \"true\");\n", "\t\t")
+    
+    elif g_type == "int":
+        s_type = point["int_type"]
+        if s_type == "" or s_type == None:
+            s_type = "int"
+        return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = ({s_type})val.toInt();\n", "\t\t")
+    
+    elif g_type == "float":
+        s_type = point["float_type"]
+        if s_type == "" or s_type == None:
+            s_type = "float"
+        return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = ({s_type})val.toFloat();\n", "\t\t")
+
+# Get block of code to check all hold_vals vs points
+def get_hold_points(cont):
+    code_str = f""
+
+    for key, val in cont["software_points"].items():
+        if not val["hardware"]:                             # software point are always active
+            code_str += get_hold_point(cont, key)
+
+        elif key in cont["pin_config"]:                     # pin hardware point
+            if cont["pin_config"][key]["enabled"]:
+                code_str += get_hold_point(cont, key)
+
+        else:                                       # timer hardware point
+            timer_name = key.split('_')[0]
+            if timer_name in cont["timers"] and cont["timers"][timer_name]["enabled"]:
+                code_str += get_hold_point(cont, key)
+
+    return code_str
+
+# Get block of code to check all hold_ens vs points
+def get_hold_en_points(cont):
+    code_str = f""
+    
+    for key, val in cont["software_points"].items():
+        if not val["hardware"]:                             # software point are always active
+            code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
+
+        elif key in cont["pin_config"]:                     # pin hardware point
+            if cont["pin_config"][key]["enabled"]:
+                code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
+
+        else:                                               # timer hardware point
+            timer_name = key.split('_')[0]
+            if timer_name in cont["timers"] and cont["timers"][timer_name]["enabled"]:
+                code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
+
     return code_str
 
 # Function that assembles generated code for Aduino
@@ -469,7 +528,7 @@ T getPoint(const volatile Point<T>& p) {{
     if (p.max_en && val > p.max) {{
         val = p.max;
     }}
-    
+
     return val;
 }}
 // Set the current value of a point with min/max checking
@@ -515,6 +574,32 @@ sei(); // Re-enable interrupts
 
 void loop() {{
 {get_pin_reads(cont)}
+
+// Set Holds
+if (Serial.available()) {{
+    String cmd = Serial.readStringUntil('\\n');
+    cmd.trim();
+
+    // Hold Enable Command Received
+    if (cmd.startsWith("hold_en ")) {{
+        String args = cmd.substring(8);
+        int sp = args.indexOf(' ');
+        String name = args.substring(0, sp);
+        bool val = args.substring(sp + 1) == "true";
+
+{get_hold_en_points(cont)}
+    }}
+      
+        // Hold Value Command Received
+        else if (cmd.startsWith("hold ")) {{
+        String args = cmd.substring(5);
+        int sp = args.indexOf(' ');
+        String name = args.substring(0, sp);
+        String val = args.substring(sp + 1);
+
+{get_hold_points(cont)}
+    }}
+  }}
 
 // Run all instances of code blocks and store results
 {get_block_list(curr_dict[cont_name]["loop_blocks"], block_lib, curr_dict, cont_name)}

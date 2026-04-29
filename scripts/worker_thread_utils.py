@@ -12,6 +12,40 @@ from . import print_log
 from . import worker_thread
 from . import dcs_dict_utils
 
+# FUNCTIONS CALLED FROM WORKER THREAD(S)
+
+# Initiate communications with arduino
+def connect(port, baud=9600) -> serial.Serial:
+    ser = serial.Serial(port, baud, timeout=1)
+    time.sleep(2)
+    return ser
+
+def set_hold(self, point: str, val):
+    self.ser.write(f"SET_HOLD {point} {val}\n".encode())
+
+def set_hold_en(self, point: str, val: bool):
+    self.ser.write(f"SET_HOLD_EN {point} {'true' if val else 'false'}\n".encode())
+
+def poll(self) -> dict:
+    """Read all available lines, return the latest state snapshot."""
+    state = {}
+    self.ser.reset_input_buffer()          # discard stale lines
+    line = self.ser.readline().decode().strip()
+    while line:
+        parts = line.split()
+        if len(parts) == 3:                # name hold holdEnable
+            state[parts[0]] = {
+                "hold":       int(parts[1]),
+                "holdEnable": parts[2] == "1",
+            }
+        line = self.ser.readline().decode().strip()
+    return state
+
+
+
+
+# FUNCTIONS CALLED FROM SCADA.py
+
 # Call to add a worker thread at a port
 def add_worker(port, worker_threads):
     cmd_queue = queue.Queue()
@@ -29,6 +63,13 @@ def remove_worker(port, worker_threads):
         worker_threads[port]["cmd_queue"].put({"command": "stop"})
         worker_threads[port]["thread"].join()                       # Wait for thread loop to finish
         del worker_threads[port]                                    # Remove the thread from worker_threads
+
+
+
+
+
+
+# FUNCTIONS CALLED FROM FLASK THREAD
 
 # Call to set hold enable on point (for worker thread) - called in FLASK
 def hold_en_worker(port, worker_threads, point_name, value, current_dict, data_path):
