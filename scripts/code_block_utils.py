@@ -176,6 +176,30 @@ def find_lists(curr_dict, controller_name):
                 found_lists[key] = curr_dict[controller_name]["int_config"][key]["blocks"]
     return found_lists
 
+# Discover which block lists exist for a controller - delete the obsolete ones
+def find_lists_saved(data_path, controller_name):
+      
+    cont = dcs_dict_utils.get_dict(data_path, controller_name)
+
+    # Setup and loop blocks are at known locations and never get disabled
+    found_lists = {"setup_blocks": cont["setup_blocks"], "loop_blocks" : cont["loop_blocks"]}
+
+    for key in cont["int_config"]:
+        if cont["int_config"][key]["enabled"] == False:
+            cont["int_config"][key]["blocks"].clear() # If the interrupt is disabled, delete the list to prevent code errors!
+            
+        else:                                                                   # Logic for enabled interrupts
+            if key.startswith("DP"):
+                if cont["software_points"][key]["enabled"]:
+                    found_lists[key] = cont["int_config"][key]["blocks"]
+                else:
+                    cont["int_config"][key]["blocks"].clear()     # If the interrupt is enabled somehow, delete the list to prevent code errors!
+                    cont["int_config"][key]["enabled"] = False    # This should be true already but this condition means it was not set!
+                
+            else:                                                                       # Thus this interrupt is a timer interrupt that is enabled -> it must have a list
+                found_lists[key] = cont["int_config"][key]["blocks"]
+    return found_lists
+
 # Function to get block_inst from Flask command (middle-man function)
 def get_inst(curr_dict, controller_name, block_list_str, index):
 
@@ -199,7 +223,7 @@ def add_point_input(block_inst, var_name, point, block_lib, point_dict):
     if var_name in block_inst["input_points"]:                          # already assigned
         return False
     
-    if point not in point_dict:
+    if point["_name"] not in point_dict:
         return False
 
     blk_type = block_lib[block_inst["block_type"]]
@@ -231,7 +255,7 @@ def add_point_output(block_inst, var_name, point, block_lib, point_dict):
     if var_name in block_inst["output_points"]:                          # already assigned
         return False
      
-    if point not in point_dict:
+    if point["_name"] not in point_dict:
         return False
 
     blk_type = block_lib[block_inst["block_type"]]
@@ -262,7 +286,7 @@ def add_array_input(block_inst, var_name, arr, block_lib, array_dict):
     if var_name in block_inst["input_points"]:                         # already assigned
         return False
      
-    if arr not in array_dict:
+    if arr["_name"] not in array_dict:
         return False
 
     if block_lib[block_inst["type"]]["input_points"][var_name] != "arr":
@@ -279,7 +303,7 @@ def add_array_output(block_inst, var_name, arr, block_lib, array_dict):
     if var_name in block_inst["output_points"]:                         # already assigned
         return False
      
-    if arr not in array_dict:
+    if arr["_name"] not in array_dict:
         return False
     
     if block_lib[block_inst["type"]]["output_points"][var_name] != "arr":

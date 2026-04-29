@@ -23,6 +23,17 @@ from scripts import create_block_lib
 from scripts import print_log
 from scripts.current_state import CurrentState
 
+def split_dcs_list(dcs_list):
+    cont_list = {}
+    prog_list = {}
+    for key in dcs_list:
+        if dcs_dict_utils.is_prog(dcs_list[key]):
+            print("Test Condition")
+            prog_list[key] = dcs_list[key]
+        else:
+            cont_list[key] = dcs_list[key]
+    return cont_list, prog_list
+
 def main():                                                         # Main Method - Program Entry Point
     
     print_log.pL("System", "Event", "Starting SCADA", "System", True, None)
@@ -41,12 +52,13 @@ def main():                                                         # Main Metho
     
     current_dcs = {}                                        # Array for current dcs connections
 
-    current_dict = {}                                       # Dictionary for DCS details of each controller (current/unsaved versions)
-    current_dict = dcs_dict_utils.init_current_dict(path)   # Get the (starting) current dictionary from previously learned devices
-    current_dict_lock = threading.Lock()                    # Prevents errors from read/write collisions in the FLASK server
+    current_dict = {}                                                   # Dictionary for DCS details of each controller (current/unsaved versions)
+    current_dict = dcs_dict_utils.init_current_dict(path)               # Get the (starting) current dictionary from previously learned devices
+    current_dict_lock = threading.Lock()                                # Prevents errors from read/write collisions in the FLASK server
+    dcs_dict_utils.load_progs(current_dict, current_dict_lock, path)    # Load all saved programs (empty controllers)
 
-    devices = {}                                            # Array for current devices (USB connections)
-    previous_devices = {}                                   # Array for previous devices (USB connections)
+    devices = {}                                                        # Array for current devices (USB connections)
+    previous_devices = {}                                               # Array for previous devices (USB connections)
 
     if is_path and is_bl:                                       # If the data path is initialized and code blocks are initialized (if not, nothing can/should run)
                                                                 # Create a thread that runs serial_thread.serial_loop
@@ -79,6 +91,8 @@ def main():                                                         # Main Metho
                                                                         # If a serial event has been detected... update device list:
             
                 previous_devices = dict(devices)
+
+                cont_list, prog_list = split_dcs_list(current_dict)
 
                 with serial_thread.devices_lock:                    # Lock while reading
                     devices = dict(serial_thread.connected_devices) # Get list of all devices from the serial thread dictionary

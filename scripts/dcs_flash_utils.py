@@ -11,6 +11,7 @@ import pickle     # Allows Dictionary to be saved to JSON
 import subprocess # Manages Extenral Programs (eg Arduino CLI)
 import sys        # Allows Python CLI Arguments to be run via code
 
+from . import dcs_dict_utils
 from . import print_log
 
 ARDUINO_CLI = "arduino-cli"                                 # Define string

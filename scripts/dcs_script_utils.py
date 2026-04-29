@@ -9,12 +9,18 @@ import shutil   # Shell Utilities (High Level File Operations)
 import argparse # Allows Console Use of Functions with Variables
 import pickle   # Allows Dictionary to be saved to JSON
 
+from . import dcs_dict_utils
 from . import print_log
 
 # Function to create an ino script for a controller
 def create_Script(data_path, name, code_str):
+
     data_path = pathlib.Path(data_path)                              # Ensure data path is a path (works for path and string inputs)
     script_path = data_path / pathlib.Path("dcs_scripts") / name     # Assign dcs_path to data_path/dcs_info (name of folder)
+
+    saved_dict = dcs_dict_utils.get_dict(data_path, name)            # Ensures a script cannot be made for an empty (code) controller
+    if dcs_dict_utils.is_prog(saved_dict):
+        return False
     
     folder_made = False                                              # Keeps track of whether the folder has been made
 

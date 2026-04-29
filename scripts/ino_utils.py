@@ -147,14 +147,14 @@ def get_block_auto(block_type, block_lib):
     return code_str
 
 # Get code block instance usage, placed in a list location
-def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name):
+def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
 
     code_str = f""
 
     # If the block has outputs
     if len(block_lib[block_inst["block_type"]]["output_points"]) != 0:
 
-        code_str += f"auto result = {block_inst["block_type"]}("
+        code_str += f"auto result{index} = {block_inst["block_type"]}("
         for key in block_inst["input_points"]:
             point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["input_points"][key])
             code_str += f"getPoint({point}), "
@@ -164,7 +164,7 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name):
 
         for key in block_inst["output_points"]:
             point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["output_points"][key])
-            code_str += f"setPoint({point}, result.{key});\n"
+            code_str += f"setPoint({point}, result{index}.{key});\n"
 
         code_str += "\n"
         return code_str
@@ -186,9 +186,11 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name):
 # Print a list of blocks
 def get_block_list(block_list, block_lib, curr_dict, cont_name):
     code_str = f""
+    index = 0
 
     for block_inst in block_list:
-        code_str += get_block_inst_code(block_inst, block_lib, curr_dict, cont_name)
+        code_str += get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index)
+        index += 1
 
     return code_str
 

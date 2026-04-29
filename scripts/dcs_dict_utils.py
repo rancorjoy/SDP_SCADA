@@ -9,6 +9,7 @@ import shutil   # Shell Utilities (High Level File Operations)
 import argparse # Allows Console Use of Functions with Variables
 import pickle   # Allows Dictionary to be saved to JSON
 import textwrap # Allows Arduino C++ code blocks to be dedented
+import threading    # Multithreading for Commands Outside of Loop
 
 from . import code_block_utils # Used in clear function at bottom
 from . import dcs_script_utils
@@ -590,6 +591,62 @@ def init_dcs(data_path, port, current_dict, current_dict_lock):
         print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
         return False                                                            # The DCS JSON was not made (there was an error)
 
+# Create an empty dcs JSON (used to save and load programs), will not have controller specific data
+def init_code_dcs(data_path, current_dict, current_dict_lock):
+    
+                                                                # Find the next available controller index
+    dcs_dir = data_path / "dcs_info"                            # The file path containing all controller JSONs
+    existing = list(dcs_dir.glob("unnamed_program_*.json"))     # Find all unnamed controllers
+    n = len(existing)                                           # Next gaurenteed unnamed controller index
+    controller_name = f"unnamed_program_{n}"                    # Use the controller index to generate the file/nick-name
+
+    pin_map = mega_int_map()                                    # Choose MEGA dcs maps because they contain all possible points
+    int_map = mega_int_map()                                    # Note only MEGA has Timer 1C so if used it cannot be loaded into UNO
+    tim_map = mega_timer_map()
+
+                                                # Create a JSON Dictionary that contains the default controller configuration
+    dcs_dict = {                                # Default Controller Setings:
+    "description": None,
+    "hwid": None,
+    "manufacturer":None,
+    "serial_number": None,
+    "port": None,      
+    "vid": None,
+    "pid": None,
+    "name": controller_name,
+    "fqbn": None,
+    "pin_config": mega_pin_map(),
+    "software_points": get_hardware_points(pin_map, tim_map),
+    "int_config": int_map,
+    "timers" : tim_map,
+    "arrays" : {},                      # By default there are no arrays on start-up, they can be added
+    "setup_blocks" : [],                # Code blocks for different parts of the program
+    "loop_blocks" : []
+    }
+    
+    try:                                                                        # Try to write this JSON as a file
+        file_path = data_path / "dcs_info" / f"{controller_name}.json"          # File path to dcs JSON files
+        with open(file_path, 'w') as dcs_file:                                  # Open the file path and write
+            json.dump(dcs_dict, dcs_file, indent=4)                             # JSON dump the dictionary for this controller
+        
+        dcs_script_utils.create_Script(data_path, controller_name, def_code)
+        with current_dict_lock:
+            add_current_dict(current_dict, data_path, controller_name)
+        
+        load_prog(data_path, controller_name, current_dict, current_dict_lock)
+
+        return True                                                             # The DCS JSON was made and the ino
+
+    except Exception as e:                                                      # If an exception is caught...
+        print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e})
+        return False                                                            # The DCS JSON was not made (there was an error)
+
+# Determine if JSON is for code controller (empty port data) - takes controller JSON directly
+def is_prog(cont):
+    if cont["description"] == None and cont["hwid"] == None and cont["manufacturer"] == None:   # Does not check all fields but good enough to know if its empty
+        return True
+    return False
+
 # Delete a dcs JSON from persistent data path for a given controller name
 def delete_dcs(data_path, name, current_dcs, current_dict, current_dict_lock):
     file_path = data_path / "dcs_info" / f"{name}.json"                   # The file path containing all controller JSONs
@@ -646,7 +703,7 @@ def create_dict(data_path, port):
         return current_dict
     return None
 
-# Load a dcs JSON into current_dcs by port
+# Load a dcs JSON into current_dcs by port, will not work for code
 def load_dcs(data_path, port, current_dcs, current_dict, current_dict_lock):
     current_dict = create_dict(data_path, port)
     current_name = port_to_name(data_path, port)
@@ -664,6 +721,30 @@ def load_dcs(data_path, port, current_dcs, current_dict, current_dict_lock):
             return True
     return False
 
+# Load a program into the currrent dict, they can be distinguished because they are empty
+def load_prog(data_path, prog_name, current_dict, current_dict_lock):
+    file_path = data_path / "dcs_info" / f"{prog_name}.json"    # Get the data-path of the relevant info json file
+    with open(file_path, 'r') as f:                             # Open the json file (read only) as f
+        prog = json.load(f)                                     # Load the json data from this file
+
+    with current_dict_lock:
+        current_dict[prog_name] = prog                          # Load the program into the current_dict
+        return True
+    return False
+
+# Load all programs into the current-dcs (run at start of main program)
+def load_progs(current_dict, current_dict_lock, datapath):
+
+    for key in current_dict:
+        if is_prog(current_dict[key]):
+            load_prog(datapath, key, current_dict, current_dict_lock)  # This needs no return type
+
+# Remove a program from the current_dcs by name
+def unload_prog(prog_name, current_dict, current_dict_lock):
+    with current_dict_lock:
+        del current_dict[prog_name]
+        return True
+
 # Remove a dcs JSON from current_dcs by port
 def unload_dcs(data_path, port, current_dcs):
     current_name = port_to_name(data_path, port)
@@ -673,7 +754,7 @@ def unload_dcs(data_path, port, current_dcs):
       print_log.pL("System", "Error", f"The key '{current_name}' was not found in the dictionary.", "System", True, None)
       return False
 
-# Rename a controller
+# Rename a controller or code
 def rename_dcs(data_path, old_name, new_name, current_dcs, current_dict, current_dict_lock): 
     file_path = data_path / "dcs_info" / f"{old_name}.json"                   # Get the file path for the current controller
     new_path  = data_path / "dcs_info" / f"{new_name}.json"                   # Get the proposed file path for the current controller
@@ -683,12 +764,8 @@ def rename_dcs(data_path, old_name, new_name, current_dcs, current_dict, current
     if new_path.is_file():                                                    # If the NEW name is already taken...
         print_log.pL("System", "Error", f"A controller named '{new_name}' already exists.", "System", True, None) 
         return False                                                          # The controller's name was not changed
+                                                                      
     try:                                                                      # If those two conditions fail (good news)... try:
-        port = name_to_port(data_path, old_name)                              # Get the port name from the DCS
-        if port is None:                                                      # If port not found...
-          print_log.pL("System", "Error", f"Could not find port for '{old_name}'.", "System", True, None)            
-          return False                                                        # The controller's name was not changed
-        
         was_loaded = old_name in current_dcs
         if was_loaded:
             unload_dcs(data_path, port, current_dcs)                          # Unload the old (defunct) data-structure
@@ -700,10 +777,12 @@ def rename_dcs(data_path, old_name, new_name, current_dcs, current_dict, current
         with open(new_path, 'w') as f:                                        # With the new file open (write) as f
           json.dump(dcs, f, indent=4)                                         # Write dcs to f, this ensures the file updates
 
-        dcs_script_utils.rename_Script(data_path, old_name, new_name)
+        if is_prog(current_dict[old_name]) == False:                          # If the old (and thus new) controller was not a program
+            dcs_script_utils.rename_Script(data_path, old_name, new_name)     # Rename the script associated with it
 
-        if was_loaded:                                                                  # If the controller was loaded when the name was changed...
-            load_dcs(data_path, port, current_dcs, current_dict, current_dict_lock);    # Load in the new data-structure
+            if was_loaded:                                                                  # If the controller was loaded when the name was changed...
+                port = name_to_port(data_path, new_name)
+                load_dcs(data_path, port, current_dcs, current_dict, current_dict_lock);    # Load in the new data-structure
 
         with current_dict_lock:
             current_dict[new_name] = current_dict[old_name]                   # Copy data to new key
@@ -1514,6 +1593,157 @@ def rem_array_const(array_dict, array_name):
         return True
     return False
 
+# Load program from controller
+def load_cont_to_prog(data_path, cont_name, prog_list, prog_name):
+
+    cont = get_dict(data_path, cont_name)
+
+    if cont == None:
+        print_log.pL("System", "Error", f"Controller {cont_name} not found", "System", "True", None)
+        return False
+
+    if prog_name in prog_list:
+            print_log.pL("System", "Event", f"Loading Controller {cont_name} into Program {prog_name}", "System", "True", None)
+    else: 
+        print_log.pL("System", "Error", f"Program {prog_name} not found", "System", "True", None)
+        return False
+    
+    clear_controller(prog_list, prog_name)
+
+    for key in cont["pin_config"]:                                                                          # For each pin in the program pin-map...
+        for key_p in prog_list[prog_name]["pin_config"]:                                                    # Check each pin in the controller
+            if prog_list[prog_name]["pin_config"][key_p]["name"] == cont["pin_config"][key]["name"]:        # If the pins are the same...   
+                prog_list[prog_name]["pin_config"][key_p] = cont["pin_config"][key]
+
+    for key in cont["int_config"]:     
+        for key_p in prog_list[prog_name]["int_config"]:                                                        # Check each int in the controller
+            if prog_list[prog_name]["int_config"][key_p]["ISR_name"] == cont["int_config"][key]["ISR_name"]:    # If the ints are the same...
+                prog_list[prog_name]["int_config"][key_p] = cont["int_config"][key]
+                                                                                                
+    for key in cont["software_points"]:
+        for key_p in prog_list[prog_name]["software_points"]:
+            if prog_list[prog_name]["software_points"][key_p]["_name"] == cont["software_points"][key]["_name"]:
+                prog_list[prog_name]["software_points"][key_p] = cont["software_points"][key]
+
+    for key in cont["timers"]:
+        if cont["timers"][key]["enabled"]:
+            prog_list[prog_name]["timers"][key]["enabled"] = True
+
+    cont_block_lists = code_block_utils.find_lists_saved(data_path, cont_name)               # Find all block lists in program
+    prog_block_lists = code_block_utils.find_lists(prog_list, prog_name)                     # Find all block lists in controller
+
+    for key_i in prog_block_lists:                                                  
+        for key_j in cont_block_lists:     
+            if key_i == key_j:     
+                prog_block_lists[key_i].clear()
+                prog_block_lists[key_i].extend(cont_block_lists[key_j])
+
+    return True
+
+
+# Load program into controller
+def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
+
+    if cont_name in cont_list:
+        print_log.pL("System", "Event", f"Loading Program {prog_name} into Controller {cont_name}", "System", "True", None)
+    else: 
+        print_log.pL("System", "Error", f"Controller {cont_name} not found", "System", "True", None)
+        return False
+
+    prog = get_dict(data_path, prog_name)
+
+    if prog == None:
+        print_log.pL("System", "Error", f"Program {prog_name} not found", "System", "True", None)
+        return False
+
+    # CHECK COMPATABILITY FIRST!
+
+    for key in prog["pin_config"]:                                                                          # For each pin in the program pin-map...
+        if prog["pin_config"][key]["enabled"]:                                                              # If the pin is in use...
+            matched = False
+            for key_p in cont_list[cont_name]["pin_config"]:                                                # Check each pin in the controller
+                if cont_list[cont_name]["pin_config"][key_p]["name"] == prog["pin_config"][key]["name"]:    # If the pins are the same...
+                    matched = True
+            if matched == False:
+                print_log.pL("System", "Error", f"Program {prog_name} has pins not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
+                return False                                                                                # If loop completes without match, code is not compattible with controller 
+
+    # If the code gets to this point, all points are compattible!  
+    for key in prog["int_config"]:                                                                              # For each int in the program pin-map...
+        if prog["int_config"][key]["enabled"]:                                                                  # If the int is in use...
+            matched = False
+            for key_p in cont_list[cont_name]["int_config"]:                                                    # Check each int in the controller
+                if cont_list[cont_name]["int_config"][key_p]["ISR_name"] == prog["int_config"][key]["ISR_name"]:# If the ints are the same...
+                    matched = True
+            if matched == False:
+                print_log.pL("System", "Error", f"Program {prog_name} has interrupts not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
+                return False       
+
+    # If the code gets to this point, all interrupts are compattible!  
+    # Direct comparrisson of timers would always fail because Timer 1 has 3 channels on MEGA and 2 channels on UNO, check points instead!
+    # First get all points in the program
+    prog_points = list_points(prog["pin_config"],prog["software_points"], prog["timers"])
+    
+    # Remove all software points from prog_points -> soft_points, they do not need to be checked
+    hard_points = {}
+    for key in prog_points:
+        if prog_points[key]["hardware"]:
+            hard_points[key] = prog_points[key]
+
+    for key in hard_points:                                                                             # None of these will be software points
+        matched = False
+        for key_p in cont_list[cont_name]["software_points"]:                                           # Any software point here will not match
+            if prog_points[key]["_name"] == cont_list[cont_name]["software_points"][key_p]["_name"]:    # This match must be a hardware point (pin or register)
+                matched = True
+        if matched == False:
+            print_log.pL("System", "Error", f"Program {prog_name} has points not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
+            return False 
+
+    # Finally just make sure timers match (enabled ones)
+    for key in prog["timers"]:
+        matched = False
+        if prog["timers"][key]["enabled"]:
+            if cont_list[cont_name]["timers"][key]:
+                matched = True
+        else:                                           # If the timer is not enabled..
+            matched =  True                             # There is no need to check it
+        if matched == False:
+            print_log.pL("System", "Error", f"Program {prog_name} has timers not found in Controller {cont_name}", "System", "True", None)
+            return False
+
+    # At this point, the programs are known to be compattible, we can start loading the program!
+    clear_controller(cont_list, cont_name)
+
+    for key in prog["pin_config"]:                                                                          # For each pin in the program pin-map...
+        if prog["pin_config"][key]["enabled"]:                                                              # If the pin is in use...
+            for key_p in cont_list[cont_name]["pin_config"]:                                                # Check each pin in the controller
+                if cont_list[cont_name]["pin_config"][key_p]["name"] == prog["pin_config"][key]["name"]:    # If the pins are the same...
+                    cont_list[cont_name]["pin_config"][key_p] = prog["pin_config"][key]
+
+    for key in prog["int_config"]:                                                                              # For each int in the program pin-map...
+        if prog["int_config"][key]["enabled"]:                                                                  # If the int is in use...
+            for key_p in cont_list[cont_name]["int_config"]:                                                    # Check each int in the controller
+                if cont_list[cont_name]["int_config"][key_p]["ISR_name"] == prog["int_config"][key]["ISR_name"]:# If the ints are the same...
+                    cont_list[cont_name]["int_config"][key_p] = prog["int_config"][key]
+
+    for key in prog_points:
+        cont_list[cont_name]["software_points"][key] = prog_points[key]
+
+    for key in prog["timers"]:
+        if prog["timers"][key]["enabled"]:
+            cont_list[cont_name]["timers"][key]["enabled"] = True
+
+    prog_block_lists = code_block_utils.find_lists_saved(data_path, prog_name)               # Find all block lists in program
+    cont_block_lists = code_block_utils.find_lists(cont_list, cont_name)                     # Find all block lists in controller
+
+    for key_i in prog_block_lists:                                                      
+        for key_j in cont_block_lists:
+            if key_i == key_j:
+                cont_block_lists[key_j].clear()
+                cont_block_lists[key_j].extend(prog_block_lists[key_i])
+
+    return True
+
 # Clears the current state of the controller to (near) default state so that it can be procedurally allocated (by GUI)
 def clear_controller(current_dict, controller_name):
 
@@ -1521,7 +1751,7 @@ def clear_controller(current_dict, controller_name):
 
     block_lists = code_block_utils.find_lists(current_dict, controller_name)            # Find all block lists
     for block_list in block_lists:                                                      # Clear all block lists
-        block_list.clear()                                                                  
+        block_lists[block_list].clear()                                                                  
 
     for key in current_dict[controller_name]["pin_config"]:                             
         current_dict[controller_name]["pin_config"][key]["enabled"] = False             # Disable all pins
@@ -1530,9 +1760,10 @@ def clear_controller(current_dict, controller_name):
         current_dict[controller_name]["pin_config"][key]["pwm_set"] = False
         current_dict[controller_name]["pin_config"][key]["int_set"] = False
 
+    keys_to_delete = []
     for key in current_dict[controller_name]["software_points"]:                        
         if current_dict[controller_name]["software_points"][key]["hardware"] == False:
-            del current_dict[controller_name]["software_points"][key]                   # Delete all software points
+            keys_to_delete.append(key)
         else:
             current_dict[controller_name]["software_points"][key]["type"] = "int"       # Reset all hardware points to original values
             current_dict[controller_name]["software_points"][key]["default"] = 1
@@ -1545,3 +1776,6 @@ def clear_controller(current_dict, controller_name):
             current_dict[controller_name]["software_points"][key]["int_type"] = ""
             current_dict[controller_name]["software_points"][key]["float_type"] = ""
             current_dict[controller_name]["software_points"][key]["const"] = False
+
+    for key in keys_to_delete:
+        del current_dict[controller_name]["software_points"][key]

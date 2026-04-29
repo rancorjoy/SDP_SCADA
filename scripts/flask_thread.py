@@ -30,8 +30,11 @@ logging.getLogger('werkzeug.serving').disabled = True
 
 COMMANDS = {
     #  cmd name        min  max  usage hint
-    "help":          (0,   0,   "help"),
-    "status":        (0,   0,   "status"),
+    "help":                 (0,   0,   "help"),
+    "status":               (0,   0,   "status"),
+    "list_serial":          (0,   0,   "list_serial"),
+    "list_conts":           (0,   0,   "list_conts"),
+    "list_current_state":   (0,   0,   "list_current_state"),
 
     "init_data":     (0,   0,   "init_data"),
     "init_info":     (0,   0,   "init_info"),
@@ -39,14 +42,17 @@ COMMANDS = {
     "migrate":       (1,   1,   "migrate <relative path>"),
     "recover":       (1,   1,   "recover <relative path>"),
 
-    "list_serial":   (0,   0,   "list_serial"),
-
     "list_dcs":      (0,   0,   "list_dcs"),
     "rename_dcs":    (2,   2,   "rename_dcs <old controller name> <new controller name>"),
     "unload_dcs":    (1,   1,   "unload_dcs <controller name>"),
     "load_dcs":      (1,   1,   "load_dcs <controller name>"),
     "delete_dcs":    (1,   1,   "delete_dcs <controller name>"),
     
+    "list_progs" :    (0,   0,   "list_progs"),
+    "add_program" :   (0,   0,   "add_program"),
+    "load_program" :  (2,   2,   "load_program <controller name> <program name>"),
+    "unload_program": (2,   2,   "unload_program <controller name> <program name>"),
+
     "save_dcs":      (1,   1,   "save_dcs <controller name>"),
     "reset_dcs":     (1,   1,   "reset_dcs <controller name>"),
     "validate_dcs":  (1,   1,   "validate_dcs <controller name>"),
@@ -154,8 +160,11 @@ def validate(cmd, args):
 
 def get_help():
     help_text = f"""General Commands:
-    help :             \t Displays a list of all valid commands
-    status :           \t Displays the network status of the SCADA server
+    help :              \t Displays a list of all valid commands
+    status :            \t Displays the network status of the SCADA server
+    list_serial :       \t Lists all detected serial connections to the SCADA server
+    list_conts :        \t List all saved controllers
+    list_current_state :\t Lists current state of SCADA system (all loaded control info)
 
     Data Path Commands:
     init_data :        \t Initializes the persistent data path
@@ -164,19 +173,22 @@ def get_help():
     migrate <path> :   \t Migrates the persistent data path to specified location <relative path>
     recover <path> :   \t Recovers the persistent data path at specified location <relative path>
 
-    Serial Commands:
-    list_serial : \t Lists all detected serial connections to the SCADA server
-
     Controller General Commands:
     list_dcs :     \t List all connected DCS Controllers
-    rename_dcs :   \t Rename a DCS Controller <old controller name> <new controller name>
+    rename_dcs :   \t Rename a DCS Controller or program <old controller name> <new controller name>
     unload_dcs :   \t Remove a DCS from the current list <controller name>
     load_dcs :     \t Add a DCS from to current list (from file) <controller name>
-    delete_dcs :   \t Delete a DCS Controller <controller name>
+    delete_dcs :   \t Delete a DCS Controller or program <controller/program name>
+
+    Controller Program Commands:
+    list_progs :    \t List all saved programs (not inclusing connected DCS controllers)
+    add_program :   \t Create a new program
+    load_program:   \t Load a saved program into a Controller's current state <controller name> <current name>
+    unload_program: \t Load a Controller's saved state into a program's current state <controller name> <current name>
 
     Controlller Program Pipeline Commands:
-    save_dcs :     \t Save Changes to a DCS Controller <controller name>
-    reset_dcs :    \t Undo Changes to a DCS Controller, reload from saved file <controller name>
+    save_dcs :     \t Save Changes to a DCS Controller or program <controller name>
+    reset_dcs :    \t Undo Changes to a DCS Controller or program, reload from saved file <controller name>
     compile_dcs :  \t Validate controller configuration based on coding rules <controller name>
     compile_dcs :  \t Regenerate code for a DCS Controller based on saved state if valid <controller name>
     program_dcs :  \t Reprogram a DCS Controller based on generated code <controller name>
@@ -250,6 +262,16 @@ def get_help():
 def eval_bool(input):
     return input.lower() == "true"
 
+def split_dcs_list(dcs_list):
+    cont_list = {}
+    prog_list = {}
+    for key in dcs_list:
+        if dcs_dict_utils.is_prog(dcs_list[key]):
+            prog_list[key] = dcs_list[key]
+        else:
+            cont_list[key] = dcs_list[key]
+    return cont_list, prog_list
+
 def flask_loop(CurrentState):                               # Method is ran in entry point - returns "app"
 
     # Get data objects out of current state
@@ -275,8 +297,11 @@ def flask_loop(CurrentState):                               # Method is ran in e
         print_log.pL("Server", "Event", f"{cmd}, {', '.join(args)} from {flask.request.remote_addr}.", "User", False, None)
 
         try:
-            if cmd == "help":       return {"ok": True, "message": get_help()}
-            if cmd == "status":     return {"ok": True, "message": "Running"}
+            if cmd == "help":               return {"ok": True, "message": get_help()}
+            if cmd == "status":             return {"ok": True, "message": "Running"}
+            if cmd == "list_serial":        return {"ok": True, "dict": scan_serial.list_serial_ports()}
+            if cmd == "list_conts":         return {"ok": True, "dict": split_dcs_list(current_dict)[0]}
+            if cmd == "list_current_state": return {"ok": True, "dict": current_dict}
 
             if cmd == "init_data":      return {"ok": True, "result": data_path_utils.init_data_path()}
             if cmd == "init_info":      return {"ok": True, "result": dcs_dict_utils.init_dcs_path()}
@@ -284,18 +309,20 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "migrate":        return {"ok": True, "result": data_path_utils.migrate(args[0])}
             if cmd == "recover":        return {"ok": True, "result": data_path_utils.recover(args[0])}
 
-            if cmd == "list_serial":    return {"ok": True, "dict": scan_serial.list_serial_ports()}
-
             if cmd == "list_dcs":   return {"ok": True, "dict": dcs_list}
             if cmd == "rename_dcs": return {"ok": True, "result": dcs_dict_utils.rename_dcs(get_path(), args[0], args[1], dcs_list, current_dict, current_dict_lock)}
             if cmd == "load_dcs":   return {"ok": True, "result": dcs_dict_utils.load_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list,  current_dict, current_dict_lock)}
             if cmd == "unload_dcs": return {"ok": True, "result": dcs_dict_utils.unload_dcs(get_path(), dcs_dict_utils.name_to_port(get_path(), args[0]), dcs_list)}
             if cmd == "delete_dcs": return {"ok": True, "result": dcs_dict_utils.delete_dcs(get_path(), args[0], dcs_list,  current_dict, current_dict_lock)}
             
-            
-            if cmd == "save_dcs":   return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
+            if cmd == "list_progs":         return {"ok": True, "dict": split_dcs_list(current_dict)[1]}
+            if cmd == "add_program" :       return {"ok": True, "result": dcs_dict_utils.init_code_dcs(get_path(), current_dict, current_dict_lock)}
+            if cmd == "load_program" :      return {"ok": True, "result": dcs_dict_utils.load_prog_to_cont(args[0], args[1], current_dict, get_path())}
+            if cmd == "unload_program" :    return {"ok": True, "result": dcs_dict_utils.load_cont_to_prog(get_path(), args[0], current_dict, args[1])}
+
+            if cmd == "save_dcs":       return {"ok": True, "result": dcs_dict_utils.save_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
             if cmd == "reset_dcs":      return {"ok": True, "result": dcs_dict_utils.reset_locked_dict(current_dict, current_dict_lock, get_path(), args[0])}
-            if cmd == "validate_dcs":         return {"ok": True, "message": code_block_utils.print_validation(get_path(), args[0], block_lib)}
+            if cmd == "validate_dcs":   return {"ok": True, "message": code_block_utils.print_validation(get_path(), args[0], block_lib)}
             if cmd == "compile_dcs":    return {"ok": True, "result": code_block_utils.check_compile(get_path(), args[0], block_lib, current_dict)}
             if cmd == "program_dcs":    return {"ok": True, "result": dcs_flash_utils.program_controller(dcs_list, args[0], flash_queue, flash_lock)}
             
