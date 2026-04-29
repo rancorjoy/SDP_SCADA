@@ -21,8 +21,6 @@ def worker(port, cmd_queue, sql_queue, cont_name, current_dict):
 
     last_sample = 0 # Seconds since the thread has been enabled
 
-    print(cont_name)
-
     while True:
 
         sample_time = current_dict[cont_name]["sample_time"]

@@ -468,27 +468,31 @@ def validate_config(data_path, controller_name, block_lib):
     hw_out_points = []
     hw_in_points = []
     const_points = []
-    
+
     for key in cont["software_points"]:
         if cont["software_points"][key]["hardware"]:
-            if cont["pin_config"][key]["direction"] == "OUTPUT":
-                hw_out_points.append(cont["software_points"][key])
-            else:
-                hw_in_points.append(cont["software_points"][key])
+            if key in cont["pin_config"]:
+                if cont["pin_config"][key]["direction"] == "OUTPUT":
+                    hw_out_points.append(cont["software_points"][key])
+                else:
+                    hw_in_points.append(cont["software_points"][key])
         elif cont["software_points"][key]["const"]:
             const_points.append(cont["software_points"][key])
 
-    for blk_list in blk_lists:
+    for blk_list in blk_lists.values():
         for blk_inst in blk_list:
+
             # Hardware inputs as block outputs check
             for out_key in blk_inst["output_points"]:
                 for item in hw_in_points:
                     if blk_inst["output_points"][out_key]["_name"] == item["_name"]:
                         errors.append(f'Point {blk_inst["output_points"][out_key]["_name"]} configured as input, used as output of {blk_inst["block_type"]}')
+                
                 # Const points as block outputs check
                 for item in const_points:
                     if blk_inst["output_points"][out_key]["_name"] == item["_name"]:
                         errors.append(f'Point {blk_inst["output_points"][out_key]["_name"]} configured as constant, used as output of {blk_inst["block_type"]}')
+            
             # Hardware outputs as block inputs check
             for in_key in blk_inst["input_points"]:
                 for item in hw_out_points:
@@ -496,14 +500,14 @@ def validate_config(data_path, controller_name, block_lib):
                         errors.append(f'Point {blk_inst["input_points"][in_key]["_name"]} configured as output, used as input of {blk_inst["block_type"]}')
 
     # Empty block inputs check
-    for blk_list in blk_lists:
+    for blk_list in blk_lists.values():
         for blk_inst in blk_list:
             for key in block_lib[blk_inst["block_type"]]["input_points"]:
                 if key not in blk_inst["input_points"]:
                     errors.append(f'Block {blk_inst["block_type"]} missing input {key}')
 
     # Empty block outputs check
-    for blk_list in blk_lists:
+    for blk_list in blk_lists.values():
         for blk_inst in blk_list:
             for key in block_lib[blk_inst["block_type"]]["output_points"]:
                 if key not in blk_inst["output_points"]:
@@ -511,7 +515,7 @@ def validate_config(data_path, controller_name, block_lib):
 
     # Output assigned multiple times check
     output_list = []
-    for blk_list in blk_lists:
+    for blk_list in blk_lists.values():
         for blk_inst in blk_list:
             for key in blk_inst["output_points"]:
                 point_name = blk_inst["output_points"][key]["_name"]
@@ -533,7 +537,7 @@ def print_validation(data_path, controller_name, block_lib):
     ret_str = display_saved_config(data_path, controller_name, block_lib)
     ret_str += "\n"
 
-    valid = validate_config(data_path, controller_name)
+    valid = validate_config(data_path, controller_name, block_lib)
 
     if len(valid["warnings"]) != 0:
         ret_str += "Warnings:\n"
@@ -554,7 +558,7 @@ def print_validation(data_path, controller_name, block_lib):
 # Compile pipeline with validation
 def check_compile(data_path, controller_name, block_lib, curr_dict):
 
-    valid = valid_to_bool(validate_config(data_path, controller_name))
+    valid = valid_to_bool(validate_config(data_path, controller_name, block_lib))
 
     if valid:
         return dcs_script_utils.create_Script(data_path, controller_name, ino_utils.get_code(data_path, controller_name, block_lib, curr_dict))
