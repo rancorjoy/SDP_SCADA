@@ -47,11 +47,11 @@ def poll(self) -> dict:
 # FUNCTIONS CALLED FROM SCADA.py
 
 # Call to add a worker thread at a port
-def add_worker(port, worker_threads, sql_queue, cont_name, current_dict):
+def add_worker(port, worker_threads, sql_queue, current_dict):
     cmd_queue = queue.Queue()
     t = threading.Thread(
         target = worker_thread.worker,
-        args=(port, cmd_queue, sql_queue, cont_name, current_dict)
+        args=(port, cmd_queue, sql_queue, current_dict)
     )
     t.daemon = True
     t.start()

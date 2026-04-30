@@ -103,9 +103,7 @@ def main():                                                         # Main Metho
                                 is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs, current_dict, current_dict_lock)
 
                                 port = device["port"]
-                                cont_name = dcs_dict_utils.port_to_name(path, port)
-
-                                worker_thread_utils.add_worker(port, worker_threads, sql_queue, cont_name, current_dict)
+                                worker_thread_utils.add_worker(port, worker_threads, sql_queue, current_dict)
 
                     # Disconnected devices
                     for device in previous_devices.values():

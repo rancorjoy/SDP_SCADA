@@ -769,6 +769,7 @@ def rename_dcs(data_path, old_name, new_name, current_dcs, current_dict, current
     try:                                                                      # If those two conditions fail (good news)... try:
         was_loaded = old_name in current_dcs
         if was_loaded:
+            port = name_to_port(data_path, old_name)
             unload_dcs(data_path, port, current_dcs)                          # Unload the old (defunct) data-structure
 
         file_path.rename(new_path)                                            # Rename the old file to the new files

@@ -10,10 +10,11 @@ import time
 import datetime
 
 from . import print_log
+from . import dcs_dict_utils
 from . import worker_thread_utils
 
 # Function that defines a worker thread
-def worker(port, cmd_queue, sql_queue, cont_name, current_dict):
+def worker(port, cmd_queue, sql_queue, current_dict):
 
     print_log.pL(f"Worker ({port})", "Event", "Worker thread initializing, opening port", "System", True, None)
     ser = worker_thread_utils.connect(port)  # establish serial connection once at thread start
@@ -23,6 +24,9 @@ def worker(port, cmd_queue, sql_queue, cont_name, current_dict):
 
     while True:
 
+        for key in current_dict:
+            if current_dict[key]["port"] == port:
+                cont_name = key
         sample_time = current_dict[cont_name]["sample_time"]
                                            
         try:                                # CHECK FOR COMMANDS 

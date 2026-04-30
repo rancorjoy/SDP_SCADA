@@ -34,7 +34,7 @@ def get_block_type():
 # This function returns an instance of a block which should be added to a block list to be executed in order
 def get_block_inst(block_type):    # Block type dictionary, either "setup" "loop" or an ISR name, dicts of input points and output points
     return {
-        "block_type" : "",                          # Key in block types dictionary to get block type
+        "block_type" : block_type,                  # Key in block types dictionary to get block type
         "input_points" : {},                        # Should be key : point where key returns the type in the block_type
         "output_points" : {},
         "condition" : None                          # If this is set to a point (bool), the block will only run if True (adds condition)
@@ -104,6 +104,7 @@ def add_block_top(curr_dict, controller_name, block_list_str, block_type, block_
     block_list = block_lists[block_list_str]
 
     block_list.insert(0, get_block_inst(block_type))
+    print(f"block type: {block_type}")
     return True
 
 # Add code block to bottom of list
