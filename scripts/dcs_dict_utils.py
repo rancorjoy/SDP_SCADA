@@ -952,28 +952,38 @@ def change_pin_pwm(pin_dict, pin, point_dict, enable):
         return False
 
     if enable:
+        print("test1")
         change_pin_dir(pin_dict, pin, "OUTPUT")
         change_point_type(pin_dict, point_dict, pin, "int", True)
         point_dict[pin]["min_en"] = True
         point_dict[pin]["max_en"] = True
         point_dict[pin]["max"] = 0
         point_dict[pin]["max"] = 255
-        point_dict[pin]["pwm_set"] = True
+        pin_dict[pin]["pwm_set"] = True
     else:
+        print("test2")
         change_pin_dir(pin_dict, pin, "INPUT")
         change_point_type(pin_dict, point_dict, pin, "bool", True)
         point_dict[pin]["min_en"] = False
         point_dict[pin]["max_en"] = False
         point_dict[pin]["max"] = 0
         point_dict[pin]["max"] = 1
-        point_dict[pin]["pwm_set"] = False
+        pin_dict[pin]["pwm_set"] = False
     return True
 
-def change_pin_int(pin_dict, pin, int):
+def change_pin_int(pin_dict, pin, val, int_map):
+
+    if pin_dict[pin]["pwm_set"]:
+        return False
+
     if pin_dict[pin]["interrupt_capable"]:
-        pin_dict[pin]["int_set"] = int
-        if int:
+        pin_dict[pin]["int_set"] = val
+        if val:
             change_pin_dir(pin_dict, pin, "INPUT")
+
+        # Set the actual interrupt!
+        int_map[pin]["enabled"] = val
+        
         return True
     return False
 
@@ -1793,3 +1803,4 @@ def clear_controller(current_dict, controller_name):
 
     for key in keys_to_delete:
         del current_dict[controller_name]["software_points"][key]
+    return True

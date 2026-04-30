@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SCADA — Controller Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<style>
+  :root {
+    --bg:        #0a0b0d;
+    --bg2:       #0f1114;
+    --bg3:       #15181d;
+    --border:    #1e2328;
+    --border2:   #2a3040;
+    --amber:     #d49324; /* Was #f5a623 */
+    --amber-dim: #7a5010;
+    --green:     #32b071; /* Was #39d98a */
+    --green-dim: #1a4d35;
+    --red:       #c94646; /* Was #f05454 */
+    --blue:      #4082d1; /* Was #4a9eff */
+    --text:      #c8cdd6;
+    --text-dim:  #5a6070;
+    --text-bright: #e8ecf2;
+    --mono:      'Share Tech Mono', monospace;
+    --ui:        'Barlow Condensed', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ui);
+    font-size: 14px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* 1. Base Badge Style */
+  .badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-right: 4px;
+    text-transform: uppercase;
+    font-family: var(--mono);
+    display: inline-block;
+    border: 1px solid transparent;
+    --badge-color: var(--text-dim); /* Default fallback */
+  }
+
+  /* 2. Assign the unique color to a variable (--badge-color) */
+  .badge.analog    { --badge-color: var(--amber);     color: var(--amber); }
+  .badge.pwm       { --badge-color: var(--blue);      color: var(--blue); }
+  .badge.interrupt { --badge-color: var(--red);       color: var(--red); }
+  .badge.enabled   { --badge-color: var(--green);     color: var(--green); }
+
+  /* 3. GHOST state: Use the variable for the border */
+  .badge.outline {
+    background: transparent !important;
+    border: 1px solid var(--badge-color) !important;
+    color: var(--badge-color) !important;
+    opacity: 0.5;
+  }
+
+  /* 4. ACTIVE state: Background uses the variable, Text stays black */
+  .badge.active {
+    background-color: var(--badge-color) !important;
+    color: #000000 !important; 
+    -webkit-text-fill-color: #000000 !important;
+    font-weight: 800 !important;
+    box-shadow: 0 0 8px var(--badge-color);
+    opacity: 1 !important;
+  }
+
+  /* Better Action Bar Toggle Buttons */
+  .pin-action-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    padding: 8px 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+  }
+
+  .pin-action-btn.active {
+  background: var(--green-dim) !important;
+  color: var(--green) !important;
+  border-color: var(--green) !important;
+  font-weight: bold;
+  }
+
+  /* ── TOP BAR ── */
+  #topbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+
+  #topbar h1 {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--amber);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  #topbar .sep { flex: 1; }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+  }
+  .status-pill .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.4s;
+  }
+  .status-pill.ok .dot   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-pill.err .dot  { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+  .status-pill.ok  { color: var(--green); }
+  .status-pill.err { color: var(--red); }
+
+  #server-addr {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* ── MAIN BODY ── */
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── LEFT SIDEBAR ── */
+  #sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 10px 14px 8px;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+  }
+
+  #entity-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0;
+  }
+
+  .entity-item {
+    padding: 9px 14px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .entity-item:hover { background: var(--bg3); }
+  .entity-item.active {
+    border-left-color: var(--amber);
+    background: var(--bg3);
+  }
+
+  .entity-item .ename {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-bright);
+  }
+  .entity-item .edesc {
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .entity-item .etag {
+    font-size: 10px;
+    font-family: var(--mono);
+    padding: 1px 5px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-top: 3px;
+    width: fit-content;
+  }
+  .etag.controller { background: var(--amber-dim); color: var(--amber); }
+  .etag.program    { background: var(--green-dim);  color: var(--green); }
+
+  #refresh-btn {
+    margin: 10px 14px;
+    padding: 8px;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.2s;
+  }
+  #refresh-btn:hover { border-color: var(--amber); color: var(--amber); }
+
+  /* ── CENTER PANEL ── */
+  #center {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  /* ── TABS ── */
+  #tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+  }
+
+  .tab {
+    padding: 10px 20px;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    font-family: var(--mono);
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--amber); border-bottom-color: var(--amber); }
+
+  /* ── TAB CONTENT ── */
+  #tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  /* ── ENTITY HEADER ── */
+  .entity-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .entity-header h2 {
+    font-family: var(--mono);
+    font-size: 16px;
+    color: var(--amber);
+  }
+  .entity-header .meta {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* ── PIN GRID ── */
+  .pin-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+  }
+
+  .pin-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    border-radius: 2px;
+    transition: border-color 0.2s;
+  }
+  .pin-card:hover { border-color: var(--border2); }
+  .pin-card.enabled { border-color: var(--amber-dim); }
+  .pin-card.analog  { border-left: 3px solid var(--blue); }
+  .pin-card.digital { border-left: 3px solid var(--text-dim); }
+  .pin-card.pwm     { border-left: 3px solid var(--green-dim); }
+  .pin-card.interrupt { border-left: 3px solid var(--amber); }
+
+  .pin-card.selected {
+  border-color: var(--amber);
+  background: var(--bg3);
+  cursor: pointer;
+  box-shadow: 0 0 0 1px var(--amber-dim);
+}
+
+#pin-action-bar {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#pin-action-bar .pin-action-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+
+.pin-action-btn {
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.15s;
+  border-radius: 2px;
+}
+.pin-action-btn:hover { border-color: var(--amber); color: var(--amber); }
+.pin-action-btn.active { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+.pin-action-btn.danger { border-color: var(--red); color: var(--red); }
+.pin-action-btn:disabled { opacity: 0.3; cursor: default; border-color: var(--border); color: var(--text-dim); }
+
+  .pin-card .pin-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-bright);
+    margin-bottom: 5px;
+  }
+  .pin-card .pin-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+  }
+  .pin-card .pin-dir {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+  }
+  .pin-card .pin-note {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  /* ── TIMER TABLE ── */
+  .timer-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    margin-bottom: 10px;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .timer-block-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+  .timer-block-header .tname {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+  .timer-block-header .tinfo {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .timer-block-header .tenabled {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+  }
+  .timer-block-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 1px;
+    background: var(--border);
+  }
+  .timer-field {
+    background: var(--bg2);
+    padding: 8px 12px;
+  }
+  .timer-field .tf-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 3px;
+  }
+  .timer-field .tf-val {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-bright);
+  }
+
+  /* ── ISR TABLE ── */
+  .isr-table { width: 100%; border-collapse: collapse; }
+  .isr-table th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .isr-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+    vertical-align: middle;
+  }
+  .isr-table tr:last-child td { border-bottom: none; }
+  .isr-table tr:hover td { background: var(--bg3); }
+  .isr-enabled  { color: var(--green); }
+  .isr-disabled { color: var(--text-dim); }
+
+  /* ── SOFTWARE POINTS ── */
+  .sp-table { width: 100%; border-collapse: collapse; }
+  .sp-table th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+  }
+  .sp-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .sp-table tr:last-child td { border-bottom: none; }
+  .sp-table tr:hover td { background: var(--bg3); }
+  .hw-point { color: var(--blue); }
+  .sw-point { color: #cc88ff; }
+  .type-bool  { color: var(--green); }
+  .type-int   { color: var(--amber); }
+  .type-float { color: var(--blue); }
+  .type-array-cast { color: #cc88ff; }
+  .size-point-unset { color: var(--red); font-style: italic; }
+
+  /* ── SECTION LABELS ── */
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    margin: 16px 0 8px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .empty-state::before {
+    content: '//';
+    font-size: 24px;
+    color: var(--border2);
+  }
+
+  /* ── SCROLLBARS ── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+  /* ── FADE IN ── */
+  @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .fadein { animation: fadein 0.2s ease forwards; }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <h1>⬡ SCADA Dashboard</h1>
+  <div class="sep"></div>
+  <div class="status-pill" id="conn-status">
+    <div class="dot"></div>
+    <span id="conn-label">CONNECTING</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div id="entity-list"></div>
+    <button id="refresh-btn" onclick="fetchState()">↺ Refresh State</button>
+  </div>
+
+  <!-- CENTER -->
+  <div id="center">
+    <div id="tabs">
+      <div class="tab active" data-tab="pins"    onclick="switchTab('pins')">Pins</div>
+      <div class="tab"        data-tab="timers"  onclick="switchTab('timers')">Timers</div>
+      <div class="tab"        data-tab="isrs"    onclick="switchTab('isrs')">ISRs</div>
+      <div class="tab"        data-tab="points"  onclick="switchTab('points')">Points</div>
+      <div class="tab" data-tab="arrays" onclick="switchTab('arrays')">Arrays</div>
+      <div class="tab"        data-tab="blocks"  onclick="switchTab('blocks')">Blocks</div>
+      <div class="tab"        data-tab="plot"    onclick="switchTab('plot')">Plot</div>
+    </div>
+<div id="tab-content">
+      <div class="empty-state">Select an entity from the sidebar</div>
+    </div>
+      <div id="pin-action-bar" style="display:none;">
+        <span class="pin-action-label" id="pin-action-title">— select a pin —</span>
+        
+        <span class="pin-action-label">Enable:</span>
+        <button id="btn-en-on" class="pin-action-btn" onclick="pinAction('edit_pin_enable', true)">On</button>
+        <button id="btn-en-off" class="pin-action-btn" onclick="pinAction('edit_pin_enable', false)">Off</button>
+        
+        <span class="pin-action-label" style="margin-left:8px;">Direction:</span>
+        <button id="btn-dir-out" class="pin-action-btn" onclick="pinAction('edit_pin_dir', 'OUTPUT')">Output</button>
+        <button id="btn-dir-in" class="pin-action-btn" onclick="pinAction('edit_pin_dir', 'INPUT')">Input</button>
+        <button id="btn-dir-pull" class="pin-action-btn" onclick="pinAction('edit_pin_dir', 'INPUT_PULLUP')">Pullup</button>
+        
+        <span class="pin-action-label" style="margin-left:8px;">Analog:</span>
+        <button id="btn-ana-on" class="pin-action-btn" onclick="pinAction('edit_pin_type', 'True')">On</button>
+        <button id="btn-ana-off" class="pin-action-btn" onclick="pinAction('edit_pin_type', 'False')">Off</button>
+        
+        <span class="pin-action-label" style="margin-left:8px;">Interrupt:</span>
+        <button id="btn-int-on" class="pin-action-btn" onclick="pinAction('edit_pin_int', 'True')">On</button>
+        <button id="btn-int-off" class="pin-action-btn" onclick="pinAction('edit_pin_int', 'False')">Off</button>
+        
+        <span class="pin-action-label" style="margin-left:8px;">PWM:</span>
+        <button id="btn-pwm-on" class="pin-action-btn" onclick="pinAction('edit_pin_pwm', 'True')">On</button>
+        <button id="btn-pwm-off" class="pin-action-btn" onclick="pinAction('edit_pin_pwm', 'False')">Off</button>
+      </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const BASE = '';
+
+// ── STATE ───────────────────────────────────────────────────────────────────
+let currentState   = {};       // full dict from /list_current_state
+let selectedEntity = null;     // key string
+let activeTab      = 'pins';
+let plotInterval   = null;
+let traceVisible   = {};       // pointName -> bool
+let plotInitialized = false;
+let traceNames     = [];       // ordered list of active trace names
+let activeDCS = {};            // live connected controllers from list_dcs
+let selectedPin = null;         // pin name string, null when none selected
+
+// Plotly color palette
+const TRACE_COLORS = [
+  '#f5a623','#39d98a','#4a9eff','#f05454','#cc88ff',
+  '#ff6b6b','#51cf66','#339af0','#fcc419','#a9e34b'
+];
+
+// == FETCH STATE ===============================================================
+async function fetchState() {
+  try {
+    const stateRes = await fetch('/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd: 'list_current_state', args: [] })
+    });
+    const stateData = await stateRes.json();
+    currentState = stateData.dict;
+  } catch(e) { setConnStatus(false); return; }
+
+  try {
+    const dcsRes = await fetch('/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd: 'list_dcs', args: [] })
+    });
+    const dcsData = await dcsRes.json();
+    activeDCS = dcsData.dict || {};
+  } catch(e) { activeDCS = {}; }
+
+  setConnStatus(true);
+  renderSidebar();
+  renderTabContent(); 
+  syncPlotTraces();
+}
+
+function setConnStatus(ok) {
+  const el = document.getElementById('conn-status');
+  const lb = document.getElementById('conn-label');
+  el.className = 'status-pill ' + (ok ? 'ok' : 'err');
+  lb.textContent = ok ? 'CONNECTED' : 'OFFLINE';
+}
+
+async function command(cmd, args = []) {
+  const res = await fetch('/command', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cmd, args })
+  });
+  return await res.json();
+}
+
+// == SIDEBAR =====================================================================
+function renderSidebar() {
+  const list = document.getElementById('entity-list');
+  list.innerHTML = '';
+
+  const controllers = [];
+  const programs    = [];
+
+  for (const key of Object.keys(currentState)) {
+    const ent = currentState[key];
+    if (ent.vid !== null) controllers.push([key, ent]);
+    else                  programs.push([key, ent]);
+  }
+
+  // == CONTROLLERS ===============================================================
+  const ctrlHeader = document.createElement('div');
+  ctrlHeader.id = 'sidebar-header';
+  ctrlHeader.textContent = 'Controllers';
+  list.appendChild(ctrlHeader);
+
+  for (const [key, ent] of controllers) {
+    const isConnected = key in activeDCS;
+    const div = document.createElement('div');
+    div.className = 'entity-item' + (key === selectedEntity ? ' active' : '');
+    div.innerHTML = `
+      <span class="ename">${key}</span>
+      <span class="edesc">${ent.description || ent.fqbn || '—'}</span>
+      <div style="display:flex; gap:6px; margin-top:3px; align-items:center;">
+        <span class="etag controller">CONTROLLER</span>
+        <span style="font-family:var(--mono); font-size:10px; color:${isConnected ? 'var(--green)' : 'var(--red)'};">
+          ${isConnected ? '● CONNECTED' : '○ OFFLINE'}
+        </span>
+      </div>
+      ${isConnected ? `<span class="edesc" style="margin-top:2px;">${ent.port}</span>` : ''}
+    `;
+    div.onclick = () => selectEntity(key);
+    list.appendChild(div);
+  }
+
+  // ── DIVIDER ──
+  const divider = document.createElement('div');
+  divider.style.cssText = 'border-top:1px solid var(--border); margin: 8px 0;';
+  list.appendChild(divider);
+
+  // ── PROGRAMS ──
+  const progHeader = document.createElement('div');
+  progHeader.id = 'sidebar-header';
+  progHeader.textContent = 'Programs';
+  list.appendChild(progHeader);
+
+  for (const [key, ent] of programs) {
+    const div = document.createElement('div');
+    div.className = 'entity-item' + (key === selectedEntity ? ' active' : '');
+    div.innerHTML = `
+      <span class="ename">${key}</span>
+      <span class="etag program">PROGRAM</span>
+    `;
+    div.onclick = () => selectEntity(key);
+    list.appendChild(div);
+  }
+}
+
+function selectEntity(key) {
+  selectedEntity = key;
+  renderSidebar();
+  renderTabContent();
+}
+
+// == TABS =========================================================================
+function switchTab(tab) {
+  if (tab !== 'pins') {
+    selectedPin = null;
+    const bar = document.getElementById('pin-action-bar');
+    if (bar) bar.style.display = 'none';
+  }
+  if (tab !== 'plot' && plotInterval) {
+    clearInterval(plotInterval);  // stop polling when leaving plot tab
+    plotInterval = null;
+  }
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === tab)
+  );
+  renderTabContent();
+}
+
+function renderTabContent() {
+  const el = document.getElementById('tab-content');
+  if (!selectedEntity) {
+    el.innerHTML = '<div class="empty-state">Select an entity from the sidebar</div>';
+    return;
+  }
+  const ent = currentState[selectedEntity];
+  if (!ent) return;
+
+  el.className = 'fadein';
+  void el.offsetWidth; // reflow to restart animation
+
+  switch(activeTab) {
+    case 'pins':   el.innerHTML = renderPins(ent);   break;
+    case 'timers': el.innerHTML = renderTimers(ent); break;
+    case 'isrs':   el.innerHTML = renderISRs(ent);   break;
+    case 'points': el.innerHTML = renderPoints(ent); break;
+    case 'arrays': el.innerHTML = renderArrays(ent); break;
+    case 'blocks': renderBlocks(ent); break;  // note: no innerHTML, Plotly needs a real div
+    case 'plot':   renderPlot(ent);   break;
+  }
+}
+
+// ── PIN VIEW ─────────────────────────────────────────────────────────────────
+function renderPins(ent) {
+  const pins = ent.pin_config || {};
+  if (!Object.keys(pins).length) return '<div class="empty-state">No pins configured</div>';
+
+  const analog  = Object.values(pins).filter(p => p.analog_capable);
+  const digital = Object.values(pins).filter(p => !p.analog_capable);
+
+function pinCard(p) {
+    const badges = [];
+    
+    // Analog badge
+    if (p.analog_capable) {
+        badges.push(`<span class="badge analog ${p.analog_set ? 'active' : 'outline'}">ADC</span>`);
+    }
+    // PWM badge
+    if (p.pwm_capable) {
+        badges.push(`<span class="badge pwm ${p.pwm_set ? 'active' : 'outline'}">PWM</span>`);
+    }
+    // Interrupt badge
+    if (p.interrupt_capable) {
+        badges.push(`<span class="badge interrupt ${p.int_set ? 'active' : 'outline'}">INT</span>`);
+    }
+
+    // Enable badge (Always visible: Solid green if ON, outlined if OFF)
+    if (p.enabled) {
+    badges.push('<span class="badge enabled active">EN</span>'); // This should be Solid Green
+    } 
+    else {
+        badges.push('<span class="badge enabled outline">OFF</span>'); // This should be Outlined Green
+    }
+
+    // Determine card border based on active mode
+    const borderClass = p.int_set      ? 'interrupt'
+                      : p.analog_set   ? 'analog'
+                      : p.pwm_set      ? 'pwm'
+                      : 'digital';
+
+    const isSelected = selectedPin === p.name;
+
+    return `
+      <div class="pin-card ${borderClass} ${p.enabled ? 'enabled' : ''} ${isSelected ? 'selected' : ''}"
+           onclick="selectPin('${p.name}')">
+        <div class="pin-name">${p.name}</div>
+        <div class="pin-badges">${badges.join('')}</div>
+        <div class="pin-dir">${p.direction}</div>
+        ${p.note ? `<div class="pin-note">${p.note}</div>` : ''}
+      </div>`;
+}
+
+  let html = '';
+  if (analog.length) {
+    html += '<div class="section-label">Analog Pins</div>';
+    html += '<div class="pin-grid">' + analog.map(pinCard).join('') + '</div>';
+  }
+  if (digital.length) {
+    html += '<div class="section-label">Digital Pins</div>';
+    html += '<div class="pin-grid">' + digital.map(pinCard).join('') + '</div>';
+  }
+  return html;
+}
+
+function selectPin(name) {
+  selectedPin = (selectedPin === name) ? null : name;  // toggle off if clicking same pin
+  // re-render cards to reflect selection without full state fetch
+  const ent = currentState[selectedEntity];
+  document.getElementById('tab-content').innerHTML = renderPins(ent);
+  updatePinActionBar(ent);
+}
+
+function updatePinActionBar(ent) {
+  const bar = document.getElementById('pin-action-bar');
+  if (activeTab !== 'pins' || !selectedPin) {
+    bar.style.display = 'none';
+    return;
+  }
+  
+  const pin = ent.pin_config[selectedPin];
+  if (!pin) return;
+  bar.style.display = 'flex';
+  document.getElementById('pin-action-title').textContent = selectedPin;
+
+  // Helper to toggle active class
+  const setActive = (id, condition) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('active', condition);
+  };
+
+  // Sync Enable/Disable buttons
+  setActive('btn-en-on',  pin.enabled === true);
+  setActive('btn-en-off', pin.enabled === false);
+
+  // Sync Direction buttons
+  setActive('btn-dir-out',  pin.direction === 'OUTPUT');
+  setActive('btn-dir-in',   pin.direction === 'INPUT');
+  setActive('btn-dir-pull', pin.direction === 'INPUT_PULLUP');
+
+  // Sync Mode buttons
+  setActive('btn-ana-on',  pin.analog_set === true);
+  setActive('btn-ana-off', pin.analog_set === false);
+  
+  setActive('btn-int-on',  pin.int_set === true);
+  setActive('btn-int-off', pin.int_set === false);
+  
+  setActive('btn-pwm-on',  pin.pwm_set === true);
+  setActive('btn-pwm-off', pin.pwm_set === false);
+}
+
+async function pinAction(cmd, arg) {
+  if (!selectedPin) return;
+  const args = arg !== undefined ? [selectedEntity, selectedPin, arg] : [selectedEntity, selectedPin];
+  await command(cmd, args);
+  await fetchState();
+  const ent = currentState[selectedEntity];
+  document.getElementById('tab-content').innerHTML = renderPins(ent);
+  updatePinActionBar(ent);
+}
+
+// ── TIMER VIEW ───────────────────────────────────────────────────────────────
+function renderTimers(ent) {
+  const timers = ent.timers || {};
+  if (!Object.keys(timers).length) return '<div class="empty-state">No timers</div>';
+
+  let html = '';
+  for (const [tname, t] of Object.entries(timers)) {
+    const chFields = Object.entries(t.channels || {}).map(([ch, cv]) => `
+      <div class="timer-field">
+        <div class="tf-label">Ch ${ch} Compare</div>
+        <div class="tf-val">${cv.compare_value}</div>
+      </div>`).join('');
+
+    html += `
+      <div class="timer-block">
+        <div class="timer-block-header">
+          <span class="tname">${tname}</span>
+          <span class="tinfo">${t.size_bits}-bit</span>
+          <span class="tinfo">${t.note || ''}</span>
+          <span class="tenabled ${t.enabled ? 'isr-enabled' : 'isr-disabled'}">
+            ${t.enabled ? '● ENABLED' : '○ DISABLED'}
+          </span>
+        </div>
+        <div class="timer-block-body">
+          <div class="timer-field">
+            <div class="tf-label">Mode</div>
+            <div class="tf-val">${t.mode}</div>
+          </div>
+          <div class="timer-field">
+            <div class="tf-label">Prescaler</div>
+            <div class="tf-val">${t.prescaler}</div>
+          </div>
+          <div class="timer-field">
+            <div class="tf-label">Preload</div>
+            <div class="tf-val">${t.preload}</div>
+          </div>
+          ${chFields}
+          <div class="timer-field">
+            <div class="tf-label">Valid Modes</div>
+            <div class="tf-val" style="font-size:10px">${(t.valid_modes||[]).join(', ')}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+  return html;
+}
+
+// ── ISR VIEW ─────────────────────────────────────────────────────────────────
+function renderISRs(ent) {
+  const isrs = ent.int_config || {};
+  if (!Object.keys(isrs).length) return '<div class="empty-state">No interrupt config</div>';
+
+  const rows = Object.entries(isrs).map(([iname, isr]) => {
+    const isTimer = iname.startsWith('Timer');
+    return `
+      <tr>
+        <td>${iname}</td>
+        <td style="color:var(--text-dim)">${isr.ISR_name}</td>
+        <td class="${isr.enabled ? 'isr-enabled' : 'isr-disabled'}">${isr.enabled ? '● ON' : '○ OFF'}</td>
+        ${!isTimer ? `
+          <td>${isr.mode || '—'}</td>
+          <td class="${isr.high ? 'isr-enabled' : 'isr-disabled'}">${isr.high ? 'HIGH' : 'LOW'}</td>
+        ` : '<td colspan="2" style="color:var(--text-dim)">—</td>'}
+        <td style="color:var(--text-dim)">${(isr.blocks||[]).length} blocks</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <table class="isr-table">
+      <thead>
+        <tr>
+          <th>Name</th><th>Vector</th><th>State</th>
+          <th>Mode</th><th>Level</th><th>Blocks</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── SOFTWARE POINTS VIEW ─────────────────────────────────────────────────────
+function renderPoints(ent) {
+  const pts = ent.software_points || {};
+  if (!Object.keys(pts).length) return '<div class="empty-state">No software points</div>';
+
+  const rows = Object.values(pts).map(p => {
+    const typeClass = p.type === 'bool' ? 'type-bool' : p.type === 'int' ? 'type-int' : 'type-float';
+    const hwClass   = p.hardware ? 'hw-point' : 'sw-point';
+    return `
+      <tr>
+        <td class="${hwClass}">${p._name}</td>
+        <td class="${typeClass}">${p.type}${p.int_type ? `<span style="color:var(--text-dim)"> (${p.int_type})</span>` : ''}</td>
+        <td>${p.hardware ? '<span style="color:var(--blue)">Hardware</span>' : '<span style="color:#cc88ff">Software</span>'}</td>
+        <td style="color:var(--text-dim)">${p.default}</td>
+        <td style="color:var(--text-dim)">${p.const ? 'CONST' : '—'}</td>
+        <td style="color:var(--text-dim)">${p.min_en ? p.min : '—'}</td>
+        <td style="color:var(--text-dim)">${p.max_en ? p.max : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <table class="sp-table">
+      <thead>
+        <tr>
+          <th>Name</th><th>Type</th><th>Source</th>
+          <th>Default</th><th>Const</th><th>Min</th><th>Max</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ── ARRAYS VIEW ──────────────────────────────────────────────────────────────
+function renderArrays(ent) {
+  const arrays = ent.arrays || {};
+  if (!Object.keys(arrays).length) return '<div class="empty-state">No arrays defined</div>';
+
+  const baseTypes = new Set(['int', 'float', 'bool']);
+
+  const rows = Object.values(arrays).map(a => {
+    const isBase    = baseTypes.has(a.type);
+    const typeClass = a.type === 'bool'  ? 'type-bool'
+                    : a.type === 'int'   ? 'type-int'
+                    : a.type === 'float' ? 'type-float'
+                    : 'type-array-cast';
+    const typeLabel = isBase ? a.type : `<span style="color:var(--text-dim)">(cast)</span> ${a.type}`;
+
+    const spName = a.size_point?._name ?? null;
+    const spCell = spName
+      ? `<span class="sw-point">${spName}</span>`
+      : `<span class="size-point-unset">not set</span>`;
+
+    return `
+      <tr>
+        <td class="sw-point">${a._name}</td>
+        <td class="${typeClass}">${typeLabel}</td>
+        <td>${spCell}</td>
+      </tr>`;
+  }).join('');
+
+  return `
+    <table class="sp-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Size Point</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// = BLOCK VIEW ===============================================================
+async function renderBlocks(ent) {
+  const el = document.getElementById('tab-content');
+
+  // Fetch active block lists from server
+  const res = await command('find_lists', [selectedEntity]);
+  if (!res.ok) { el.innerHTML = '<div class="empty-state">Could not load blocks</div>'; return; }
+
+  const lists = res.dict;
+  if (!Object.keys(lists).length) { el.innerHTML = '<div class="empty-state">No active block lists</div>'; return; }
+
+  let html = '';
+  for (const [listName, blocks] of Object.entries(lists)) {
+    html += `<div class="section-label">${listName}</div>`;
+
+    if (!blocks.length) {
+      html += `<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:8px 0;">// empty</div>`;
+      continue;
+    }
+
+    blocks.forEach((blk, idx) => {
+      const inputs  = Object.entries(blk.input_points)
+        .map(([k, v]) => `<span style="color:var(--blue)">${k}</span>: ${v?._name || '?'}`)
+        .join(', ') || '—';
+      const outputs = Object.entries(blk.output_points)
+        .map(([k, v]) => `<span style="color:var(--green)">${k}</span>: ${v?._name || '?'}`)
+        .join(', ') || '—';
+      const condition = blk.condition ? 
+        `<span style="color:var(--amber)">if ${blk.condition._name}</span>` : '';
+
+      html += `
+        <div class="timer-block" style="margin-bottom:6px;">
+          <div class="timer-block-header">
+            <span style="color:var(--text-dim);font-family:var(--mono);font-size:10px;">[${idx}]</span>
+            <span class="tname">${blk.block_type}</span>
+            ${condition}
+          </div>
+          <div class="timer-block-body">
+            <div class="timer-field">
+              <div class="tf-label">Inputs</div>
+              <div class="tf-val" style="font-size:11px;">${inputs}</div>
+            </div>
+            <div class="timer-field">
+              <div class="tf-label">Outputs</div>
+              <div class="tf-val" style="font-size:11px;">${outputs}</div>
+            </div>
+          </div>
+        </div>`;
+    });
+  }
+
+  el.innerHTML = html;
+}
+
+// = PLOT VIEW ===========================================================================
+async function renderPlot(ent) {
+  const el = document.getElementById('tab-content');
+  el.innerHTML = `
+    <div id="plot-container" style="width:100%;height:100%;min-height:400px;"></div>
+  `;
+
+  // Fetch point names and data
+  const [pointsRes, dataRes] = await Promise.all([
+    command('get_plot_points', [selectedEntity]),
+    command('get_plot_data',   [selectedEntity])
+  ]);
+
+  if (!pointsRes.ok || !dataRes.ok) {
+    el.innerHTML = '<div class="empty-state">Could not load plot data</div>';
+    return;
+  }
+
+  const pointNames = pointsRes.dict;   // array of strings
+  const plotData   = dataRes.dict;     // { point_name: [{t, v}, ...] }
+
+  if (!pointNames.length) {
+    el.innerHTML = '<div class="empty-state">No data logged yet</div>';
+    return;
+  }
+
+  // Build Plotly traces
+  const traces = pointNames.map((name, i) => ({
+    x:    (plotData[name] || []).map(r => r.t),
+    y:    (plotData[name] || []).map(r => parseFloat(r.v)),
+    name,
+    type: 'scatter',
+    mode: 'lines',
+    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 }
+  }));
+
+  const layout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  '#0a0b0d',
+    font: { family: "'Share Tech Mono', monospace", size: 10, color: '#5a6070' },
+    margin: { t: 10, b: 40, l: 50, r: 10 },
+    xaxis: { 
+      type: 'date', 
+      gridcolor: '#1e2328', 
+      zerolinecolor: '#1e2328', 
+      range: [ new Date(Date.now() - 60000).toISOString(), new Date().toISOString() ]
+      },
+    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', range: [0, 1024] },
+    legend: { orientation: 'h', y: -0.2, bgcolor: 'transparent' }
+  };
+
+  Plotly.newPlot('plot-container', traces, layout, {
+    responsive: true,
+    displayModeBar: false
+  });
+
+  // Build toggle buttons
+  const toggleBar = document.createElement('div');
+  toggleBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;';
+  pointNames.forEach((name, i) => {
+    const color = TRACE_COLORS[i % TRACE_COLORS.length];
+    const btn = document.createElement('span');
+    btn.className = 'trace-toggle';
+    btn.textContent = name;
+    btn.style.borderColor = color;
+    btn.style.color = color;
+    btn.onclick = () => {
+      const isVisible = btn.style.opacity !== '0.3';
+      btn.style.opacity = isVisible ? '0.3' : '1';
+      Plotly.restyle('plot-container', 
+        { visible: isVisible ? 'legendonly' : true }, [i]
+      );
+    };
+    toggleBar.appendChild(btn);
+  });
+  el.insertBefore(toggleBar, el.firstChild);
+
+  // Start live polling — clears when user switches tab
+  if (plotInterval) clearInterval(plotInterval);
+  plotInterval = setInterval(async () => {
+    const res = await command('get_plot_data', [selectedEntity]);
+    if (!res.ok) return;
+    const fresh = res.dict;
+
+    const xUpdate = pointNames.map(n => (fresh[n] || []).map(r => r.t));
+    const yUpdate = pointNames.map(n => (fresh[n] || []).map(r => parseFloat(r.v)));
+
+    // Full redraw with fresh data (simpler than extendTraces for batch updates)
+    Plotly.react('plot-container', 
+      pointNames.map((name, i) => ({
+        x: xUpdate[i], y: yUpdate[i], name,
+        type: 'scatter', mode: 'lines',
+        line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 }
+      })),
+      layout
+    );
+  }, 2000);
+}
+
+// ── LIVE PLOT ────────────────────────────────────────────────────────────────
+function getAllHardwarePoints() {
+  // Collect all unique hardware point names across all entities
+  const names = new Set();
+  for (const ent of Object.values(currentState)) {
+    for (const [pname, pt] of Object.entries(ent.software_points || {})) {
+      if (pt.hardware) names.add(pname);
+    }
+  }
+  return [...names].sort();
+}
+
+function syncPlotTraces() {
+  const newNames = getAllHardwarePoints();
+
+  // Add any new traces to visibility map (default visible)
+  for (const n of newNames) {
+    if (!(n in traceVisible)) traceVisible[n] = true;
+  }
+
+  // Only re-init if trace set changed
+  const changed = JSON.stringify(newNames) !== JSON.stringify(traceNames);
+  if (changed) {
+    traceNames = newNames;
+    initPlot();
+    renderTraceToggles();
+  }
+}
+
+function initPlot() {
+  const traces = traceNames.map((name, i) => ({
+    x: [], y: [],
+    name,
+    type: 'scatter',
+    mode: 'lines',
+    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
+    visible: traceVisible[name] ? true : 'legendonly'
+  }));
+
+  const layout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  '#0a0b0d',
+    font: { family: "'Share Tech Mono', monospace", size: 10, color: '#5a6070' },
+    margin: { t: 4, b: 30, l: 50, r: 10 },
+    xaxis: {
+      type: 'date',
+      gridcolor: '#1e2328',
+      zerolinecolor: '#1e2328',
+      tickfont: { size: 9 }
+    },
+    yaxis: {
+      gridcolor: '#1e2328',
+      zerolinecolor: '#1e2328',
+      tickfont: { size: 9 }
+    },
+    legend: { orientation: 'h', y: -0.15, font: { size: 9 }, bgcolor: 'transparent' },
+    showlegend: false
+  };
+
+  Plotly.newPlot('plot-container', traces, layout, {
+    responsive: true,
+    displayModeBar: false
+  });
+
+  plotInitialized = true;
+}
+
+function renderTraceToggles() {
+  const container = document.getElementById('trace-toggles');
+  container.innerHTML = '';
+  traceNames.forEach((name, i) => {
+    const color = TRACE_COLORS[i % TRACE_COLORS.length];
+    const btn = document.createElement('span');
+    btn.className = 'trace-toggle' + (traceVisible[name] ? '' : ' hidden');
+    btn.textContent = name;
+    btn.style.borderColor = color;
+    btn.style.color = traceVisible[name] ? color : '#5a6070';
+    btn.onclick = () => toggleTrace(name, i, color, btn);
+    container.appendChild(btn);
+  });
+}
+
+function toggleTrace(name, idx, color, btn) {
+  traceVisible[name] = !traceVisible[name];
+  btn.classList.toggle('hidden', !traceVisible[name]);
+  btn.style.color = traceVisible[name] ? color : '#5a6070';
+  Plotly.restyle('plot-container', { visible: traceVisible[name] ? true : 'legendonly' }, [idx]);
+}
+
+async function fetchAndPlot() {
+  if (!plotInitialized || !traceNames.length) return;
+  try {
+    const res  = await fetch(`${BASE}/get_data_snapshot`);  // <-- adjust to your actual endpoint
+    const data = await res.json();
+    // Expected: { timestamp: "ISO string", points: { "AP0": 0.5, "DP2": 1, ... } }
+    // Adjust parsing below to match your actual response shape
+
+    const t = data.timestamp || new Date().toISOString();
+    const pts = data.points || data;
+
+    const xUpdate = traceNames.map(() => [[t]]);
+    const yUpdate = traceNames.map(name => [[pts[name] ?? null]]);
+
+    Plotly.extendTraces('plot-container', { x: xUpdate, y: yUpdate },
+      traceNames.map((_, i) => i), 300);  // keep last 300 points
+  } catch(e) {
+    // Silently skip failed polls — connection status covers this
+  }
+}
+
+function restartPlotLoop() {
+  // if (plotInterval) clearInterval(plotInterval);
+  // const ms = parseInt(document.getElementById('plot-interval').value) || 1000;
+  // plotInterval = setInterval(fetchAndPlot, ms);
+}
+
+// ── BOOT ─────────────────────────────────────────────────────────────────────
+(async () => {
+  await fetchState();
+  restartPlotLoop();
+})();
+</script>
+</body>
+</html>

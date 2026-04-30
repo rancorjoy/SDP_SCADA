@@ -215,6 +215,31 @@ def get_inst(curr_dict, controller_name, block_list_str, index):
     
     return block_list[index]
 
+# Add a condition to a block
+def add_condition(block_inst, point, point_dict):
+
+    if block_inst == None:
+        return False
+
+    if block_inst["condition"] != None:
+        return False
+    
+    if point["_name"] not in point_dict:
+        return False
+    
+    if point["type"] != "bool":
+        return False
+    
+    block_inst["condition"] = point
+    return True
+
+# Remove a condition from a block
+def rem_condition(block_inst):
+    if block_inst["condition"] != None:                            # Check it exists first
+         block_inst["condition"] == None                           # Unset it
+         return True
+    return False
+
 # Add point to input of block
 def add_point_input(block_inst, var_name, point, block_lib, point_dict):
      

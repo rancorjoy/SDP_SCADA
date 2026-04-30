@@ -24,7 +24,8 @@ from . import dcs_script_utils
 from . import ino_utils
 from . import code_block_utils
 from . import worker_thread_utils
-from . import print_log                
+from . import print_log   
+from . import sql_utils             
 from scripts.current_state import CurrentState
 
 logging.getLogger('werkzeug').disabled = True           # Disable default logging (reduces clutter in main window)
@@ -121,6 +122,11 @@ COMMANDS = {
     "list_block_types" :        (0,   0,    "list_block_types"),
     "current_block_config" :    (1,   1,    "current_block_config <controller name>"),
     "saved_block_config" :      (1,   1,    "saved_block_config <controller name>"),
+
+    # Things exposed to the web-page that are not in the help menu
+    "find_lists":      (1,   1,     "find_lists <controller_name>"),
+    "get_plot_data":   (1, 2, "get_plot_data <controller_name> [n_rows]"),
+    "get_plot_points": (1, 1, "get_plot_points <controller_name>"),
 }
 
 def get_path():                                                 # Derives the data path when a function needs it from Pointer.json
@@ -267,8 +273,10 @@ def get_help():
     """
     return help_text
 
-def eval_bool(input):
-    return input.lower() == "true"
+def eval_bool(val):
+    if isinstance(val, bool):
+        return val
+    return str(val).lower() in ("true", "1", "yes", "on")
 
 def split_dcs_list(dcs_list):
     cont_list = {}
@@ -292,6 +300,10 @@ def flask_loop(CurrentState):                               # Method is ran in e
     worker_threads = CurrentState.worker_threads
 
     app = flask.Flask(__name__)                             # Runs Flask Thread for Command Inputs
+
+    @app.route("/")                                         # Route that loads web page
+    def index():
+        return flask.render_template("gui.html")            # File name of web page
 
     @app.route("/command", methods=["POST"])
     def handle_command():
@@ -348,8 +360,8 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "edit_pin_name":      return {"ok": True, "result": dcs_dict_utils.change_pin_name(current_dict[args[0]]["pin_config"],args[1], args[2])}
             if cmd == "edit_pin_type":      return {"ok": True, "result": dcs_dict_utils.change_pin_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], eval_bool(args[2]))}
             if cmd == "edit_pin_dir":       return {"ok": True, "result": dcs_dict_utils.change_pin_dir(current_dict[args[0]]["pin_config"],args[1], args[2])}
-            if cmd == "edit_pin_pwm":       return {"ok": True, "result": dcs_dict_utils.change_pin_pwm(current_dict[args[0]]["pin_config"],args[1], current_dict[args[0]]["software_points"], args[2])}
-            if cmd == "edit_pin_int":       return {"ok": True, "result": dcs_dict_utils.change_pin_int(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]))}
+            if cmd == "edit_pin_pwm":       return {"ok": True, "result": dcs_dict_utils.change_pin_pwm(current_dict[args[0]]["pin_config"],args[1], current_dict[args[0]]["software_points"], eval_bool(args[2]))}
+            if cmd == "edit_pin_int":       return {"ok": True, "result": dcs_dict_utils.change_pin_int(current_dict[args[0]]["pin_config"],args[1], eval_bool(args[2]), current_dict[args[0]]["int_config"])}
 
             if cmd == "list_integer_types":     return {"ok": True, "message": dcs_dict_utils.show_int_types()}
             if cmd == "list_dcs_points":        return {"ok": True, "dict": dcs_dict_utils.list_points(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], current_dict[args[0]]["timers"])}
@@ -400,6 +412,15 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "list_block_types":     return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct
             if cmd == "current_block_config": return {"ok": True, "message": code_block_utils.display_current_config(current_dict, args[0], block_lib)}
             if cmd == "saved_block_config":   return {"ok": True, "message": code_block_utils.display_saved_config(get_path(), args[0], block_lib)}
+
+            # Things exposed to the web-page that are not in the help menu
+            if cmd == "find_lists":             return {"ok": True, "dict": code_block_utils.find_lists(current_dict, args[0])}
+            if cmd == "get_plot_data":
+                n = int(args[1]) if len(args) > 1 else 300
+                return {"ok": True, "dict": sql_utils.get_plot_data(get_path(), args[0], n)}
+
+            if cmd == "get_plot_points":
+                return {"ok": True, "dict": sql_utils.get_plot_points(get_path(), args[0])}
 
         except Exception as e:
             app.logger.error(f"CMD [{cmd}] raised: {e}")
