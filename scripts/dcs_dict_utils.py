@@ -1691,7 +1691,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
             if matched == False:
                 print_log.pL("System", "Error", f"Program {prog_name} has pins not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
                 return False                                                                                # If loop completes without match, code is not compattible with controller 
-
+    print("test0")
     # If the code gets to this point, all points are compattible!  
     for key in prog["int_config"]:                                                                              # For each int in the program pin-map...
         if prog["int_config"][key]["enabled"]:                                                                  # If the int is in use...
@@ -1702,7 +1702,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
             if matched == False:
                 print_log.pL("System", "Error", f"Program {prog_name} has interrupts not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
                 return False       
-
+    print("test1")
     # If the code gets to this point, all interrupts are compattible!  
     # Direct comparrisson of timers would always fail because Timer 1 has 3 channels on MEGA and 2 channels on UNO, check points instead!
     # First get all points in the program
@@ -1713,7 +1713,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
     for key in prog_points:
         if prog_points[key]["hardware"]:
             hard_points[key] = prog_points[key]
-
+    print("test2")
     for key in hard_points:                                                                             # None of these will be software points
         matched = False
         for key_p in cont_list[cont_name]["software_points"]:                                           # Any software point here will not match
@@ -1722,7 +1722,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
         if matched == False:
             print_log.pL("System", "Error", f"Program {prog_name} has points not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
             return False 
-
+    print("test3")
     # Finally just make sure timers match (enabled ones)
     for key in prog["timers"]:
         matched = False
@@ -1734,7 +1734,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
         if matched == False:
             print_log.pL("System", "Error", f"Program {prog_name} has timers not found in Controller {cont_name}", "System", "True", None)
             return False
-
+    print("test4")
     # At this point, the programs are known to be compattible, we can start loading the program!
     clear_controller(cont_list, cont_name)
 

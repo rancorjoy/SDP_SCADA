@@ -13,12 +13,12 @@
     --bg3:       #15181d;
     --border:    #1e2328;
     --border2:   #2a3040;
-    --amber:     #d49324; /* Was #f5a623 */
+    --amber:     #f5a623;
     --amber-dim: #7a5010;
-    --green:     #32b071; /* Was #39d98a */
+    --green:     #39d98a;
     --green-dim: #1a4d35;
-    --red:       #c94646; /* Was #f05454 */
-    --blue:      #4082d1; /* Was #4a9eff */
+    --red:       #f05454;
+    --blue:      #4a9eff;
     --text:      #c8cdd6;
     --text-dim:  #5a6070;
     --text-bright: #e8ecf2;
@@ -74,7 +74,7 @@
     -webkit-text-fill-color: #000000 !important;
     font-weight: 800 !important;
     box-shadow: 0 0 8px var(--badge-color);
-    opacity: 1 !important;
+    opacity: 0.75 !important;
   }
 
   /* Better Action Bar Toggle Buttons */
@@ -94,6 +94,78 @@
   border-color: var(--green) !important;
   font-weight: bold;
   }
+
+  .action-section {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 16px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+}
+.action-section h3 {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--amber);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+}
+.action-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.input-group {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  padding: 4px;
+  border-radius: 2px;
+}
+
+.validation-terminal {
+  background: #050505;
+  border: 1px solid var(--border2);
+  margin-top: 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: inset 0 0 10px #000;
+}
+.terminal-header {
+  background: var(--bg3);
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border2);
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+#terminal-body {
+  padding: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.input-group input {
+  background: transparent;
+  border: none;
+  color: var(--text-bright);
+  padding: 4px 8px;
+  font-family: var(--mono);
+  outline: none;
+}
+.btn-danger {
+  color: var(--red) !important;
+  border-color: var(--red) !important;
+}
+.btn-danger:hover {
+  background: var(--red);
+  color: #000 !important;
+}
+.right-align { margin-left: auto; }
 
   /* ── TOP BAR ── */
   #topbar {
@@ -553,6 +625,7 @@
   <!-- CENTER -->
   <div id="center">
     <div id="tabs">
+      <div class="tab" data-tab="actions" onclick="switchTab('actions')">Actions</div>
       <div class="tab active" data-tab="pins"    onclick="switchTab('pins')">Pins</div>
       <div class="tab"        data-tab="timers"  onclick="switchTab('timers')">Timers</div>
       <div class="tab"        data-tab="isrs"    onclick="switchTab('isrs')">ISRs</div>
@@ -646,13 +719,47 @@ function setConnStatus(ok) {
   lb.textContent = ok ? 'CONNECTED' : 'OFFLINE';
 }
 
+// Send and receive command from flask!
 async function command(cmd, args = []) {
-  const res = await fetch('/command', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ cmd, args })
-  });
-  return await res.json();
+  try {
+    const res = await fetch('/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, args })
+    });
+    const data = await res.json();
+    
+    if (data.ok) {
+      await fetchState(); // Refresh sidebar/state
+      
+      // Handle Validation Terminal Logic
+      if (cmd === 'validate_dcs') {
+        const win = document.getElementById('validation-window');
+        const body = document.getElementById('terminal-body');
+        if (win && body) {
+          win.style.display = 'block';
+          let logHtml = '';
+          
+          const hasErrors = data.errors && data.errors.length > 0;
+          const hasWarnings = data.warnings && data.warnings.length > 0;
+
+          if (!hasErrors && !hasWarnings) {
+            logHtml = '<div style="color:var(--green)">> Validation Passed: Ready to Compile.</div>';
+          } else {
+            if (data.errors) data.errors.forEach(err => logHtml += `<div style="color:var(--red)">[ERROR] ${err}</div>`);
+            if (data.warnings) data.warnings.forEach(wrn => logHtml += `<div style="color:var(--amber)">[WARN] ${wrn}</div>`);
+          }
+          body.innerHTML = logHtml;
+          win.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    } else if (data.message) {
+      alert("Error: " + data.message);
+    }
+    return data;
+  } catch (e) {
+    console.error("Command failed:", e);
+  }
 }
 
 // == SIDEBAR =====================================================================
@@ -717,27 +824,41 @@ function renderSidebar() {
   }
 }
 
-function selectEntity(key) {
-  selectedEntity = key;
+function selectEntity(name) {
+  selectedEntity = name;
+  selectedPin = null;
+  // Change the line below from 'pins' to 'actions'
+  if (!activeTab) activeTab = 'actions'; 
+  
+  // Also ensure that if we are switching entities, we stay on actions
+  // or default to it if the previous tab doesn't make sense.
+  
   renderSidebar();
   renderTabContent();
+  
+  // Highlight the tab in the UI manually on first load
+  document.querySelectorAll('.tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.tab === activeTab)
+  );
 }
 
 // == TABS =========================================================================
 function switchTab(tab) {
+  activeTab = tab; // Set the global activeTab to the one clicked
+
   if (tab !== 'pins') {
     selectedPin = null;
     const bar = document.getElementById('pin-action-bar');
     if (bar) bar.style.display = 'none';
   }
-  if (tab !== 'plot' && plotInterval) {
-    clearInterval(plotInterval);  // stop polling when leaving plot tab
-    plotInterval = null;
-  }
-  activeTab = tab;
+  
+  // ... (rest of your plot cleanup logic) ...
+
+  // Update visual state of all tabs
   document.querySelectorAll('.tab').forEach(t =>
     t.classList.toggle('active', t.dataset.tab === tab)
   );
+
   renderTabContent();
 }
 
@@ -754,6 +875,7 @@ function renderTabContent() {
   void el.offsetWidth; // reflow to restart animation
 
   switch(activeTab) {
+    case 'actions': renderActionsTab(ent); break;
     case 'pins':   el.innerHTML = renderPins(ent);   break;
     case 'timers': el.innerHTML = renderTimers(ent); break;
     case 'isrs':   el.innerHTML = renderISRs(ent);   break;
@@ -762,6 +884,91 @@ function renderTabContent() {
     case 'blocks': renderBlocks(ent); break;  // note: no innerHTML, Plotly needs a real div
     case 'plot':   renderPlot(ent);   break;
   }
+}
+
+// == ACTIONS VIEW ============================================================
+function renderActionsTab(ent) {
+  const el = document.getElementById('tab-content');
+  const isController = ent.vid !== null;
+  
+  let html = `<div class="actions-container fadein">`;
+
+  // 1. General Management
+  html += `
+    <div class="action-section">
+      <h3>General Management</h3>
+      <div class="action-row">
+        <div class="input-group">
+          <input type="text" id="new-name" placeholder="New Name...">
+          <button class="pin-action-btn" onclick="window.command('rename_dcs', [selectedEntity, document.getElementById('new-name').value])">Rename</button>
+        </div>
+        ${isController ? `
+        <div class="input-group">
+          <input type="number" id="sample-time" placeholder="ms..." value="${ent.sample_time || ''}">
+          <button class="pin-action-btn" onclick="window.command('change_sample_time', [selectedEntity, document.getElementById('sample-time').value])">Set Sample Time (s)</button>
+        </div>` : ''}
+        
+        <div class="right-align action-row">
+          <button class="pin-action-btn btn-danger" onclick="window.command('clear_dcs', [selectedEntity])">Clear Controller</button>
+          <button class="pin-action-btn btn-danger" onclick="window.command('delete_dcs', [selectedEntity])">Delete Controller</button>
+        </div>
+      </div>
+    </div>`;
+
+  // 2. Storage
+  html += `
+    <div class="action-section">
+      <h3>Storage</h3>
+      <div class="action-row">
+        <button class="pin-action-btn" onclick="window.command('save_dcs', [selectedEntity])">Save to File</button>
+        <button class="pin-action-btn" onclick="window.command('reset_dcs', [selectedEntity])">Revert to Saved</button>
+      </div>
+    </div>`;
+
+  if (isController) {
+    // 3. Code Attachment
+    // 3. Code Attachment
+    html += `
+      <div class="action-section">
+        <h3>Code Attachment</h3>
+        <div class="action-row">
+          <div class="input-group">
+            <input type="text" id="prog-name" placeholder="Program Name..." value="${ent.program || ''}">
+          </div>
+
+          <button class="pin-action-btn" 
+            onclick="window.command('load_program', [selectedEntity, document.getElementById('prog-name').value])">
+            Load Code
+          </button>
+
+          <button class="pin-action-btn" 
+            onclick="window.command('unload_program', [selectedEntity, document.getElementById('prog-name').value])">
+            Unload Code
+          </button>
+        </div>
+      </div>`;
+
+    // 4. Program Pipeline (Moved Down)
+    html += `
+      <div class="action-section">
+        <h3>Program Pipeline</h3>
+        <div class="action-row">
+          <button class="pin-action-btn" onclick="window.command('validate_dcs', [selectedEntity])">1. Validate</button>
+          <button class="pin-action-btn" onclick="window.command('compile_dcs', [selectedEntity])">2. Compile</button>
+          <button class="pin-action-btn" onclick="window.command('program_dcs', [selectedEntity])">3. Flash Hardware</button>
+        </div>
+      </div>`;
+  }
+
+  // 5. Validation Feedback Window
+  html += `
+    <div id="validation-window" class="validation-terminal" style="display:none;">
+      <div class="terminal-header">PIPELINE LOG</div>
+      <div id="terminal-body"></div>
+    </div>`;
+
+  html += `</div>`;
+  el.innerHTML = html;
 }
 
 // ── PIN VIEW ─────────────────────────────────────────────────────────────────
@@ -790,7 +997,7 @@ function pinCard(p) {
 
     // Enable badge (Always visible: Solid green if ON, outlined if OFF)
     if (p.enabled) {
-    badges.push('<span class="badge enabled active">EN</span>'); // This should be Solid Green
+    badges.push('<span class="badge enabled active">ENB</span>'); // This should be Solid Green
     } 
     else {
         badges.push('<span class="badge enabled outline">OFF</span>'); // This should be Outlined Green
@@ -874,9 +1081,14 @@ function updatePinActionBar(ent) {
 
 async function pinAction(cmd, arg) {
   if (!selectedPin) return;
+  // Prepare the arguments: [entity_name, pin_name, value]
   const args = arg !== undefined ? [selectedEntity, selectedPin, arg] : [selectedEntity, selectedPin];
-  await command(cmd, args);
-  await fetchState();
+  
+  // The 'command' function now handles fetchState() and UI refresh automatically
+  await command(cmd, args); 
+  
+  // We still need to update the local UI variables for the Pin Tab 
+  // to reflect the newly fetched currentState
   const ent = currentState[selectedEntity];
   document.getElementById('tab-content').innerHTML = renderPins(ent);
   updatePinActionBar(ent);
