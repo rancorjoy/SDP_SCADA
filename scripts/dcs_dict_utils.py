@@ -957,7 +957,6 @@ def change_pin_pwm(pin_dict, pin, point_dict, enable):
         return False
 
     if enable:
-        print("test1")
         change_pin_dir(pin_dict, pin, "OUTPUT")
         change_point_type(pin_dict, point_dict, pin, "int", True)
         point_dict[pin]["min_en"] = True
@@ -966,7 +965,6 @@ def change_pin_pwm(pin_dict, pin, point_dict, enable):
         point_dict[pin]["max"] = 255
         pin_dict[pin]["pwm_set"] = True
     else:
-        print("test2")
         change_pin_dir(pin_dict, pin, "INPUT")
         change_point_type(pin_dict, point_dict, pin, "bool", True)
         point_dict[pin]["min_en"] = False
@@ -1781,8 +1779,6 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
     for key in prog_points:
         if prog_points[key]["hardware"]:
             hard_points[key] = prog_points[key]
-
-    print(hard_points)
 
     for key in hard_points:                                                                             # None of these will be software points
         matched = False
