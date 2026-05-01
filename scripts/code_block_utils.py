@@ -221,7 +221,7 @@ def add_condition(block_inst, point, point_dict):
     if block_inst == None:
         return False
 
-    if block_inst["condition"] != None:
+    if block_inst["condition"] is not None:
         return False
     
     if point["_name"] not in point_dict:
