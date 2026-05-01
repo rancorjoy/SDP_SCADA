@@ -74,7 +74,8 @@ def create_block_lib(block_lib):
     #  Increment Block
     increment_blk = code_block_utils.get_block_type()
     increment_blk["input_points"] = {"point" : "num"}                  # Block Inputs
-    increment_blk["output_points"] = {}                                # Block Outputs
+    increment_blk["output_points"] = {"point" : "num"}                 # Block Outputs
+    assign_blk["output_type_case"] = {"left" : "decltype(point_t())"}
     increment_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
     increment_blk["dep_list"] = []                                     # List of dependancies saved as strings
                                                                        # Logical code using point to represent points
@@ -190,8 +191,8 @@ def create_block_lib(block_lib):
     
     new_blk = code_block_utils.get_block_type()
     new_blk["input_points"] = {"reading" : "num", "index" : "int", "length" : "int", "arr" : "arr"}  # Block Inputs
-    new_blk["output_points"] = {"avg" : "float"}                        # Block Outputs
-    new_blk["output_type_case"] = {"avg" : "float"}
+    new_blk["output_points"] = {"index" : "int", "avg" : "float"}                        # Block Outputs
+    new_blk["output_type_case"] = {"index" : "int", "avg" : "float"}
     new_blk["type"] = "Array"                                             # Meta-Data to help with organizing
     new_blk["dep_list"] = []                                              # List of dependancies saved as strings
                                                                           # Logical code using point to represent points
