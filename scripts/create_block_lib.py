@@ -55,6 +55,20 @@ def create_block_lib(block_lib):
     assign_blk["description"] = "Performs assignment left = right."
     block_lib["assign_blk"] = assign_blk                            # Store the new block in the block library
 
+    # Bool Assign Block
+    assign_blk = code_block_utils.get_block_type()
+    assign_blk["input_points"] = {"left" : "bool", "right" : "bool"}  # Block Inputs
+    assign_blk["output_points"] = {}                                # Block Outputs
+    assign_blk["type"] = "Logic"                                    # Meta-Data to help with organizing
+    assign_blk["dep_list"] = []                                     # List of dependancies saved as strings
+                                                                    # Logical code using point to represent points
+    assign_blk["code_str"] = textwrap.dedent(
+    """               
+    left = right;
+    """)
+    assign_blk["description"] = "Performs assignment left = right for booleans."
+    block_lib["bool_assign_blk"] = assign_blk                            # Store the new block in the block library
+
     #  Increment Block
     increment_blk = code_block_utils.get_block_type()
     increment_blk["input_points"] = {"point" : "num"}                  # Block Inputs
