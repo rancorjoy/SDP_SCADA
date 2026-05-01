@@ -32,7 +32,7 @@ def flash_loop(event_queue, lock, datapath, is_init, worker_threads):
                 pause_event = threading.Event()
                 worker_threads[port]["cmd_queue"].put({"command": "pause", "ready": pause_event})
                 pause_event.wait()  # block flash thread until port is actually closed
-                time.sleep(0.1)
+                #time.sleep(0.1)
 
                 fqbn = dcs_flash_utils.resolve_fqbn(port)
 
