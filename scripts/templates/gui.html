@@ -2192,7 +2192,7 @@ function _initDualPlots() {
     x: [], y: [], name,
     type: 'scatter', mode: 'lines',
     line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
-    visible: plotVisibleA[name] ? true : 'legendonly'
+    visible: true
   }));
 
   const boolTraces = plotBoolNames.map((name, i) => ({
@@ -2200,7 +2200,7 @@ function _initDualPlots() {
     type: 'scatter', mode: 'lines+markers',
     line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
     marker: { size: 3 },
-    visible: plotVisibleB[name] ? true : 'legendonly'
+    visible: true
   }));
 
   const analogLayout = _plotLayout({
