@@ -149,6 +149,18 @@
   white-space: pre-wrap;
 }
 
+#plot-wrap {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 150px); /* Adjust based on your header height */
+    overflow-y: auto;
+}
+
+.plot-container {
+    min-height: 400px;
+    margin-bottom: 20px;
+    border: 1px solid #444;
+}
 
 .input-group input {
   background: transparent;
@@ -2033,6 +2045,69 @@ let plotAnalogNames= [];          // subset: non-bool
 let plotVisibleA   = {};          // analogPlot traceIdx -> bool (visible)
 let plotVisibleB   = {};          // boolPlot traceIdx -> bool (visible)
 let plotInited     = false;
+
+// === INTEGRATED PLOT CONTROLLER ===
+let plotTimer = null;
+let isPlotActive = false;
+
+function initPlotting() {
+    const plotLayout = {
+        grid: { rows: 2, columns: 1, pattern: 'independent' },
+        margin: { t: 30, b: 40, l: 50, r: 20 },
+        showlegend: true,
+        legend: { orientation: 'h' }
+    };
+
+    // Initialize empty charts
+    Plotly.newPlot('plot-analog', [], { ...plotLayout, title: 'Analog Signals' });
+    Plotly.newPlot('plot-bool', [], { ...plotLayout, title: 'Logic States' });
+}
+
+async function fetchPlotData() {
+    if (!isPlotActive) return;
+
+    try {
+        // Polls the command endpoint as seen in working build
+        const response = await fetch(`/command?get_plot_data=true&controller=${currentController}`);
+        const data = await response.json();
+        
+        if (data.series) {
+            updateCharts(data.series);
+        }
+    } catch (err) {
+        console.error("Plot polling failed:", err);
+    }
+}
+
+function updateCharts(series) {
+    const analogData = [];
+    const boolData = [];
+
+    series.forEach(s => {
+        // Logic to separate bits from floats
+        if (s.type === 'bool' || s.name.includes('Status')) {
+            boolData.push({ x: s.times, y: s.values, name: s.name, type: 'scatter' });
+        } else {
+            analogData.push({ x: s.times, y: s.values, name: s.name, type: 'scatter' });
+        }
+    });
+
+    Plotly.react('plot-analog', analogData);
+    Plotly.react('plot-bool', boolData);
+}
+
+// === TAB SWITCHING HOOK ===
+// Ensure this is called when the user clicks the "Plot" tab
+function onTabChange(tabName) {
+    if (tabName === 'plot') {
+        isPlotActive = true;
+        initPlotting();
+        plotTimer = setInterval(fetchPlotData, 2000); // 2-second refresh
+    } else {
+        isPlotActive = false;
+        clearInterval(plotTimer);
+    }
+}
 
 // Common base layout template
 function _plotLayout(opts) {
