@@ -115,6 +115,24 @@
         "dep_list": [],
         "code_str": "\nif (divisor == 0) {{\n    quotient = 0;\n    remainder = dividend;  // preserves a = bq + r\n}} \nelse {{\n    remainder = dividend % divisor;\n    if (remainder < 0) {{\n        remainder += abs(divisor);\n    }}\n    quotient = (dividend - remainder) / divisor;\n}}\n"
     },
+    "moving_avg_blk": {
+        "input_points": {
+            "reading": "num",
+            "index": "int",
+            "length": "int",
+            "arr": "arr"
+        },
+        "output_points": {
+            "avg": "float"
+        },
+        "output_type_case": {
+            "avg": "float"
+        },
+        "type": "Array",
+        "description": "Takes the moving average of an array of length and returns the average.",
+        "dep_list": [],
+        "code_str": "\nindex += 1;\nif(index == length)\n{\n    index = 0;\n}\n\narr[index] = reading;\nfloat sum = 0;\nfor (int i=0; i<length; i++)\n{\n    sum += (float)arr[i];\n}\navg = sum/length;\n"
+    },
     "equal_blk": {
         "input_points": {
             "argument1": "any",
@@ -194,5 +212,16 @@
         "description": "Checks if argument1 =< argument2 are equal and returns result.",
         "dep_list": [],
         "code_str": "\nargument1 <= argument2 ? result = true : result = false;\n"
+    },
+    "inv_self_blk": {
+        "input_points": {
+            "argument1": "bool"
+        },
+        "output_points": {},
+        "output_type_case": {},
+        "type": "Logical",
+        "description": "Checks if argument1 =< argument2 are equal and returns result.",
+        "dep_list": [],
+        "code_str": "\nargument1 == true ? argument1 = false : argument1 = true;\n"
     }
 }

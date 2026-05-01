@@ -160,7 +160,7 @@ def get_block_sets(block_type, block_lib):
 def get_block_auto(block_type, block_lib):
     code_str = f""
     for key in block_lib[block_type]["output_points"]:
-        code_str += f"auto {key} = 0;\n"
+        code_str += f"{key}_t {key} = {{}};\n"  # zero-initializes any type
     return code_str
 
 # Get code block instance usage, placed in a list location
@@ -181,14 +181,20 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
         code_str += f"auto result{index} = {block_inst["block_type"]}("
         for key in block_inst["input_points"]:
             point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["input_points"][key])
-            code_str += f"getPoint({point}), "
+            if block_lib[block_inst["block_type"]]["input_points"][key] == "arr":
+                code_str += f"{point}, "
+            else:
+                code_str += f"getPoint({point}), "
 
         code_str = code_str[:-2] # Remove last comma and space
         code_str += ");\n"
 
         for key in block_inst["output_points"]:
             point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["output_points"][key])
-            code_str += f"setPoint({point}, result{index}.{key});\n"
+            if block_lib[block_inst["block_type"]]["output_points"][key] == "arr":
+                code_str += f"{point} = result{index}.{key};\n"
+            else:
+                code_str += f"setPoint({point}, result{index}.{key});\n"
 
         code_str += "\n"
         return top_str + code_str + bottom_str
@@ -199,7 +205,10 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
         code_str += f"{block_inst["block_type"]}("
         for key in block_inst["input_points"]:
             point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["input_points"][key])
-            code_str += f"getPoint({point}), "
+            if block_lib[block_inst["block_type"]]["input_points"][key] == "arr":
+                code_str += f"{point}, "
+            else:
+                code_str += f"getPoint({point}), "
 
         code_str = code_str[:-2] # Remove last comma and space
         code_str += ");\n"
@@ -465,20 +474,22 @@ def get_hold_point(cont, point_name):
     point = cont["software_points"][point_name]
     g_type = point["type"]
 
-    if g_type == "bool":
-        return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = (bool)(val == \"true\");\n", "\t\t")
-    
-    elif g_type == "int":
-        s_type = point["int_type"]
-        if s_type == "" or s_type == None:
-            s_type = "int"
-        return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = ({s_type})val.toInt();\n", "\t\t")
-    
-    elif g_type == "float":
-        s_type = point["float_type"]
-        if s_type == "" or s_type == None:
-            s_type = "float"
-        return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = ({s_type})val.toFloat();\n", "\t\t")
+    if point["const"] == False:
+        if g_type == "bool":
+            return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = (bool)(val == \"true\");\n", "\t\t")
+        
+        elif g_type == "int":
+            s_type = point["int_type"]
+            if s_type == "" or s_type == None:
+                s_type = "int"
+            return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = ({s_type})val.toInt();\n", "\t\t")
+        
+        elif g_type == "float":
+            s_type = point["float_type"]
+            if s_type == "" or s_type == None:
+                s_type = "float"
+            return textwrap.indent(f"if (name == \"{point_name}\") {point_name}.hold_val = ({s_type})val.toFloat();\n", "\t\t")
+    return f""
 
 # Get block of code to check all hold_vals vs points
 def get_hold_points(cont):
@@ -504,17 +515,18 @@ def get_hold_en_points(cont):
     code_str = f""
     
     for key, val in cont["software_points"].items():
-        if not val["hardware"]:                             # software point are always active
-            code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
-
-        elif key in cont["pin_config"]:                     # pin hardware point
-            if cont["pin_config"][key]["enabled"]:
+        if cont["software_points"][key]["const"] == False:
+            if not val["hardware"]:                             # software point are always active
                 code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
 
-        else:                                               # timer hardware point
-            timer_name = key.split('_')[0]
-            if timer_name in cont["timers"] and cont["timers"][timer_name]["enabled"]:
-                code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
+            elif key in cont["pin_config"]:                     # pin hardware point
+                if cont["pin_config"][key]["enabled"]:
+                    code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
+
+            else:                                               # timer hardware point
+                timer_name = key.split('_')[0]
+                if timer_name in cont["timers"] and cont["timers"][timer_name]["enabled"]:
+                    code_str += textwrap.indent(f"if (name == \"{key}\") {key}.hold_en = val;\n","\t\t")
 
     return code_str
 

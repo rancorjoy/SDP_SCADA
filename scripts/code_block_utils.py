@@ -315,7 +315,7 @@ def add_array_input(block_inst, var_name, arr, block_lib, array_dict):
     if arr["_name"] not in array_dict:
         return False
 
-    if block_lib[block_inst["type"]]["input_points"][var_name] != "arr":
+    if block_lib[block_inst["block_type"]]["input_points"][var_name] != "arr":
         return False
      
     block_inst["input_points"][var_name] = arr

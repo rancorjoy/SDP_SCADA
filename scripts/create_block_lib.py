@@ -170,6 +170,33 @@ def create_block_lib(block_lib):
 
 
 
+    ### ARRAY BLOCKS ###
+    
+    new_blk = code_block_utils.get_block_type()
+    new_blk["input_points"] = {"reading" : "num", "index" : "int", "length" : "int", "arr" : "arr"}  # Block Inputs
+    new_blk["output_points"] = {"avg" : "float"}                        # Block Outputs
+    new_blk["output_type_case"] = {"avg" : "float"}
+    new_blk["type"] = "Array"                                             # Meta-Data to help with organizing
+    new_blk["dep_list"] = []                                              # List of dependancies saved as strings
+                                                                          # Logical code using point to represent points
+    new_blk["code_str"] = textwrap.dedent(
+    """               
+    index += 1;
+    if(index == length)
+    {
+        index = 0;
+    }
+
+    arr[index] = reading;
+    float sum = 0;
+    for (int i=0; i<length; i++)
+    {
+        sum += (float)arr[i];
+    }
+    avg = sum/length;
+    """)
+    new_blk["description"] = "Takes the moving average of an array of length and returns the average."
+    block_lib["moving_avg_blk"] = new_blk                                      # Store the new block in the block library
 
 
     ### LOGICAL BLOCKS ###
