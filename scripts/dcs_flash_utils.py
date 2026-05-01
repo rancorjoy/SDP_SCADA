@@ -101,12 +101,13 @@ def resolve_fqbn(port):
                 print_log.pL("Flash", "Error", f"Port {port} found but no matching board", "System", True, None)
                 return None
 
-        # FALLBACK: If auto-detect fails, use list_serial_ports to get VID/PID
-        all_ports = scan_serial.listSerialPorts.list_serial_ports()
+        import serial.tools.list_ports
+        all_ports = serial.tools.list_ports.comports()
         for p in all_ports:
-            if p['port'] == port:
-                vid_pid = (hex(p['vid']), hex(p['pid']))
-                return FQBN_MAP.get(vid_pid) # Look up in your manual map   
+            if p.device == port:
+                if p.vid is not None and p.pid is not None:
+                    vid_pid = (hex(p.vid), hex(p.pid))
+                    return FQBN_MAP.get(vid_pid)
 
         print_log.pL("Flash", "Error", f"No port matching {port} found in arduino-cli output", "System", True, None)
         return None

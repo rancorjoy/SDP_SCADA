@@ -1709,6 +1709,9 @@ def load_cont_to_prog(data_path, cont_name, prog_list, prog_name):
             if prog_list[prog_name]["software_points"][key_p]["_name"] == cont["software_points"][key]["_name"]:
                 prog_list[prog_name]["software_points"][key_p] = cont["software_points"][key]
 
+    for key in cont["arrays"]:
+        prog_list[cont_name]["arrays"][key] = cont["arrays"][key]
+
     for key in cont["timers"]:
         if cont["timers"][key]["enabled"]:
             prog_list[prog_name]["timers"][key]["enabled"] = True
@@ -1821,6 +1824,9 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
         if prog["timers"][key]["enabled"]:
             cont_list[cont_name]["timers"][key]["enabled"] = True
 
+    for key in prog["arrays"]:
+        cont_list[cont_name]["arrays"][key] = prog["arrays"][key]
+
     prog_block_lists = code_block_utils.find_lists_saved(data_path, prog_name)               # Find all block lists in program
     cont_block_lists = code_block_utils.find_lists(cont_list, cont_name)                     # Find all block lists in controller
 
@@ -1923,8 +1929,5 @@ def clear_controller(current_dict, controller_name):
 
     for key in current_dict[controller_name]["timers"]:
         current_dict[controller_name]["timers"][key]["enabled"] = False
-
-    for key in current_dict[controller_name]["arrays"]:
-        del current_dict[controller_name]["arrays"][key]
 
     return True
