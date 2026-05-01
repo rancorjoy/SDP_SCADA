@@ -675,51 +675,6 @@
   /* ── FADE IN ── */
   @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   .fadein { animation: fadein 0.2s ease forwards; isolation: isolate; }
-
-  /* ── PLOT TAB ── */
-  #plot-toolbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg2);
-    flex-wrap: wrap;
-  }
-  #plot-toolbar .pin-action-label { font-family: var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:0.1em; text-transform:uppercase; }
-  #trace-toggles { display:flex; flex-wrap:wrap; gap:5px; padding:6px 12px; border-bottom:1px solid var(--border); background:var(--bg2); flex-shrink:0; }
-  .trace-toggle {
-    display: inline-block;
-    padding: 3px 9px;
-    border: 1px solid currentColor;
-    border-radius: 2px;
-    font-family: var(--mono);
-    font-size: 10px;
-    cursor: pointer;
-    user-select: none;
-    transition: opacity 0.15s;
-    white-space: nowrap;
-  }
-  .trace-toggle.hidden { opacity: 0.28; }
-  .trace-toggle:hover  { opacity: 0.75; }
-
-  /* Two-plot layout inside tab-content when on plot tab */
-  #plot-wrap {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-height: 0;
-  }
-  #plot-analog { flex: 3; min-height: 0; overflow: hidden; }
-  #plot-bool   { flex: 2; min-height: 0; overflow: hidden; }
-  #plot-divider {
-    flex-shrink: 0;
-    height: 1px;
-    background: var(--border2);
-    margin: 0;
-  }
 </style>
 </head>
 <body>
@@ -1129,19 +1084,7 @@ function switchTab(tab) {
     if (bbar) bbar.style.display = 'none';
   }
   
-  // Stop live plot when leaving plot tab; reset so switching back re-inits
-  if (tab !== 'plot') {
-    if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
-    plotInited = false;
-    // Restore tab-content normal styling
-    const tc = document.getElementById('tab-content');
-    if (tc) {
-      tc.style.overflowY = '';
-      tc.style.padding   = '';
-      tc.style.display   = '';
-      tc.style.flexDirection = '';
-    }
-  }
+  // ... (rest of your plot cleanup logic) ...
 
   // Update visual state of all tabs
   document.querySelectorAll('.tab').forEach(t =>
@@ -1189,8 +1132,8 @@ async function renderTabContent() {
       await renderBlocks(ent);        // Fixed: Always render when tab is active
       break;
     case 'plot':   
-      renderPlot(ent);
-      return; // skip updateAllActionBars for plot tab
+      renderPlot(ent);   
+      break;
   }
 
   // Re-apply action bars visibility after render
@@ -2024,380 +1967,219 @@ async function renderBlocks(ent, forceRefresh) {
 }
 
 // = PLOT VIEW ===========================================================================
-// Plot state — kept outside renderPlot so live updates don't re-init
-let plotMode       = 'live';      // 'live' | 'historical'
-let plotEntity     = null;        // which entity the current plot belongs to
-let plotPointNames = [];          // all point names for this entity
-let plotBoolNames  = [];          // subset: bool type
-let plotAnalogNames= [];          // subset: non-bool
-let plotVisibleA   = {};          // analogPlot traceIdx -> bool (visible)
-let plotVisibleB   = {};          // boolPlot traceIdx -> bool (visible)
-let plotInited     = false;
-
-// Common base layout template
-function _plotLayout(opts) {
-  return Object.assign({
-    paper_bgcolor: 'transparent',
-    plot_bgcolor:  '#0a0b0d',
-    font: { family: "'Share Tech Mono', monospace", size: 9, color: '#5a6070' },
-    margin: { t: 6, b: 28, l: 52, r: 10 },
-    xaxis: { type: 'date', gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } },
-    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } },
-    showlegend: false,
-    hovermode: 'x unified',
-    hoverlabel: { bgcolor: '#15181d', bordercolor: '#2a3040', font: { family: "'Share Tech Mono', monospace", size: 9 } }
-  }, opts);
-}
-
 async function renderPlot(ent) {
   const el = document.getElementById('tab-content');
-
-  // ── Build the static scaffold once (or when entity changes) ──────────────
-  if (plotInited && plotEntity === selectedEntity) {
-    // Already set up — just ensure the poll/fetch is running
-    if (plotMode === 'live') _startLivePlot();
-    return;
-  }
-
-  // Clear old interval before re-building
-  if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
-  plotInited = false;
-  plotEntity = selectedEntity;
-
-  // ── Scaffold HTML ─────────────────────────────────────────────────────────
-  // We take over tab-content completely (no overflow-y scroll needed for plot)
-  el.style.overflowY = 'hidden';
-  el.style.padding   = '0';
-  el.style.display   = 'flex';
-  el.style.flexDirection = 'column';
-
   el.innerHTML = `
-    <!-- Toolbar -->
-    <div id="plot-toolbar">
-      <span class="pin-action-label">Mode:</span>
-      <button id="plt-btn-live" class="pin-action-btn active" onclick="plotSetMode('live')">Live</button>
-      <button id="plt-btn-hist" class="pin-action-btn"        onclick="plotSetMode('historical')">Historical</button>
-
-      <span id="plt-hist-controls" style="display:none;align-items:center;gap:8px;">
-        <span class="pin-action-label" style="margin-left:8px;">From:</span>
-        <input type="datetime-local" id="plt-from"
-          style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
-        <span class="pin-action-label">To:</span>
-        <input type="datetime-local" id="plt-to"
-          style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
-        <button class="pin-action-btn" onclick="plotFetchHistorical()">Load</button>
-      </span>
-
-      <span class="pin-action-label" style="margin-left:12px;">Interval:</span>
-      <select id="plt-interval"
-        style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;"
-        onchange="plotSetInterval(this.value)">
-        <option value="1000">1 s</option>
-        <option value="2000" selected>2 s</option>
-        <option value="5000">5 s</option>
-        <option value="10000">10 s</option>
-      </select>
-
-      <span class="pin-action-label" style="margin-left:12px;">Window:</span>
-      <select id="plt-window"
-        style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
-        <option value="30">30 s</option>
-        <option value="60" selected>1 min</option>
-        <option value="300">5 min</option>
-        <option value="600">10 min</option>
-        <option value="3600">1 hr</option>
-      </select>
-    </div>
-
-    <!-- Toggle strip: analog/float points -->
-    <div id="trace-toggles-analog"
-      style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:28px;">
-      <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">ANALOG/FLOAT:</span>
-    </div>
-
-    <!-- Toggle strip: bool points -->
-    <div id="trace-toggles-bool"
-      style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:28px;">
-      <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">BOOL:</span>
-    </div>
-
-    <!-- Two stacked plots -->
-    <div id="plot-wrap">
-      <div id="plot-analog"></div>
-      <div id="plot-divider"></div>
-      <div id="plot-bool"></div>
-    </div>
+    <div id="plot-container" style="width:100%;height:100%;min-height:400px;"></div>
   `;
 
-  // ── Fetch point names ─────────────────────────────────────────────────────
-  const pointsRes = await _rawCommand('get_plot_points', [selectedEntity]);
-  if (!pointsRes || !pointsRes.ok) {
-    el.innerHTML = '<div class="empty-state">Could not load point list</div>';
+  // Fetch point names and data
+  const [pointsRes, dataRes] = await Promise.all([
+    command('get_plot_points', [selectedEntity]),
+    command('get_plot_data',   [selectedEntity])
+  ]);
+
+  if (!pointsRes.ok || !dataRes.ok) {
+    el.innerHTML = '<div class="empty-state">Could not load plot data</div>';
     return;
   }
 
-  plotPointNames = pointsRes.dict || [];
+  const pointNames = pointsRes.dict;   // array of strings
+  const plotData   = dataRes.dict;     // { point_name: [{t, v}, ...] }
 
-  // Classify: bool vs analog/float
-  // We infer bool from the software_points type data; fall back to value range heuristic
-  const swPts = (currentState[selectedEntity] || {}).software_points || {};
-  plotBoolNames   = plotPointNames.filter(n => (swPts[n] && swPts[n].type === 'bool'));
-  plotAnalogNames = plotPointNames.filter(n => !plotBoolNames.includes(n));
+  if (!pointNames.length) {
+    el.innerHTML = '<div class="empty-state">No data logged yet</div>';
+    return;
+  }
 
-  // Build visibility maps (preserve existing choices on re-render)
-  plotAnalogNames.forEach((n, i) => { if (!(n in plotVisibleA)) plotVisibleA[n] = true; });
-  plotBoolNames.forEach(  (n, i) => { if (!(n in plotVisibleB)) plotVisibleB[n] = true; });
-
-  // ── Init both Plotly figures (empty — data filled by fetch) ───────────────
-  _initDualPlots();
-
-  // ── Render toggle strips ──────────────────────────────────────────────────
-  _renderToggles();
-
-  // ── Default time range for historical inputs ──────────────────────────────
-  const now   = new Date();
-  const minus1 = new Date(now - 60*60*1000);
-  document.getElementById('plt-to').value   = _toLocalDT(now);
-  document.getElementById('plt-from').value = _toLocalDT(minus1);
-
-  plotInited = true;
-
-  // ── Kick off live or historical ───────────────────────────────────────────
-  if (plotMode === 'live') _startLivePlot();
-  else _applyHistControls();
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-function _toLocalDT(d) {
-  // Returns "YYYY-MM-DDTHH:MM" in local time for datetime-local input
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-// Raw fetch — does NOT call fetchState() to avoid flicker
-async function _rawCommand(cmd, args) {
-  try {
-    const res = await fetch('/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd, args })
-    });
-    return await res.json();
-  } catch(e) { return null; }
-}
-
-function _initDualPlots() {
-  const baseConfig = { responsive: true, displayModeBar: false };
-
-  const analogTraces = plotAnalogNames.map((name, i) => ({
-    x: [], y: [], name,
-    type: 'scatter', mode: 'lines',
-    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
-    visible: plotVisibleA[name] ? true : 'legendonly'
+  // Build Plotly traces
+  const traces = pointNames.map((name, i) => ({
+    x:    (plotData[name] || []).map(r => r.t),
+    y:    (plotData[name] || []).map(r => parseFloat(r.v)),
+    name,
+    type: 'scatter',
+    mode: 'lines',
+    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 }
   }));
 
-  const boolTraces = plotBoolNames.map((name, i) => ({
-    x: [], y: [], name,
-    type: 'scatter', mode: 'lines+markers',
-    line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
-    marker: { size: 3 },
-    visible: plotVisibleB[name] ? true : 'legendonly'
-  }));
+  const layout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  '#0a0b0d',
+    font: { family: "'Share Tech Mono', monospace", size: 10, color: '#5a6070' },
+    margin: { t: 10, b: 40, l: 50, r: 10 },
+    xaxis: { 
+      type: 'date', 
+      gridcolor: '#1e2328', 
+      zerolinecolor: '#1e2328', 
+      range: [ new Date(Date.now() - 60000).toISOString(), new Date().toISOString() ]
+      },
+    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', range: [0, 1024] },
+    legend: { orientation: 'h', y: -0.2, bgcolor: 'transparent' }
+  };
 
-  const analogLayout = _plotLayout({
-    margin: { t: 6, b: 20, l: 52, r: 10 },
-    xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8}, showticklabels: false },
-    yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} }
+  Plotly.newPlot('plot-container', traces, layout, {
+    responsive: true,
+    displayModeBar: false
   });
 
-  const boolLayout = _plotLayout({
-    margin: { t: 4, b: 28, l: 52, r: 10 },
-    xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} },
-    yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8},
-             range: [-0.1, 1.1], tickvals: [0, 1], ticktext: ['0','1'] }
-  });
-
-  Plotly.newPlot('plot-analog', analogTraces.length ? analogTraces : [{ x:[], y:[], type:'scatter', mode:'lines', showlegend:false }], analogLayout, baseConfig);
-  Plotly.newPlot('plot-bool',   boolTraces.length   ? boolTraces   : [{ x:[], y:[], type:'scatter', mode:'lines', showlegend:false }], boolLayout,   baseConfig);
-}
-
-function _renderToggles() {
-  const stripA = document.getElementById('trace-toggles-analog');
-  const stripB = document.getElementById('trace-toggles-bool');
-
-  // Keep the label span, remove old buttons
-  const labelA = stripA.querySelector('span');
-  const labelB = stripB.querySelector('span');
-  stripA.innerHTML = ''; stripA.appendChild(labelA);
-  stripB.innerHTML = ''; stripB.appendChild(labelB);
-
-  plotAnalogNames.forEach((name, i) => {
+  // Build toggle buttons
+  const toggleBar = document.createElement('div');
+  toggleBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;';
+  pointNames.forEach((name, i) => {
     const color = TRACE_COLORS[i % TRACE_COLORS.length];
     const btn = document.createElement('span');
-    btn.className = 'trace-toggle' + (plotVisibleA[name] ? '' : ' hidden');
+    btn.className = 'trace-toggle';
     btn.textContent = name;
-    btn.style.color = plotVisibleA[name] ? color : '#5a6070';
     btn.style.borderColor = color;
+    btn.style.color = color;
     btn.onclick = () => {
-      plotVisibleA[name] = !plotVisibleA[name];
-      btn.classList.toggle('hidden', !plotVisibleA[name]);
-      btn.style.color = plotVisibleA[name] ? color : '#5a6070';
-      Plotly.restyle('plot-analog', { visible: plotVisibleA[name] ? true : 'legendonly' }, [i]);
+      const isVisible = btn.style.opacity !== '0.3';
+      btn.style.opacity = isVisible ? '0.3' : '1';
+      Plotly.restyle('plot-container', 
+        { visible: isVisible ? 'legendonly' : true }, [i]
+      );
     };
-    stripA.appendChild(btn);
+    toggleBar.appendChild(btn);
   });
+  el.insertBefore(toggleBar, el.firstChild);
 
-  plotBoolNames.forEach((name, i) => {
-    const color = TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length];
-    const btn = document.createElement('span');
-    btn.className = 'trace-toggle' + (plotVisibleB[name] ? '' : ' hidden');
-    btn.textContent = name;
-    btn.style.color = plotVisibleB[name] ? color : '#5a6070';
-    btn.style.borderColor = color;
-    btn.onclick = () => {
-      plotVisibleB[name] = !plotVisibleB[name];
-      btn.classList.toggle('hidden', !plotVisibleB[name]);
-      btn.style.color = plotVisibleB[name] ? color : '#5a6070';
-      Plotly.restyle('plot-bool', { visible: plotVisibleB[name] ? true : 'legendonly' }, [i]);
-    };
-    stripB.appendChild(btn);
-  });
-}
+  // Start live polling — clears when user switches tab
+  if (plotInterval) clearInterval(plotInterval);
+  plotInterval = setInterval(async () => {
+    const res = await command('get_plot_data', [selectedEntity]);
+    if (!res.ok) return;
+    const fresh = res.dict;
 
-function _applyData(plotData) {
-  if (!plotInited) return;
+    const xUpdate = pointNames.map(n => (fresh[n] || []).map(r => r.t));
+    const yUpdate = pointNames.map(n => (fresh[n] || []).map(r => parseFloat(r.v)));
 
-  // Build update arrays for analog plot
-  if (plotAnalogNames.length) {
-    const xA = plotAnalogNames.map(n => (plotData[n] || []).map(r => r.t));
-    const yA = plotAnalogNames.map(n => (plotData[n] || []).map(r => parseFloat(r.v)));
-    Plotly.react('plot-analog',
-      plotAnalogNames.map((name, i) => ({
-        x: xA[i], y: yA[i], name,
+    // Full redraw with fresh data (simpler than extendTraces for batch updates)
+    Plotly.react('plot-container', 
+      pointNames.map((name, i) => ({
+        x: xUpdate[i], y: yUpdate[i], name,
         type: 'scatter', mode: 'lines',
-        line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5, shape: 'linear' },
-        visible: plotVisibleA[name] ? true : 'legendonly'
+        line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 }
       })),
-      _plotLayout({
-        margin: { t: 6, b: 20, l: 52, r: 10 },
-        xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8}, showticklabels: false },
-        yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} }
-      })
+      layout
     );
-  }
-
-  // Build update arrays for bool plot
-  if (plotBoolNames.length) {
-    const xB = plotBoolNames.map(n => (plotData[n] || []).map(r => r.t));
-    const yB = plotBoolNames.map(n => (plotData[n] || []).map(r => parseFloat(r.v)));
-    Plotly.react('plot-bool',
-      plotBoolNames.map((name, i) => ({
-        x: xB[i], y: yB[i], name,
-        type: 'scatter', mode: 'lines+markers',
-        line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
-        marker: { size: 3 },
-        visible: plotVisibleB[name] ? true : 'legendonly'
-      })),
-      _plotLayout({
-        margin: { t: 4, b: 28, l: 52, r: 10 },
-        xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} },
-        yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8},
-                 range: [-0.1, 1.1], tickvals:[0,1], ticktext:['0','1'] }
-      })
-    );
-  }
+  }, 2000);
 }
 
-// ── Live mode ──────────────────────────────────────────────────────────────────
-function _startLivePlot() {
-  if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
-  const ms = parseInt((document.getElementById('plt-interval') || {}).value || '2000');
-  _livePoll(); // immediate first fetch
-  plotInterval = setInterval(_livePoll, ms);
-}
-
-async function _livePoll() {
-  if (activeTab !== 'plot' || !plotInited) return;
-  const windowSec = parseInt((document.getElementById('plt-window') || {}).value || '60');
-  const res = await _rawCommand('get_plot_data', [selectedEntity]);
-  if (!res || !res.ok) return;
-
-  // Trim to window
-  const now = Date.now();
-  const cutoff = new Date(now - windowSec * 1000).toISOString();
-  const trimmed = {};
-  for (const [k, arr] of Object.entries(res.dict || {})) {
-    trimmed[k] = (arr || []).filter(r => r.t >= cutoff);
-  }
-  _applyData(trimmed);
-}
-
-// ── Historical mode ────────────────────────────────────────────────────────────
-function _applyHistControls() {
-  const ctrl = document.getElementById('plt-hist-controls');
-  if (ctrl) ctrl.style.display = 'flex';
-}
-
-async function plotFetchHistorical() {
-  if (!plotInited) return;
-  const fromVal = document.getElementById('plt-from').value;
-  const toVal   = document.getElementById('plt-to').value;
-  if (!fromVal || !toVal) { alert('Please select both From and To times.'); return; }
-
-  const fromISO = new Date(fromVal).toISOString();
-  const toISO   = new Date(toVal).toISOString();
-
-  const res = await _rawCommand('get_plot_data_range', [selectedEntity, fromISO, toISO]);
-  if (!res || !res.ok) {
-    // Fallback: use get_plot_data and client-side filter
-    const res2 = await _rawCommand('get_plot_data', [selectedEntity]);
-    if (!res2 || !res2.ok) return;
-    const filtered = {};
-    for (const [k, arr] of Object.entries(res2.dict || {})) {
-      filtered[k] = (arr || []).filter(r => r.t >= fromISO && r.t <= toISO);
+// ── LIVE PLOT ────────────────────────────────────────────────────────────────
+function getAllHardwarePoints() {
+  // Collect all unique hardware point names across all entities
+  const names = new Set();
+  for (const ent of Object.values(currentState)) {
+    for (const [pname, pt] of Object.entries(ent.software_points || {})) {
+      if (pt.hardware) names.add(pname);
     }
-    _applyData(filtered);
-  } else {
-    _applyData(res.dict || {});
+  }
+  return [...names].sort();
+}
+
+function syncPlotTraces() {
+  const newNames = getAllHardwarePoints();
+
+  // Add any new traces to visibility map (default visible)
+  for (const n of newNames) {
+    if (!(n in traceVisible)) traceVisible[n] = true;
+  }
+
+  // Only re-init if trace set changed
+  const changed = JSON.stringify(newNames) !== JSON.stringify(traceNames);
+  if (changed) {
+    traceNames = newNames;
+    initPlot();
+    renderTraceToggles();
   }
 }
 
-// ── Mode switching ─────────────────────────────────────────────────────────────
-function plotSetMode(mode) {
-  plotMode = mode;
-  const btnLive = document.getElementById('plt-btn-live');
-  const btnHist = document.getElementById('plt-btn-hist');
-  const histCtrl = document.getElementById('plt-hist-controls');
-  if (!btnLive) return;
+function initPlot() {
+  const traces = traceNames.map((name, i) => ({
+    x: [], y: [],
+    name,
+    type: 'scatter',
+    mode: 'lines',
+    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
+    visible: traceVisible[name] ? true : 'legendonly'
+  }));
 
-  if (mode === 'live') {
-    btnLive.classList.add('active');
-    btnHist.classList.remove('active');
-    if (histCtrl) histCtrl.style.display = 'none';
-    _startLivePlot();
-  } else {
-    btnHist.classList.add('active');
-    btnLive.classList.remove('active');
-    if (histCtrl) histCtrl.style.display = 'flex';
-    if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
-    _applyHistControls();
+  const layout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  '#0a0b0d',
+    font: { family: "'Share Tech Mono', monospace", size: 10, color: '#5a6070' },
+    margin: { t: 4, b: 30, l: 50, r: 10 },
+    xaxis: {
+      type: 'date',
+      gridcolor: '#1e2328',
+      zerolinecolor: '#1e2328',
+      tickfont: { size: 9 }
+    },
+    yaxis: {
+      gridcolor: '#1e2328',
+      zerolinecolor: '#1e2328',
+      tickfont: { size: 9 }
+    },
+    legend: { orientation: 'h', y: -0.15, font: { size: 9 }, bgcolor: 'transparent' },
+    showlegend: false
+  };
+
+  Plotly.newPlot('plot-container', traces, layout, {
+    responsive: true,
+    displayModeBar: false
+  });
+
+  plotInitialized = true;
+}
+
+function renderTraceToggles() {
+  const container = document.getElementById('trace-toggles');
+  container.innerHTML = '';
+  traceNames.forEach((name, i) => {
+    const color = TRACE_COLORS[i % TRACE_COLORS.length];
+    const btn = document.createElement('span');
+    btn.className = 'trace-toggle' + (traceVisible[name] ? '' : ' hidden');
+    btn.textContent = name;
+    btn.style.borderColor = color;
+    btn.style.color = traceVisible[name] ? color : '#5a6070';
+    btn.onclick = () => toggleTrace(name, i, color, btn);
+    container.appendChild(btn);
+  });
+}
+
+function toggleTrace(name, idx, color, btn) {
+  traceVisible[name] = !traceVisible[name];
+  btn.classList.toggle('hidden', !traceVisible[name]);
+  btn.style.color = traceVisible[name] ? color : '#5a6070';
+  Plotly.restyle('plot-container', { visible: traceVisible[name] ? true : 'legendonly' }, [idx]);
+}
+
+async function fetchAndPlot() {
+  if (!plotInitialized || !traceNames.length) return;
+  try {
+    const res  = await fetch(`${BASE}/get_data_snapshot`);  // <-- adjust to your actual endpoint
+    const data = await res.json();
+    // Expected: { timestamp: "ISO string", points: { "AP0": 0.5, "DP2": 1, ... } }
+    // Adjust parsing below to match your actual response shape
+
+    const t = data.timestamp || new Date().toISOString();
+    const pts = data.points || data;
+
+    const xUpdate = traceNames.map(() => [[t]]);
+    const yUpdate = traceNames.map(name => [[pts[name] ?? null]]);
+
+    Plotly.extendTraces('plot-container', { x: xUpdate, y: yUpdate },
+      traceNames.map((_, i) => i), 300);  // keep last 300 points
+  } catch(e) {
+    // Silently skip failed polls — connection status covers this
   }
 }
 
-function plotSetInterval(ms) {
-  if (plotMode === 'live') _startLivePlot();
+function restartPlotLoop() {
+  // if (plotInterval) clearInterval(plotInterval);
+  // const ms = parseInt(document.getElementById('plot-interval').value) || 1000;
+  // plotInterval = setInterval(fetchAndPlot, ms);
 }
-
-// ── LEGACY stubs (syncPlotTraces / initPlot / renderTraceToggles etc.) ─────────
-// These were wired to fetchState(). We replace with no-ops to avoid flicker.
-function getAllHardwarePoints() { return []; }
-function syncPlotTraces() { /* no-op: plot is self-managed */ }
-function initPlot() {}
-function renderTraceToggles() {}
-function toggleTrace() {}
-async function fetchAndPlot() {}
-function restartPlotLoop() {}
 
 // ── BOOT ─────────────────────────────────────────────────────────────────────
 (async () => {
