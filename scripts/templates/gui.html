@@ -2351,37 +2351,32 @@ async function _livePoll() {
 
 // ── Historical mode ────────────────────────────────────────────────────────────
 function _applyHistControls() {
-  console.log("HISTORICAL CLICKED");
   const ctrl = document.getElementById('plt-hist-controls');
   if (ctrl) ctrl.style.display = 'flex';
 }
 
 async function plotFetchHistorical() {
+  console.log("HISTORICAL CLICKED");
+
   if (!plotInited) return;
 
-  const fromISO = new Date(document.getElementById('plt-from').value).toISOString();
-  const toISO   = new Date(document.getElementById('plt-to').value).toISOString();
+  const from = new Date(document.getElementById('plt-from').value);
+  const to   = new Date(document.getElementById('plt-to').value);
 
   const res = await _rawCommand('get_plot_data', [selectedEntity]);
-  if (!res || !res.ok) {
-    console.error("Failed to load data", res);
-    return;
-  }
+  console.log("RAW HIST DATA:", res);
+
+  if (!res || !res.ok) return;
 
   const filtered = {};
   for (const [k, arr] of Object.entries(res.dict || {})) {
     filtered[k] = (arr || []).filter(r => {
-      const t = new Date(r.t || r.timestamp).getTime();
-      return t >= new Date(fromISO).getTime() &&
-             t <= new Date(toISO).getTime();
+      const t = new Date(r.t || r.timestamp);
+      return t >= from && t <= to;
     });
   }
 
-  console.log("Filtered data:", filtered);
-  _applyData(filtered);
-}
-
-  console.log("Filtered data:", filtered);
+  console.log("FILTERED:", filtered);
   _applyData(filtered);
 }
 
