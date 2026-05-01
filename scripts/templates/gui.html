@@ -2050,6 +2050,45 @@ let plotInited     = false;
 let plotTimer = null;
 let isPlotActive = false;
 
+// Global settings for easy testing
+let plotSettings = {
+    analogMin: 0,
+    analogMax: 100,
+    boolMin: -0.1,
+    boolMax: 1.1
+};
+
+function updatePlotLayout() {
+    const analogLayout = {
+        title: 'Analog Signals',
+        yaxis: { range: [plotSettings.analogMin, plotSettings.analogMax], autorange: false },
+        xaxis: { title: 'Time' },
+        margin: { t: 30, b: 40, l: 50, r: 20 }
+    };
+
+    const boolLayout = {
+        title: 'Logic States',
+        yaxis: { range: [plotSettings.boolMin, plotSettings.boolMax], autorange: false },
+        xaxis: { title: 'Time' },
+        margin: { t: 30, b: 40, l: 50, r: 20 }
+    };
+
+    Plotly.relayout('plot-analog', analogLayout);
+    Plotly.relayout('plot-bool', boolLayout);
+}
+
+// Function to call from your UI Inputs
+function setManualRange(min, max, type = 'analog') {
+    if (type === 'analog') {
+        plotSettings.analogMin = parseFloat(min);
+        plotSettings.analogMax = parseFloat(max);
+    } else {
+        plotSettings.boolMin = parseFloat(min);
+        plotSettings.boolMax = parseFloat(max);
+    }
+    updatePlotLayout();
+}
+
 function initPlotting() {
     const plotLayout = {
         grid: { rows: 2, columns: 1, pattern: 'independent' },
@@ -2194,6 +2233,16 @@ async function renderPlot(ent) {
     <div id="trace-toggles-bool"
       style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:28px;">
       <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">BOOL:</span>
+    </div>
+
+    <div class="plot-toolbar" style="padding: 10px; background: #333; display: flex; gap: 10px; align-items: center;">
+    <span>Analog Range:</span>
+    <input type="number" id="yMin" value="0" style="width: 60px;" onchange="setManualRange(this.value, document.getElementById('yMax').value, 'analog')">
+    <input type="number" id="yMax" value="100" style="width: 60px;" onchange="setManualRange(document.getElementById('yMin').value, this.value, 'analog')">
+    
+    <button onclick="isPlotActive = !isPlotActive; this.innerText = isPlotActive ? 'Stop Live' : 'Start Live'">
+        Toggle Live Data
+    </button>
     </div>
 
     <!-- Two stacked plots -->
