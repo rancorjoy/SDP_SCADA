@@ -140,17 +140,15 @@ def add_block_index(curr_dict, controller_name, block_list_str, block_type, inde
     block_list.insert(index, get_block_inst(block_type))
     return True
 
-# Remove code block at index n of list
-def remove_block_index(curr_dict, controller_name, block_list_str, index): 
+def remove_block_index(curr_dict, controller_name, block_list_str, index):
+    block_lists = find_lists(curr_dict, controller_name)
+    if block_list_str not in block_lists:
+        return False
+    
+    block_list = block_lists[block_list_str]
 
     if index >= len(block_list):
         return False
-
-    block_lists = find_lists(curr_dict, controller_name)
-    if block_list_str not in block_lists:
-         return False
-    
-    block_list = block_lists[block_list_str]
 
     block_list.pop(index)
     return True
