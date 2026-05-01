@@ -45,7 +45,7 @@ def create_block_lib(block_lib):
     assign_blk = code_block_utils.get_block_type()
     assign_blk["input_points"] = {"right" : "num"}                  # Block Inputs
     assign_blk["output_points"] = {"left" : "num"}                  # Block Outputs
-    assign_blk["output_type_case"] = {"left" : "decltype(left_t() + right_t())"}
+    assign_blk["output_type_case"] = {"left" : "decltype(right_t())"}
     assign_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
     assign_blk["dep_list"] = []                                     # List of dependancies saved as strings
                                                                     # Logical code using point to represent points
