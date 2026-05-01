@@ -419,9 +419,8 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "add_output_point":       return {"ok": True, "result": code_block_utils.add_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib, current_dict[args[0]]["software_points"])}
             if cmd == "add_output_array":       return {"ok": True, "result": code_block_utils.add_array_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["arrays"][args[4]], block_lib, current_dict[args[0]]["arrays"])}
             if cmd == "rem_output_point":       return {"ok": True, "result": code_block_utils.remove_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3])}
-            if cmd == "add_condition": return {"ok": True, "result": code_block_utils.add_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), current_dict[args[0]]["software_points"][args[3]], current_dict[args[0]]["software_points"])}
-            if cmd == "rem_condition":          return {"ok": True, "result": code_block_utils.add_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])))}
-
+            if cmd == "add_condition":          return {"ok": True, "result": code_block_utils.add_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), current_dict[args[0]]["software_points"][args[3]], current_dict[args[0]]["software_points"])}
+            if cmd == "rem_condition":          return {"ok": True, "result": code_block_utils.remove_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])))}
             if cmd == "list_block_types":     return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct
             if cmd == "current_block_config": return {"ok": True, "message": code_block_utils.display_current_config(current_dict, args[0], block_lib)}
             if cmd == "saved_block_config":   return {"ok": True, "message": code_block_utils.display_saved_config(get_path(), args[0], block_lib)}
