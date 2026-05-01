@@ -1256,7 +1256,8 @@ def rem_point_from_blocks(point_name, current_dict, cont_name):
                     del outputs[key]
 
             # Clean conditional point
-            if block_inst["condition"]["_name"] == current_dict[cont_name]["software_points"][point_name]["_name"]:
+            condition = block_inst.get("condition")
+            if condition is not None and condition.get("_name") == point_name:
                 code_block_utils.rem_condition(block_inst)
 
 def change_point_const(point_dict, point, value, array_dict):
