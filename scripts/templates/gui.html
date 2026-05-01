@@ -2358,23 +2358,14 @@ function _applyHistControls() {
 async function plotFetchHistorical() {
   console.log("HISTORICAL CLICKED");
 
-  if (!plotInited) return;
-
-  const from = new Date(document.getElementById('plt-from').value);
-  const to   = new Date(document.getElementById('plt-to').value);
-
   const res = await _rawCommand('get_plot_data', [selectedEntity]);
   console.log("RAW HIST DATA:", res);
 
   if (!res || !res.ok) return;
 
-  const filtered = {};
-  for (const [k, arr] of Object.entries(res.dict || {})) {
-    filtered[k] = (arr || []).filter(r => {
-      const t = new Date(r.t || r.timestamp);
-      return t >= from && t <= to;
-    });
-  }
+  // 🚨 NO FILTER AT ALL
+  _applyData(res.dict || {});
+}
 
   console.log("FILTERED:", filtered);
   _applyData(filtered);
