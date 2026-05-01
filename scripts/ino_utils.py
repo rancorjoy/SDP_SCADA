@@ -179,7 +179,6 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
     if len(block_lib[block_inst["block_type"]]["output_points"]) != 0:
 
         code_str += f"auto result{index} = {block_inst["block_type"]}("
-        # Instead of: for key in block_inst["input_points"]:
         for key in block_lib[block_inst["block_type"]]["input_points"]:
             point = code_block_utils.get_point_name_by_value(
                 curr_dict, cont_name, block_inst["input_points"][key]
@@ -189,15 +188,15 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
             else:
                 code_str += f"getPoint({point}), "
 
-        code_str = code_str[:-2] # Remove last comma and space
+        code_str = code_str[:-2]
         code_str += ");\n"
 
-    for key in block_lib[block_inst["block_type"]]["output_points"]:
-        point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["output_points"][key])
-        if block_lib[block_inst["block_type"]]["output_points"][key] == "arr":
-            code_str += f"{point} = result{index}.{key};\n"
-        else:
-            code_str += f"setPoint({point}, result{index}.{key});\n"
+        for key in block_lib[block_inst["block_type"]]["output_points"]:
+            point = code_block_utils.get_point_name_by_value(curr_dict, cont_name, block_inst["output_points"][key])
+            if block_lib[block_inst["block_type"]]["output_points"][key] == "arr":
+                code_str += f"{point} = result{index}.{key};\n"
+            else:
+                code_str += f"setPoint({point}, result{index}.{key});\n"
 
         code_str += "\n"
         return top_str + code_str + bottom_str
@@ -213,7 +212,7 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
             else:
                 code_str += f"getPoint({point}), "
 
-        code_str = code_str[:-2] # Remove last comma and space
+        code_str = code_str[:-2]
         code_str += ");\n"
 
         code_str += "\n"
