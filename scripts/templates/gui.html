@@ -2235,13 +2235,12 @@ async function renderPlot(ent) {
       <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">BOOL:</span>
     </div>
 
-    <div class="plot-toolbar" style="padding: 10px; background: #333; display: flex; gap: 10px; align-items: center;">
-    <span>Analog Range:</span>
-    <input type="number" id="yMin" value="0" style="width: 60px;" onchange="setManualRange(this.value, document.getElementById('yMax').value, 'analog')">
-    <input type="number" id="yMax" value="100" style="width: 60px;" onchange="setManualRange(document.getElementById('yMin').value, this.value, 'analog')">
-    
-    <button onclick="isPlotActive = !isPlotActive; this.innerText = isPlotActive ? 'Stop Live' : 'Start Live'">
-        Toggle Live Data
+    <div class="toolbar" style="border-bottom: 1px solid #333; padding: 5px 15px;">
+    <span style="color: #888; font-size: 12px; margin-right: 10px;">Y-AXIS RANGE:</span>
+    <input type="number" id="yMin" class="bin-input" value="0" style="width: 60px;" placeholder="Min">
+    <input type="number" id="yMax" class="bin-input" value="224" style="width: 60px;" placeholder="Max">
+    <button class="btn btn-sm btn-outline-warning" onclick="applyManualScale()" style="margin-left: 10px;">
+        Apply Scale
     </button>
     </div>
 
@@ -2292,6 +2291,25 @@ async function renderPlot(ent) {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+function applyManualScale() {
+    const min = parseFloat(document.getElementById('yMin').value);
+    const max = parseFloat(document.getElementById('yMax').value);
+
+    // Validates that numbers were entered
+    if (isNaN(min) || isNaN(max)) return;
+
+    const update = {
+        'yaxis.range': [min, max],
+        'yaxis.autorange': false
+    };
+
+    // Forces both plots to respect the new numerical boundaries
+    Plotly.relayout('plot-analog', update);
+    
+    // Logic for Bool plot stays fixed (0 to 1) to keep it clean
+    Plotly.relayout('plot-bool', { 'yaxis.range': [-0.1, 1.1], 'yaxis.autorange': false });
+}
 
 function _toLocalDT(d) {
   // Returns "YYYY-MM-DDTHH:MM" in local time for datetime-local input
