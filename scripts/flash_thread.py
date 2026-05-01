@@ -26,12 +26,13 @@ def flash_loop(event_queue, lock, datapath, is_init, worker_threads):
                 event = event_queue.get()                   # If a command is recieved...
                 port        = event["port"]
                 script_name = event["script_name"]
-                fqbn = dcs_flash_utils.resolve_fqbn(port)
                 
                 # send a pause event with a ready event attached
                 pause_event = threading.Event()
                 worker_threads[port]["cmd_queue"].put({"command": "pause", "ready": pause_event})
                 pause_event.wait()  # block flash thread until port is actually closed
+
+                fqbn = dcs_flash_utils.resolve_fqbn(port)
 
                 if fqbn is None:
                     print_log.pL("Flash", "Error", f"Could not detect board type on {port}, aborting.", "System", True, None)
