@@ -2292,23 +2292,34 @@ async function renderPlot(ent) {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
+// Add these variables to your global scope
+let manualMin = 0;
+let manualMax = 224;
+
 function applyManualScale() {
-    const min = parseFloat(document.getElementById('yMin').value);
-    const max = parseFloat(document.getElementById('yMax').value);
+    manualMin = parseFloat(document.getElementById('yMin').value);
+    manualMax = parseFloat(document.getElementById('yMax').value);
+    console.log(`Range locked to: ${manualMin} - ${manualMax}`);
+}
 
-    // Validates that numbers were entered
-    if (isNaN(min) || isNaN(max)) return;
+function updateCharts(series) {
+    const analogData = [];
+    // ... logic to filter series into analogData ...
 
-    const update = {
-        'yaxis.range': [min, max],
-        'yaxis.autorange': false
+    const layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        yaxis: { 
+            range: [manualMin, manualMax], // Forces the range on every update
+            autorange: false,              // Prevents the reset you're seeing
+            gridcolor: '#222'
+        },
+        xaxis: { gridcolor: '#222' },
+        margin: { t: 20, b: 40, l: 50, r: 20 }
     };
 
-    // Forces both plots to respect the new numerical boundaries
-    Plotly.relayout('plot-analog', update);
-    
-    // Logic for Bool plot stays fixed (0 to 1) to keep it clean
-    Plotly.relayout('plot-bool', { 'yaxis.range': [-0.1, 1.1], 'yaxis.autorange': false });
+    // Use Plotly.react with the forced layout
+    Plotly.react('plot-analog', analogData, layout);
 }
 
 function _toLocalDT(d) {
