@@ -172,7 +172,7 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
 
     # If the code block is conditional
     if block_inst["condition"] != None:
-        top_str = f"if (getPoint({block_inst["condition"]["_name"]}) {{\n)"
+        top_str = f"if (getPoint({block_inst["condition"]["_name"]})) {{\n"
         bottom_str = f"}}\n"
 
     # If the block has outputs
