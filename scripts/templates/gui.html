@@ -2264,6 +2264,23 @@ function _renderToggles() {
 }
 
 function _applyData(plotData) {
+
+  if (!plotData || Object.keys(plotData).length === 0) {
+  console.warn("No real data — injecting demo data");
+
+  plotData = {
+    demo_signal: [
+      { t: new Date(Date.now() - 30000).toISOString(), v: 0 },
+      { t: new Date(Date.now() - 20000).toISOString(), v: 1 },
+      { t: new Date(Date.now() - 10000).toISOString(), v: 0 },
+      { t: new Date().toISOString(), v: 1 }
+    ]
+  };
+
+  plotAnalogNames = ["demo_signal"];
+  plotVisibleA["demo_signal"] = true;
+  }
+
   if (!plotInited) return;
 
   // Build update arrays for analog plot
