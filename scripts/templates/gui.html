@@ -2346,7 +2346,8 @@ async function _livePoll() {
   for (const [k, arr] of Object.entries(res.dict || {})) {
     trimmed[k] = (arr || []).filter(r => r.t >= cutoff);
   }
-  _applyData(trimmed);
+  //NO FILTER AT ALL
+  _applyData(res.dict || {});
 }
 
 // ── Historical mode ────────────────────────────────────────────────────────────
@@ -2363,7 +2364,7 @@ async function plotFetchHistorical() {
 
   if (!res || !res.ok) return;
 
-  // 🚨 NO FILTER AT ALL
+  //NO FILTER AT ALL
   _applyData(res.dict || {});
 }
 
