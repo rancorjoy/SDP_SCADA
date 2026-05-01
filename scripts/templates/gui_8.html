@@ -149,6 +149,18 @@
   white-space: pre-wrap;
 }
 
+#plot-wrap {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 150px); /* Adjust based on your header height */
+    overflow-y: auto;
+}
+
+.plot-container {
+    min-height: 400px;
+    margin-bottom: 20px;
+    border: 1px solid #444;
+}
 
 .input-group input {
   background: transparent;
@@ -341,13 +353,6 @@
     overflow-y: auto;
     padding: 8px 16px 16px 16px;
     position: relative;
-  }
-  /* Plot tab needs flex column so Plotly containers get real pixel heights */
-  #tab-content.plot-mode {
-    overflow: hidden;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
   }
 
   /* ── ENTITY HEADER ── */
@@ -920,8 +925,8 @@ async function fetchState() {
 
   setConnStatus(true);
   renderSidebar();
-  // Never re-render the plot tab from fetchState — the plot manages itself
-  if (activeTab !== 'plot') renderTabContent();
+  renderTabContent(); 
+  syncPlotTraces();
 }
 
 function setConnStatus(ok) {
@@ -942,8 +947,11 @@ async function command(cmd, args = []) {
     const data = await res.json();
     
     if (data.ok) {
-      // Refresh state + re-render active tab (fetchState skips plot tab render)
+      // 1. Refresh the global currentState and activeDCS
       await fetchState(); 
+      
+      // 2. Re-render the active tab to show/hide dynamic elements (like CH-C)
+      renderTabContent(); 
       
       // Handle Validation Terminal Logic
       if (cmd === 'validate_dcs') {
@@ -1133,12 +1141,18 @@ function switchTab(tab) {
     if (bbar) bbar.style.display = 'none';
   }
   
-  // Stop live plot and remove plot layout class when leaving plot tab
+  // Stop live plot when leaving plot tab; reset so switching back re-inits
   if (tab !== 'plot') {
     if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
     plotInited = false;
+    // Restore tab-content normal styling
     const tc = document.getElementById('tab-content');
-    if (tc) tc.classList.remove('plot-mode');
+    if (tc) {
+      tc.style.overflowY = '';
+      tc.style.padding   = '';
+      tc.style.display   = '';
+      tc.style.flexDirection = '';
+    }
   }
 
   // Update visual state of all tabs
@@ -1159,16 +1173,7 @@ async function renderTabContent() {
   const ent = currentState[selectedEntity];
   if (!ent) return;
 
-  // Plot tab: apply layout class, skip fadein (it resets styles and causes flicker)
-  if (activeTab === 'plot') {
-    el.classList.add('plot-mode');
-    renderPlot(ent);
-    return; // skip fadein and updateAllActionBars
-  }
-
-  // All other tabs: remove plot-mode class and do normal fadein
-  el.classList.remove('plot-mode');
-  el.className = el.className.replace('fadein','').trim() + ' fadein';
+  el.className = 'fadein';
   void el.offsetWidth;
 
   switch(activeTab) {
@@ -1193,10 +1198,14 @@ async function renderTabContent() {
       el.innerHTML = renderArrays(ent); 
       break;
     case 'blocks':
-      await renderBlocks(ent);
+      await renderBlocks(ent);        // Fixed: Always render when tab is active
       break;
+    case 'plot':   
+      renderPlot(ent);
+      return; // skip updateAllActionBars for plot tab
   }
 
+  // Re-apply action bars visibility after render
   updateAllActionBars();
 }
 
@@ -2037,6 +2046,108 @@ let plotVisibleA   = {};          // analogPlot traceIdx -> bool (visible)
 let plotVisibleB   = {};          // boolPlot traceIdx -> bool (visible)
 let plotInited     = false;
 
+// === INTEGRATED PLOT CONTROLLER ===
+let plotTimer = null;
+let isPlotActive = false;
+
+// Global settings for easy testing
+let plotSettings = {
+    analogMin: 0,
+    analogMax: 100,
+    boolMin: -0.1,
+    boolMax: 1.1
+};
+
+function updatePlotLayout() {
+    const analogLayout = {
+        title: 'Analog Signals',
+        yaxis: { range: [plotSettings.analogMin, plotSettings.analogMax], autorange: false },
+        xaxis: { title: 'Time' },
+        margin: { t: 30, b: 40, l: 50, r: 20 }
+    };
+
+    const boolLayout = {
+        title: 'Logic States',
+        yaxis: { range: [plotSettings.boolMin, plotSettings.boolMax], autorange: false },
+        xaxis: { title: 'Time' },
+        margin: { t: 30, b: 40, l: 50, r: 20 }
+    };
+
+    Plotly.relayout('plot-analog', analogLayout);
+    Plotly.relayout('plot-bool', boolLayout);
+}
+
+// Function to call from your UI Inputs
+function setManualRange(min, max, type = 'analog') {
+    if (type === 'analog') {
+        plotSettings.analogMin = parseFloat(min);
+        plotSettings.analogMax = parseFloat(max);
+    } else {
+        plotSettings.boolMin = parseFloat(min);
+        plotSettings.boolMax = parseFloat(max);
+    }
+    updatePlotLayout();
+}
+
+function initPlotting() {
+    const plotLayout = {
+        grid: { rows: 2, columns: 1, pattern: 'independent' },
+        margin: { t: 30, b: 40, l: 50, r: 20 },
+        showlegend: true,
+        legend: { orientation: 'h' }
+    };
+
+    // Initialize empty charts
+    Plotly.newPlot('plot-analog', [], { ...plotLayout, title: 'Analog Signals' });
+    Plotly.newPlot('plot-bool', [], { ...plotLayout, title: 'Logic States' });
+}
+
+async function fetchPlotData() {
+    if (!isPlotActive) return;
+
+    try {
+        // Polls the command endpoint as seen in working build
+        const response = await fetch(`/command?get_plot_data=true&controller=${currentController}`);
+        const data = await response.json();
+        
+        if (data.series) {
+            updateCharts(data.series);
+        }
+    } catch (err) {
+        console.error("Plot polling failed:", err);
+    }
+}
+
+function updateCharts(series) {
+    const analogData = [];
+    const boolData = [];
+
+    series.forEach(s => {
+        // Logic to separate bits from floats
+        if (s.type === 'bool' || s.name.includes('Status')) {
+            boolData.push({ x: s.times, y: s.values, name: s.name, type: 'scatter' });
+        } else {
+            analogData.push({ x: s.times, y: s.values, name: s.name, type: 'scatter' });
+        }
+    });
+
+    Plotly.react('plot-analog', analogData);
+    Plotly.react('plot-bool', boolData);
+}
+
+// === TAB SWITCHING HOOK ===
+// Ensure this is called when the user clicks the "Plot" tab
+function onTabChange(tabName) {
+    if (tabName === 'plot') {
+        isPlotActive = true;
+        initPlotting();
+        plotTimer = setInterval(fetchPlotData, 2000); // 2-second refresh
+    } else {
+        isPlotActive = false;
+        clearInterval(plotTimer);
+    }
+}
+
 // Common base layout template
 function _plotLayout(opts) {
   return Object.assign({
@@ -2054,12 +2165,11 @@ function _plotLayout(opts) {
 
 async function renderPlot(ent) {
   const el = document.getElementById('tab-content');
-  // CSS class gives tab-content the flex layout Plotly needs (set by renderTabContent)
 
   // ── Build the static scaffold once (or when entity changes) ──────────────
   if (plotInited && plotEntity === selectedEntity) {
-    // DOM is intact — just make sure the live poll is running
-    if (plotMode === 'live' && !plotInterval) _startLivePlot();
+    // Already set up — just ensure the poll/fetch is running
+    if (plotMode === 'live') _startLivePlot();
     return;
   }
 
@@ -2067,6 +2177,13 @@ async function renderPlot(ent) {
   if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
   plotInited = false;
   plotEntity = selectedEntity;
+
+  // ── Scaffold HTML ─────────────────────────────────────────────────────────
+  // We take over tab-content completely (no overflow-y scroll needed for plot)
+  el.style.overflowY = 'hidden';
+  el.style.padding   = '0';
+  el.style.display   = 'flex';
+  el.style.flexDirection = 'column';
 
   el.innerHTML = `
     <!-- Toolbar -->
@@ -2118,6 +2235,15 @@ async function renderPlot(ent) {
       <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">BOOL:</span>
     </div>
 
+    <div class="toolbar" style="border-bottom: 1px solid #333; padding: 5px 15px;">
+    <span style="color: #888; font-size: 12px; margin-right: 10px;">Y-AXIS RANGE:</span>
+    <input type="number" id="yMin" class="bin-input" value="0" style="width: 60px;" placeholder="Min">
+    <input type="number" id="yMax" class="bin-input" value="224" style="width: 60px;" placeholder="Max">
+    <button class="btn btn-sm btn-outline-warning" onclick="applyManualScale()" style="margin-left: 10px;">
+        Apply Scale
+    </button>
+    </div>
+
     <!-- Two stacked plots -->
     <div id="plot-wrap">
       <div id="plot-analog"></div>
@@ -2165,6 +2291,36 @@ async function renderPlot(ent) {
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
+
+// Add these variables to your global scope
+let manualMin = 0;
+let manualMax = 224;
+
+function applyManualScale() {
+    manualMin = parseFloat(document.getElementById('yMin').value);
+    manualMax = parseFloat(document.getElementById('yMax').value);
+    console.log(`Range locked to: ${manualMin} - ${manualMax}`);
+}
+
+function updateCharts(series) {
+    const analogData = [];
+    // ... logic to filter series into analogData ...
+
+    const layout = {
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        yaxis: { 
+            range: [manualMin, manualMax], // Forces the range on every update
+            autorange: false,              // Prevents the reset you're seeing
+            gridcolor: '#222'
+        },
+        xaxis: { gridcolor: '#222' },
+        margin: { t: 20, b: 40, l: 50, r: 20 }
+    };
+
+    // Use Plotly.react with the forced layout
+    Plotly.react('plot-analog', analogData, layout);
+}
 
 function _toLocalDT(d) {
   // Returns "YYYY-MM-DDTHH:MM" in local time for datetime-local input
