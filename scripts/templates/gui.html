@@ -654,16 +654,6 @@
   }
   .section-label:first-child { margin-top: 0; }
 
-  #center {
-    display: flex;
-    flex-direction: column;
-  }
-
-  #tab-content {
-    flex: 1;
-    min-height: 0;
-  }
-
   /* ── EMPTY STATE ── */
   .empty-state {
     display: flex;
@@ -2085,10 +2075,6 @@ async function renderPlot(ent) {
       <button id="plt-btn-live" class="pin-action-btn active" onclick="plotSetMode('live')">Live</button>
       <button id="plt-btn-hist" class="pin-action-btn"        onclick="plotSetMode('historical')">Historical</button>
 
-      Y Min: <input id="plt-ymin" type="number" style="width:70px;">
-      Y Max: <input id="plt-ymax" type="number" style="width:70px;">
-      <button onclick="plotApplyYBounds()">Apply</button>
-
       <span id="plt-hist-controls" style="display:none;align-items:center;gap:8px;">
         <span class="pin-action-label" style="margin-left:8px;">From:</span>
         <input type="datetime-local" id="plt-from"
@@ -2159,10 +2145,11 @@ async function renderPlot(ent) {
   plotAnalogNames.forEach((n, i) => { if (!(n in plotVisibleA)) plotVisibleA[n] = true; });
   plotBoolNames.forEach(  (n, i) => { if (!(n in plotVisibleB)) plotVisibleB[n] = true; });
 
+  // ── Init both Plotly figures (empty — data filled by fetch) ───────────────
+  _initDualPlots();
+
   // ── Render toggle strips ──────────────────────────────────────────────────
-  requestAnimationFrame(() => {
-    _initDualPlots();
-  });
+  _renderToggles();
 
   // ── Default time range for historical inputs ──────────────────────────────
   const now   = new Date();
@@ -2183,27 +2170,6 @@ function _toLocalDT(d) {
   // Returns "YYYY-MM-DDTHH:MM" in local time for datetime-local input
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function plotApplyYBounds() {
-  const ymin = parseFloat(document.getElementById('plt-ymin').value);
-  const ymax = parseFloat(document.getElementById('plt-ymax').value);
-
-  const update = {};
-
-  if (!isNaN(ymin) && !isNaN(ymax)) {
-    update['yaxis.range'] = [ymin, ymax];
-  } else {
-    update['yaxis.autorange'] = true;
-  }
-
-  // Always apply to analog
-  Plotly.relayout('plot-analog', update);
-
-  // Only apply to bool if it still makes sense
-  if (!isNaN(ymin) && !isNaN(ymax) && ymin <= 0 && ymax >= 1) {
-    Plotly.relayout('plot-bool', update);
-  }
 }
 
 // Raw fetch — does NOT call fetchState() to avoid flicker
