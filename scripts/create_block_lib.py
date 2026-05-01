@@ -335,6 +335,21 @@ def create_block_lib(block_lib):
     blk["description"] = "OR operation of argument1 OR argument2, returns result."
     block_lib["or_blk"] = blk                                 # Store the new block in the block library
 
+    # AND
+    blk = code_block_utils.get_block_type()
+    blk["input_points"] = {"argument1" : "bool","argument2" : "bool"}   # Block Inputs
+    blk["output_points"] = {"result" : "bool"}                          # Block Outputs
+    blk["output_type_case"] = {"result" : "bool"}
+    blk["type"] = "Logical"                                           # Meta-Data to help with organizing
+    blk["dep_list"] = []                                              # List of dependancies saved as strings
+                                                                      # Logical code using point to represent points
+    blk["code_str"] = textwrap.dedent(
+    """               
+    argument1 && argument2 ? result = true : result = false;
+    """)
+    blk["description"] = "AND operation of argument1 AND argument2, returns result."
+    block_lib["and_blk"] = blk                                 # Store the new block in the block library
+
 
 
 
