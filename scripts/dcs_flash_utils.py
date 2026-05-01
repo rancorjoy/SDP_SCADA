@@ -13,6 +13,7 @@ import sys        # Allows Python CLI Arguments to be run via code
 
 from . import dcs_dict_utils
 from . import print_log
+from . import listSerialPorts
 
 ARDUINO_CLI = "arduino-cli"                                 # Define string
 
@@ -99,6 +100,13 @@ def resolve_fqbn(port):
 
                 print_log.pL("Flash", "Error", f"Port {port} found but no matching board", "System", True, None)
                 return None
+
+        # FALLBACK: If auto-detect fails, use list_serial_ports to get VID/PID
+        all_ports = listSerialPorts.list_serial_ports()
+        for p in all_ports:
+            if p['port'] == port:
+                vid_pid = (hex(p['vid']), hex(p['pid']))
+                return FQBN_MAP.get(vid_pid) # Look up in your manual map   
 
         print_log.pL("Flash", "Error", f"No port matching {port} found in arduino-cli output", "System", True, None)
         return None
