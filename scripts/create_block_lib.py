@@ -74,14 +74,14 @@ def create_block_lib(block_lib):
     #  Increment Block
     increment_blk = code_block_utils.get_block_type()
     increment_blk["input_points"] = {"point" : "num"}                  # Block Inputs
-    increment_blk["output_points"] = {"point" : "num"}                 # Block Outputs
-    assign_blk["output_type_case"] = {"left" : "decltype(point_t())"}
+    increment_blk["output_points"] = {"point_out" : "num"}                 # Block Outputs
+    assign_blk["output_type_case"] = {"point_out" : "decltype(point_t())"}
     increment_blk["type"] = "Arithmetic"                               # Meta-Data to help with organizing
     increment_blk["dep_list"] = []                                     # List of dependancies saved as strings
                                                                        # Logical code using point to represent points
     increment_blk["code_str"] = textwrap.dedent(
     """               
-    point += 1;
+    point_out = point + 1;
     """)
     increment_blk["description"] = "Increments the value of point by 1."
     block_lib["increment_blk"] = increment_blk                          # Store the new block in the block library
