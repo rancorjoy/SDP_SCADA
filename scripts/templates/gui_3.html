@@ -339,7 +339,7 @@
   #tab-content {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 16px 16px 16px;
+    padding: 0 16px 16px 16px;
     position: relative;
   }
 
@@ -1907,21 +1907,12 @@ async function renderBlocks(ent, forceRefresh) {
           </div>`;
       }).join('');
 
-      // Condition field — editable, uses add_condition / rem_condition endpoints
+      // Condition field — read-only display (no server endpoint for set/clear yet)
       const condName = blk.condition?._name || null;
-      const condSafeId = `cond-${listName}-${idx}`.replace(/[^a-zA-Z0-9_-]/g, '_');
       const condField = `
         <div class="timer-field" style="min-width:130px;">
           <div class="tf-label" style="color:var(--amber);font-size:9px;">CONDITION <span style="color:var(--text-dim)">bool</span></div>
-          <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${condName ? `<span style="color:var(--amber)">${condName}</span>` : '<span style="color:var(--text-dim)">none</span>'}</div>
-          <div style="display:flex;gap:3px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-            <input type="text" placeholder="bool point" id="${condSafeId}"
-              style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">
-            <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;"
-              onclick="blockPointCmd('add_condition',[selectedEntity,'${listName}',${idx},document.getElementById('${condSafeId}').value])">Set</button>
-            ${condName ? `<button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
-              onclick="blockPointCmd('rem_condition',[selectedEntity,'${listName}',${idx}])">✕</button>` : ''}
-          </div>
+          <div class="tf-val" style="font-size:11px;">${condName ? `<span style="color:var(--amber)">${condName}</span>` : '<span style="color:var(--text-dim)">none</span>'}</div>
         </div>`;
 
       html += `

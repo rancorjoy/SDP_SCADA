@@ -236,7 +236,7 @@ def add_condition(block_inst, point, point_dict):
 # Remove a condition from a block
 def rem_condition(block_inst):
     if block_inst["condition"] != None:                            # Check it exists first
-         block_inst["condition"] == None                           # Unset it
+         block_inst["condition"] = None                            # Unset it
          return True
     return False
 

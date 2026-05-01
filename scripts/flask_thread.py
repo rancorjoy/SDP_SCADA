@@ -111,6 +111,8 @@ COMMANDS = {
     "move_block_down" :         (3,   3,    "move_block_down <controller name> <list name> <index>"),
     "swap_blocks" :             (4,   4,    "swap_blocks <controller name> <list name> <index1> <index2>"),
     "remove_block" :            (3,   3,    "remove_block <controller name> <list name> <index>"),
+    "expand_T1" :               (1,   1,    "expand_T1 <program name>"),
+    "reduce_T1" :               (1,   1,    "reduce_T1 <program name>"),
 
     "add_input_point" :         (5,   5,    "add_input_point <controller name> <list name> <index> <key> <point>"),
     "add_input_array" :         (5,   5,    "add_input_array <controller name> <list name> <index> <key> <array>"),
@@ -118,6 +120,8 @@ COMMANDS = {
     "add_output_point" :        (5,   5,    "add_output_point <controller name> <list name> <index> <key> <point>"),
     "add_output_array" :        (5,   5,    "add_input_array <controller name> <list name> <index> <key> <array>"),
     "rem_output_point" :        (4,   4,    "rem_output_point <controller name> <list name> <index> <key>"),
+    "add_condition" :           (4,   4,    "add_condition <controller name> <list name> <index> <point>"),
+    "rem_condition" :           (3,   3,    "add_condition <controller name> <list name> <index>"),
 
     "list_block_types" :        (0,   0,    "list_block_types"),
     "current_block_config" :    (1,   1,    "current_block_config <controller name>"),
@@ -127,6 +131,7 @@ COMMANDS = {
     "find_lists":      (1,   1,     "find_lists <controller_name>"),
     "get_plot_data":   (1, 2, "get_plot_data <controller_name> [n_rows]"),
     "get_plot_points": (1, 1, "get_plot_points <controller_name>"),
+    "dump_block_lib":  (0, 0,   "dump_block_lib")
 }
 
 def get_path():                                                 # Derives the data path when a function needs it from Pointer.json
@@ -257,6 +262,8 @@ def get_help():
     move_block_down :         \t Move a block down in a block list <controller name> <list name> <index>
     swap_blocks :             \t Swap two blocks in a block list <controller name> <list name> <index1> <index2>
     remove_block :            \t Remove a block from a block list <controller name> <list name> <index>
+    expand_T1 :               \t Add Channel C to Timer1 in a program <program name>
+    reduce_T1 :               \t Remove Channel C from Timer1 in a program <program name>
 
     Code Block Point Commands:
     add_input_point :         \t Add a point to block input (key) <controller name> <list name> <index> <key> <point>
@@ -265,6 +272,8 @@ def get_help():
     add_output_point :        \t Add a point to block output (key) <controller name> <list name> <index> <key> <point>
     add_output_array :        \t Add a array to block output (key) <controller name> <list name> <index> <key> <point>
     rem_output_point :        \t Remove a point/array from block output (key) <controller name> <list name> <index> <key>
+    add_condition" :          \t Add a condition to a block <controller name> <list name> <index> <point>"),
+    rem_condition" :          \t Remove a condition from a point <controller name> <list name> <index>"),
 
     Code Block Utility Commands:
     list_block_types :        \t List all available block types and details
@@ -366,7 +375,7 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "list_integer_types":     return {"ok": True, "message": dcs_dict_utils.show_int_types()}
             if cmd == "list_dcs_points":        return {"ok": True, "dict": dcs_dict_utils.list_points(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], current_dict[args[0]]["timers"])}
             if cmd == "add_dcs_point":          return {"ok": True, "result": dcs_dict_utils.add_point(current_dict[args[0]]["software_points"], args[1])}
-            if cmd == "rem_dcs_point":          return {"ok": True, "result": dcs_dict_utils.rem_point(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1])}
+            if cmd == "rem_dcs_point":          return {"ok": True, "result": dcs_dict_utils.rem_point(current_dict, args[0], args[1])}
             if cmd == "rename_dcs_point":       return {"ok": True, "result": dcs_dict_utils.change_point_name(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2])}
             if cmd == "edit_point_type":        return {"ok": True, "result": dcs_dict_utils.change_point_type(current_dict[args[0]]["pin_config"], current_dict[args[0]]["software_points"], args[1], args[2], False)}
             if cmd == "edit_point_spec_type":   return {"ok": True, "result": dcs_dict_utils.change_point_spec_type(current_dict[args[0]]["software_points"], args[1], args[2])}
@@ -401,6 +410,8 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "move_block_down":        return {"ok": True, "result": code_block_utils.block_list_move_down(current_dict, args[0], args[1], int(args[2]))}
             if cmd == "swap_blocks":            return {"ok": True, "result": code_block_utils.block_list_swap(current_dict, args[0], args[1], int(args[2]), int(args[3]))}
             if cmd == "remove_block":           return {"ok": True, "result": code_block_utils.remove_block_index(current_dict, args[0], args[1], int(args[2]))}
+            if cmd == "expand_T1":              return {"ok": True, "result": dcs_dict_utils.expand_Timer1(current_dict, args[0])}
+            if cmd == "reduce_T1":              return {"ok": True, "result": dcs_dict_utils.reduce_Timer1(current_dict, args[0])}
 
             if cmd == "add_input_point":        return {"ok": True, "result": code_block_utils.add_point_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib, current_dict[args[0]]["software_points"])}
             if cmd == "add_input_array":        return {"ok": True, "result": code_block_utils.add_array_input(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["arrays"][args[4]], block_lib, current_dict[args[0]]["arrays"])}
@@ -408,6 +419,8 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "add_output_point":       return {"ok": True, "result": code_block_utils.add_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"][args[4]], block_lib, current_dict[args[0]]["software_points"])}
             if cmd == "add_output_array":       return {"ok": True, "result": code_block_utils.add_array_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["arrays"][args[4]], block_lib, current_dict[args[0]]["arrays"])}
             if cmd == "rem_output_point":       return {"ok": True, "result": code_block_utils.remove_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3])}
+            if cmd == "add_condition":          return {"ok": True, "result": code_block_utils.add_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3], current_dict[args[0]]["software_points"])}
+            if cmd == "rem_condition":          return {"ok": True, "result": code_block_utils.add_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])))}
 
             if cmd == "list_block_types":     return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct
             if cmd == "current_block_config": return {"ok": True, "message": code_block_utils.display_current_config(current_dict, args[0], block_lib)}
@@ -418,6 +431,7 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "get_plot_data":
                 n = int(args[1]) if len(args) > 1 else 300
                 return {"ok": True, "dict": sql_utils.get_plot_data(get_path(), args[0], n)}
+            if cmd == "dump_block_lib": return {"ok": True, "dict": block_lib}
 
             if cmd == "get_plot_points":
                 return {"ok": True, "dict": sql_utils.get_plot_points(get_path(), args[0])}

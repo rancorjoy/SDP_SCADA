@@ -339,7 +339,7 @@
   #tab-content {
     flex: 1;
     overflow-y: auto;
-    padding: 8px 16px 16px 16px;
+    padding: 0 16px 16px 16px;
     position: relative;
   }
 
@@ -555,8 +555,8 @@
     font-size: 10px;
   }
   .timer-block-body {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 1px;
     background: var(--border);
   }
@@ -834,8 +834,6 @@ let selectedISR = null;         // ISR name string, null when none selected
 let selectedPoint = null;
 let selectedArray = null;
 let selectedBlock = null;  // { listName, index }
-let cachedBlockLists = null; // cached result of find_lists, cleared on tab switch
-let blockLib = null;           // block type library from dump_block_lib, loaded once at boot
 
 // Plotly color palette
 const TRACE_COLORS = [
@@ -1025,7 +1023,6 @@ function renderSidebar() {
 function selectEntity(name) {
   selectedEntity = name;
   selectedPin = null;
-  cachedBlockLists = null;
   // Change the line below from 'pins' to 'actions'
   if (!activeTab) activeTab = 'actions'; 
   
@@ -1076,7 +1073,6 @@ function switchTab(tab) {
   }
   if (tab !== 'blocks') {
     selectedBlock = null;
-    cachedBlockLists = null;
     const bbar = document.getElementById('block-action-bar');
     if (bbar) bbar.style.display = 'none';
   }
@@ -1743,9 +1739,9 @@ function selectBlock(listName, index) {
     selectedBlock = { listName, index };
   }
   updateBlockActionBar();
-  // Re-render from cache only — no server call needed for selection
+  // re-render just the blocks without a full fetch to reflect selection highlight
   const ent = currentState[selectedEntity];
-  renderBlocks(ent, false);
+  renderBlocks(ent);
 }
 
 function updateBlockActionBar() {
@@ -1764,86 +1760,52 @@ async function blockAction(cmd) {
   await window.command(cmd, [selectedEntity, selectedBlock.listName, selectedBlock.index]);
   selectedBlock = null;
   const ent = currentState[selectedEntity];
-  await renderBlocks(ent, true);
+  renderBlocks(ent);
 }
 
-async function addBlock(cmd) {
+function addBlock(cmd) {
   const listEl = document.getElementById('blk-list-select');
-  const typeEl = document.getElementById('blk-type-select');
+  const typeEl = document.getElementById('blk-type-input');
   if (!listEl || !typeEl) return;
   const listName = listEl.value.trim();
   const blockType = typeEl.value.trim();
   if (!listName || !blockType) return;
-  await window.command(cmd, [selectedEntity, listName, blockType]);
-  const ent = currentState[selectedEntity];
-  await renderBlocks(ent, true);
-}
-
-// Helper: run a block point command then force-refresh the block view
-async function blockPointCmd(cmd, args) {
-  await window.command(cmd, args);
-  const ent = currentState[selectedEntity];
-  await renderBlocks(ent, true);
+  window.command(cmd, [selectedEntity, listName, blockType]);
 }
 
 // = BLOCK VIEW ===============================================================
-async function renderBlocks(ent, forceRefresh) {
+async function renderBlocks(ent) {
   const el = document.getElementById('tab-content');
 
-  // Only hit the server on first load or after a block-mutating command
-  if (forceRefresh || cachedBlockLists === null) {
-    const res = await fetch('/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd: 'find_lists', args: [selectedEntity] })
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      el.innerHTML = '<div class="empty-state">Could not load blocks</div>';
-      return;
-    }
-    cachedBlockLists = data.dict || {};
+  const res = await fetch('/command', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cmd: 'list_dcs_blk_lists', args: [selectedEntity] })
+  });
+  const data = await res.json();
+  if (!data.ok) { 
+    el.innerHTML = '<div class="empty-state">Could not load blocks</div>'; 
+    return; 
   }
 
-  const lists = cachedBlockLists;
+  const lists = data.dict;
 
-  // Build list name options for the add-block dropdown
-  const listNames = Object.keys(lists);
-
-  // Build block type dropdown grouped by category from blockLib
-  let blockTypeOptions = '<option value="">— select type —</option>';
-  if (blockLib) {
-    const groups = {};
-    for (const [key, bt] of Object.entries(blockLib)) {
-      const cat = bt.type || 'Other';
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(key);
-    }
-    for (const [cat, keys] of Object.entries(groups)) {
-      blockTypeOptions += `<optgroup label="${cat}">`;
-      for (const key of keys) {
-        const desc = blockLib[key].description || '';
-        blockTypeOptions += `<option value="${key}" title="${desc}">${key}</option>`;
-      }
-      blockTypeOptions += `</optgroup>`;
-    }
-  }
-
+  // Add block controls at top
   let html = `
     <div style="display:flex;gap:8px;align-items:center;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
       <span class="pin-action-label">List:</span>
       <select id="blk-list-select" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:11px;padding:4px 8px;">
-        ${listNames.map(l => `<option value="${l}">${l}</option>`).join('')}
+        ${Object.keys(lists).map(l => `<option value="${l}">${l}</option>`).join('')}
       </select>
       <span class="pin-action-label" style="margin-left:8px;">Block Type:</span>
-      <select id="blk-type-select" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:11px;padding:4px 8px;">
-        ${blockTypeOptions}
-      </select>
+      <div class="input-group">
+        <input type="text" id="blk-type-input" placeholder="e.g. ADD, SET..." style="width:120px;">
+      </div>
       <button class="pin-action-btn" onclick="addBlock('add_block_top')">+ Top</button>
       <button class="pin-action-btn" onclick="addBlock('add_block_bottom')">+ Bottom</button>
     </div>`;
 
-  if (!listNames.length) {
+  if (!Object.keys(lists).length) {
     el.innerHTML = html + '<div class="empty-state">No active block lists</div>';
     updateBlockActionBar();
     return;
@@ -1852,7 +1814,7 @@ async function renderBlocks(ent, forceRefresh) {
   for (const [listName, blocks] of Object.entries(lists)) {
     html += `<div class="section-label">${listName}</div>`;
 
-    if (!blocks || !blocks.length) {
+    if (!blocks.length) {
       html += `<div style="color:var(--text-dim);font-family:var(--mono);font-size:11px;padding:8px 0;">// empty</div>`;
       continue;
     }
@@ -1860,83 +1822,52 @@ async function renderBlocks(ent, forceRefresh) {
     blocks.forEach((blk, idx) => {
       const isSelected = selectedBlock && selectedBlock.listName === listName && selectedBlock.index === idx;
 
-      // Get block type definition from lib (for canonical key lists)
-      const btDef = (blockLib && blockLib[blk.block_type]) || null;
-      const defInputKeys  = btDef ? Object.keys(btDef.input_points)  : Object.keys(blk.input_points  || {});
-      const defOutputKeys = btDef ? Object.keys(btDef.output_points) : Object.keys(blk.output_points || {});
-
-      // One box per input key defined by the block type
-      const inputFields = defInputKeys.map(k => {
-        const v = (blk.input_points || {})[k];
-        const safeId = `in-${listName}-${idx}-${k}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const pointName = v?._name || null;
-        const expectedType = btDef ? (btDef.input_points[k] || '') : '';
-        return `
-          <div class="timer-field" style="min-width:130px;">
-            <div class="tf-label" style="color:var(--blue);font-size:9px;">IN · ${k}<span style="color:var(--text-dim);margin-left:4px;">${expectedType}</span></div>
-            <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${pointName ? pointName : '<span style="color:var(--text-dim)">unset</span>'}</div>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-              <input type="text" placeholder="point name" id="${safeId}"
-                style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">
-              <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;"
-                onclick="blockPointCmd('add_input_point',[selectedEntity,'${listName}',${idx},'${k}',document.getElementById('${safeId}').value])">Set</button>
-              ${pointName ? `<button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
-                onclick="blockPointCmd('rem_input_point',[selectedEntity,'${listName}',${idx},'${k}'])">✕</button>` : ''}
-            </div>
-          </div>`;
-      }).join('');
-
-      // One box per output key defined by the block type
-      const outputFields = defOutputKeys.map(k => {
-        const v = (blk.output_points || {})[k];
-        const safeId = `out-${listName}-${idx}-${k}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const pointName = v?._name || null;
-        const expectedType = btDef ? (btDef.output_points[k] || '') : '';
-        return `
-          <div class="timer-field" style="min-width:130px;">
-            <div class="tf-label" style="color:var(--green);font-size:9px;">OUT · ${k}<span style="color:var(--text-dim);margin-left:4px;">${expectedType}</span></div>
-            <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${pointName ? pointName : '<span style="color:var(--text-dim)">unset</span>'}</div>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-              <input type="text" placeholder="point name" id="${safeId}"
-                style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">
-              <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;"
-                onclick="blockPointCmd('add_output_point',[selectedEntity,'${listName}',${idx},'${k}',document.getElementById('${safeId}').value])">Set</button>
-              ${pointName ? `<button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
-                onclick="blockPointCmd('rem_output_point',[selectedEntity,'${listName}',${idx},'${k}'])">✕</button>` : ''}
-            </div>
-          </div>`;
-      }).join('');
-
-      // Condition field — editable, uses add_condition / rem_condition endpoints
-      const condName = blk.condition?._name || null;
-      const condSafeId = `cond-${listName}-${idx}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const condField = `
-        <div class="timer-field" style="min-width:130px;">
-          <div class="tf-label" style="color:var(--amber);font-size:9px;">CONDITION <span style="color:var(--text-dim)">bool</span></div>
-          <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${condName ? `<span style="color:var(--amber)">${condName}</span>` : '<span style="color:var(--text-dim)">none</span>'}</div>
-          <div style="display:flex;gap:3px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-            <input type="text" placeholder="bool point" id="${condSafeId}"
-              style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">
-            <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;"
-              onclick="blockPointCmd('add_condition',[selectedEntity,'${listName}',${idx},document.getElementById('${condSafeId}').value])">Set</button>
-            ${condName ? `<button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
-              onclick="blockPointCmd('rem_condition',[selectedEntity,'${listName}',${idx}])">✕</button>` : ''}
+      const inputFields = Object.entries(blk.input_points || {}).map(([k, v]) => `
+        <div class="timer-field">
+          <div class="tf-label" style="color:var(--blue)">IN: ${k}</div>
+          <div class="tf-val" style="font-size:11px;">${v?._name || '<span style="color:var(--text-dim)">null</span>'}</div>
+          <div style="display:flex;gap:4px;margin-top:4px;" onclick="event.stopPropagation()">
+            <input type="text" placeholder="point name" style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;"
+              id="in-${listName}-${idx}-${k}">
+            <button class="pin-action-btn" style="padding:2px 6px;font-size:9px;"
+              onclick="window.command('add_input_point',[selectedEntity,'${listName}',${idx},'${k}',document.getElementById('in-${listName}-${idx}-${k}').value])">Set</button>
+            <button class="pin-action-btn" style="padding:2px 6px;font-size:9px;color:var(--red);border-color:var(--red);"
+              onclick="window.command('rem_input_point',[selectedEntity,'${listName}',${idx},'${k}'])">✕</button>
           </div>
+        </div>`).join('');
+
+      const outputFields = Object.entries(blk.output_points || {}).map(([k, v]) => `
+        <div class="timer-field">
+          <div class="tf-label" style="color:var(--green)">OUT: ${k}</div>
+          <div class="tf-val" style="font-size:11px;">${v?._name || '<span style="color:var(--text-dim)">null</span>'}</div>
+          <div style="display:flex;gap:4px;margin-top:4px;" onclick="event.stopPropagation()">
+            <input type="text" placeholder="point name" style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;"
+              id="out-${listName}-${idx}-${k}">
+            <button class="pin-action-btn" style="padding:2px 6px;font-size:9px;"
+              onclick="window.command('add_output_point',[selectedEntity,'${listName}',${idx},'${k}',document.getElementById('out-${listName}-${idx}-${k}').value])">Set</button>
+            <button class="pin-action-btn" style="padding:2px 6px;font-size:9px;color:var(--red);border-color:var(--red);"
+              onclick="window.command('rem_output_point',[selectedEntity,'${listName}',${idx},'${k}'])">✕</button>
+          </div>
+        </div>`).join('');
+
+      const conditionField = `
+        <div class="timer-field">
+          <div class="tf-label" style="color:var(--amber)">CONDITION</div>
+          <div class="tf-val" style="font-size:11px;">${blk.condition?._name || '<span style="color:var(--text-dim)">none</span>'}</div>
         </div>`;
 
       html += `
-        <div class="timer-block" style="margin-bottom:8px;cursor:pointer;${isSelected ? 'border-color:var(--amber);box-shadow:0 0 0 1px var(--amber-dim);' : ''}"
+        <div class="timer-block" style="margin-bottom:6px;cursor:pointer;${isSelected ? 'border-color:var(--amber);box-shadow:0 0 0 1px var(--amber-dim);' : ''}"
              onclick="selectBlock('${listName}', ${idx})">
           <div class="timer-block-header">
             <span style="color:var(--text-dim);font-family:var(--mono);font-size:10px;">[${idx}]</span>
-            <span class="tname">${blk.block_type || '?'}</span>
-            ${btDef ? `<span style="color:var(--text-dim);font-size:10px;margin-left:6px;">${btDef.description || ''}</span>` : ''}
-            ${condName ? `<span style="color:var(--amber);font-size:11px;margin-left:auto;">if ${condName}</span>` : ''}
+            <span class="tname">${blk.block_type}</span>
+            ${blk.condition ? `<span style="color:var(--amber);font-size:11px;">if ${blk.condition._name}</span>` : ''}
           </div>
-          <div class="timer-block-body" style="flex-wrap:wrap;">
+          <div class="timer-block-body">
             ${inputFields}
             ${outputFields}
-            ${condField}
+            ${conditionField}
           </div>
         </div>`;
     });
@@ -2163,17 +2094,6 @@ function restartPlotLoop() {
 
 // ── BOOT ─────────────────────────────────────────────────────────────────────
 (async () => {
-  // Load block library once at startup — it never changes at runtime
-  try {
-    const blRes = await fetch('/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd: 'dump_block_lib', args: [] })
-    });
-    const blData = await blRes.json();
-    if (blData.ok) blockLib = blData.dict;
-  } catch(e) { console.warn('Could not load block lib:', e); }
-
   await fetchState();
   restartPlotLoop();
 })();

@@ -601,7 +601,7 @@ def init_code_dcs(data_path, current_dict, current_dict_lock):
     n = len(existing)                                           # Next gaurenteed unnamed controller index
     controller_name = f"unnamed_program_{n}"                    # Use the controller index to generate the file/nick-name
 
-    pin_map = mega_int_map()                                    # Choose MEGA dcs maps because they contain all possible points
+    pin_map = mega_pin_map()                                    # Choose MEGA dcs maps because they contain all possible points
     int_map = mega_int_map()                                    # Note only MEGA has Timer 1C so if used it cannot be loaded into UNO
     tim_map = mega_timer_map()
 
@@ -659,6 +659,9 @@ def delete_dcs(data_path, name, current_dcs, current_dict, current_dict_lock):
         dcs_script_utils.remove_Script(script_path, name)
 
         with current_dict_lock:
+            del current_dict[name]
+
+        with current_dict_lock:
             remove_current_dict(current_dict, data_path, name)
 
         return True                                                       # The DCS JSON was deleted
@@ -668,6 +671,8 @@ def delete_dcs(data_path, name, current_dcs, current_dict, current_dict_lock):
     except Exception as e:                                                # If there is another exception...
         print_log.pL("System", "Error", "An unexpected error has occured.", "System", True, {e}) 
         return False                                                      # The DCS JSON was not deleted
+
+
       
 # Return name of existing JSON file from port
 def port_to_name(data_path, port):            
@@ -1031,15 +1036,16 @@ def val_timer(point_name, value, tim_dict):
     return val_prescale(point_name, value) and val_timer_reg(point_name, value, tim_dict)
 
 def change_point_name(pin_dict, point_dict, old_name, new_name): 
-    if point_dict[old_name]["hardware"]:                            # Do not change hardware pin names!
+    if old_name not in point_dict:
         return False
-    if old_name in point_dict:
-        if new_name in point_dict:
-            return False
-        point_dict[new_name] = point_dict[old_name]
-        del point_dict[old_name]
-        return True
-    return False
+    if point_dict[old_name]["hardware"]:
+        return False
+    if new_name in point_dict:
+        return False
+    point_dict[new_name] = point_dict[old_name]
+    point_dict[new_name]["_name"] = new_name
+    del point_dict[old_name]
+    return True
 
 # Change the int type of a point
 def set_point_int_type(point_dict, point_name, str):
@@ -1192,13 +1198,66 @@ def add_point(point_dict, name):
     point_dict[name]["_name"] = name
     return True
 
-def rem_point(pin_dict, point_dict, name):
-    if name not in point_dict:
+def rem_point(current_dict, cont_name, point_name):
+    # 1. Controller Existence Check
+    if cont_name not in current_dict:
+        # This prevents indexing current_dict[cont_name] if the name is wrong
         return False
-    if point_dict[name]["hardware"] == False: #Stops key deletion if key is hardware, disabled pins will not print to SQL but will have points!
-        del point_dict[name]
+        
+    # 2. Get the points dictionary for THIS controller
+    points = current_dict[cont_name].get("software_points")
+    if points is None or point_name not in points:
+        return False
+
+    # 3. Hardware check: Use .get() to be safe
+    point_data = points[point_name]
+    
+    # If point_data is not a dict (which would happen if JSON is corrupted), 
+    # it would cause the "string indices" error. We check type first.
+    if isinstance(point_data, dict) and point_data.get("hardware") == False:
+        
+        # 4. CRITICAL: Cleanup blocks while the point still exists
+        # If you delete it before calling this, the cleanup can't verify the point
+        rem_point_from_blocks(point_name, current_dict, cont_name)
+        
+        # 5. Now delete from master list
+        del points[point_name]
         return True
+        
     return False
+
+def rem_point_from_blocks(point_name, current_dict, cont_name):
+    # This returns a dict like {'setup_blocks': [...], 'loop_blocks': [...]}
+    block_lists_dict = code_block_utils.find_lists(current_dict, cont_name)
+    
+    # FIX: Iterate over .values() to get the actual lists, not the string keys
+    for block_list in block_lists_dict.values():
+        if not isinstance(block_list, list):
+            continue
+            
+        for block_inst in block_list:
+            # Safety check: ensure we have a dictionary block
+            if not isinstance(block_inst, dict):
+                continue
+
+            # Clean Input Points: use list(keys) to allow deletion during loop
+            inputs = block_inst.get("input_points", {})
+            for key in list(inputs.keys()):
+                p_conf = inputs[key]
+                # Match by name string
+                if isinstance(p_conf, dict) and p_conf.get("_name") == point_name:
+                    del inputs[key]
+            
+            # Clean Output Points
+            outputs = block_inst.get("output_points", {})
+            for key in list(outputs.keys()):
+                p_conf = outputs[key]
+                if isinstance(p_conf, dict) and p_conf.get("_name") == point_name:
+                    del outputs[key]
+
+            # Clean conditional point
+            if block_inst["condition"]["_name"] == current_dict[cont_name]["software_points"][point_name]["_name"]:
+                code_block_utils.rem_condition(block_inst)
 
 def change_point_const(point_dict, point, value, array_dict):
     if point in point_dict:
@@ -1232,7 +1291,7 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
             if type == "bool":
                 point_dict[point]["int_type"] = {}
                 point_dict[point]["float_type"] = {}
-                if pin_dict[point]["analog_set"]:
+                if pin_dict.get(point, {}).get("analog_set", False):
                     return False
                 point_dict[point]["min_en"] = False
                 point_dict[point]["max_en"] = False
@@ -1249,7 +1308,7 @@ def change_point_type(pin_dict, point_dict, point, type, auth): # Auth to change
                 point_dict[point]["max"] = int(point_dict[point]["max"])
             if type == "float":
                 point_dict[point]["int_type"] = {}
-                if pin_dict[point]["analog_set"]:
+                if pin_dict.get(point, {}).get("analog_set", False):
                     return False
                 #point_dict[point]["hold_val"] = float(point_dict[point]["hold_val"])
                 point_dict[point]["min"] = float(point_dict[point]["min"])
@@ -1559,10 +1618,10 @@ def set_int_mode(int_config, int_name, mode):
 
     if int_name.startswith("DP"):                           # If the interrupt is from a digital pin
         if mode in ["LOW", "CHANGE", "RISING", "FALLING"]:
-            intr["enabled"] = mode
+            intr["mode"] = mode
             return True
         elif mode == "HIGH" and intr["high"]:               # Check if the board supports this interrupt mode
-            intr["enabled"] = mode
+            intr["mode"] = mode
             return True
 
     return False
@@ -1691,7 +1750,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
             if matched == False:
                 print_log.pL("System", "Error", f"Program {prog_name} has pins not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
                 return False                                                                                # If loop completes without match, code is not compattible with controller 
-    print("test0")
+
     # If the code gets to this point, all points are compattible!  
     for key in prog["int_config"]:                                                                              # For each int in the program pin-map...
         if prog["int_config"][key]["enabled"]:                                                                  # If the int is in use...
@@ -1702,7 +1761,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
             if matched == False:
                 print_log.pL("System", "Error", f"Program {prog_name} has interrupts not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
                 return False       
-    print("test1")
+
     # If the code gets to this point, all interrupts are compattible!  
     # Direct comparrisson of timers would always fail because Timer 1 has 3 channels on MEGA and 2 channels on UNO, check points instead!
     # First get all points in the program
@@ -1713,16 +1772,20 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
     for key in prog_points:
         if prog_points[key]["hardware"]:
             hard_points[key] = prog_points[key]
-    print("test2")
+
+    print(hard_points)
+
     for key in hard_points:                                                                             # None of these will be software points
         matched = False
+
         for key_p in cont_list[cont_name]["software_points"]:                                           # Any software point here will not match
             if prog_points[key]["_name"] == cont_list[cont_name]["software_points"][key_p]["_name"]:    # This match must be a hardware point (pin or register)
                 matched = True
+
         if matched == False:
             print_log.pL("System", "Error", f"Program {prog_name} has points not found in Controller {cont_name}", "System", "True", None)                                                                                                # Break out of the loop
             return False 
-    print("test3")
+
     # Finally just make sure timers match (enabled ones)
     for key in prog["timers"]:
         matched = False
@@ -1734,7 +1797,7 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
         if matched == False:
             print_log.pL("System", "Error", f"Program {prog_name} has timers not found in Controller {cont_name}", "System", "True", None)
             return False
-    print("test4")
+
     # At this point, the programs are known to be compattible, we can start loading the program!
     clear_controller(cont_list, cont_name)
 
@@ -1766,6 +1829,56 @@ def load_prog_to_cont(cont_name, prog_name, cont_list, data_path):
                 cont_block_lists[key_j].clear()
                 cont_block_lists[key_j].extend(prog_block_lists[key_i])
 
+    return True
+
+# Reduces the timer1 implementation of a program to be Uno compatible
+def reduce_Timer1(current_dict, prog_name):
+    if is_prog(current_dict[prog_name]) == False:
+        return False
+
+    if "Timer1_CHC_Comp" in current_dict[prog_name]["software_points"]:
+        if "Timer1_COMPC" in current_dict[prog_name]["int_config"]:
+            del current_dict[prog_name]["int_config"]["Timer1_COMPC"]
+            rem_point(current_dict, prog_name, "Timer1_CHC_Comp")
+            del current_dict[prog_name]["timers"]["Timer1"]["channels"]["C"]
+            return True
+    return False
+
+# Expands the timer1 implementation of a program to be Mega complete
+def expand_Timer1(current_dict, prog_name):
+    if is_prog(current_dict[prog_name]) == False:
+        return False
+
+    if "Timer1_CHC_Comp" in current_dict[prog_name]["software_points"]:
+        return False
+    
+    if "Timer1_COMPC" in current_dict[prog_name]["int_config"]:
+        return False
+    
+    # Add the channel back to the timer
+    current_dict[prog_name]["timers"]["Timer1"]["channels"]["C"] = {"compare_value": 0}
+
+    # Add the channel C interrupt back (Timer1_COMPC)
+    current_dict[prog_name]["int_config"]["Timer1_COMPC"] = {
+        "ISR_name": "TIMER1_COMPC_vect",
+        "enabled": False,
+        "blocks": []        # List of code blocks assigned to this ISR
+    }
+    
+    # Add back the hardware point Timer1_CHC_Comp
+    current_dict[prog_name]["software_points"]["Timer1_CHC_Comp"] = {
+        "type": "int",
+        "default": 0,
+        "min_en": False,
+        "max_en": False,
+        "min": 0,
+        "max": 1,
+        "hardware": True,
+        "int_type": "uint16_t",
+        "float_type": "",
+        "const": True,
+        "_name": "Timer1_CHC_Comp"
+    }
     return True
 
 # Clears the current state of the controller to (near) default state so that it can be procedurally allocated (by GUI)
@@ -1803,4 +1916,14 @@ def clear_controller(current_dict, controller_name):
 
     for key in keys_to_delete:
         del current_dict[controller_name]["software_points"][key]
+
+    for key in current_dict[controller_name]["int_config"]:
+        current_dict[controller_name]["int_config"][key]["enabled"] = False
+
+    for key in current_dict[controller_name]["timers"]:
+        current_dict[controller_name]["timers"][key]["enabled"] = False
+
+    for key in current_dict[controller_name]["arrays"]:
+        del current_dict[controller_name]["arrays"][key]
+
     return True

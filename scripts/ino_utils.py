@@ -167,6 +167,13 @@ def get_block_auto(block_type, block_lib):
 def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
 
     code_str = f""
+    top_str = f""
+    bottom_str = f""
+
+    # If the code block is conditional
+    if block_inst["condition"] != None:
+        top_str = f"if (getPoint({block_inst["condition"]["_name"]}) {{\n)"
+        bottom_str = f"}}\n"
 
     # If the block has outputs
     if len(block_lib[block_inst["block_type"]]["output_points"]) != 0:
@@ -184,7 +191,7 @@ def get_block_inst_code(block_inst, block_lib, curr_dict, cont_name, index):
             code_str += f"setPoint({point}, result{index}.{key});\n"
 
         code_str += "\n"
-        return code_str
+        return top_str + code_str + bottom_str
 
     # If the block has no outputs
     else:
