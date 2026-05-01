@@ -10,10 +10,11 @@ import argparse   # Allows Console Use of Functions with Variables
 import pickle     # Allows Dictionary to be saved to JSON
 import subprocess # Manages Extenral Programs (eg Arduino CLI)
 import sys        # Allows Python CLI Arguments to be run via code
+import time       # For retry sleep
+import serial.tools.list_ports  # For VID/PID fallback without opening the port
 
 from . import dcs_dict_utils
 from . import print_log
-from . import scan_serial
 
 ARDUINO_CLI = "arduino-cli"                                 # Define string
 
@@ -59,19 +60,43 @@ def upload_sketch(sketch_dir, fqbn, port):
     return True
 
 # Common Arduino VID/PID - FQBN mappings
+# Keys are (hex_vid_str, hex_pid_str) matching the output of hex() on pyserial integers
 FQBN_MAP = {
-    ("0x2341", "0x0043"): "arduino:avr:uno",
-    ("0x2341", "0x0001"): "arduino:avr:uno",
-    ("0x2341", "0x0243"): "arduino:avr:uno",
-    ("0x2341", "0x0010"): "arduino:avr:mega",
-    ("0x2341", "0x0042"): "arduino:avr:mega",
-    ("0x2341", "0x0036"): "arduino:avr:leonardo",
+    ("0x2341", "0x43"):   "arduino:avr:uno",       # hex() omits leading zeros, e.g. 0x0043 -> "0x43"
+    ("0x2341", "0x1"):    "arduino:avr:uno",
+    ("0x2341", "0x243"):  "arduino:avr:uno",
+    ("0x2341", "0x10"):   "arduino:avr:mega",
+    ("0x2341", "0x42"):   "arduino:avr:mega",
+    ("0x2341", "0x36"):   "arduino:avr:leonardo",
     ("0x2341", "0x8036"): "arduino:avr:leonardo",
-    ("0x2341", "0x0058"): "arduino:avr:nano",
+    ("0x2341", "0x58"):   "arduino:avr:nano",
     ("0x2341", "0x8057"): "arduino:samd:mkrwifi1010",
 }
 
-def resolve_fqbn(port):
+def _fqbn_from_pyserial(port):
+    """
+    Read VID/PID directly from pyserial (reads sysfs on Linux, no port open needed).
+    Returns fqbn string or None.
+    """
+    for p in serial.tools.list_ports.comports():
+        if p.device == port:
+            if p.vid is not None and p.pid is not None:
+                vid_str = hex(p.vid)   # e.g. "0x2341"
+                pid_str = hex(p.pid)   # e.g. "0x43"  (no zero-padding)
+                fqbn = FQBN_MAP.get((vid_str, pid_str))
+                if fqbn:
+                    print_log.pL("Flash", "Event", f"Resolved board on {port} via VID/PID {vid_str}:{pid_str} → {fqbn}", "System", True, None)
+                else:
+                    print_log.pL("Flash", "Error", f"Port {port} found, VID/PID {vid_str}:{pid_str} not in FQBN_MAP", "System", True, None)
+                return fqbn
+    print_log.pL("Flash", "Error", f"Port {port} not found by pyserial comports()", "System", True, None)
+    return None
+
+def _fqbn_from_arduino_cli(port):
+    """
+    Ask arduino-cli to identify the board. Returns fqbn string or None.
+    Does NOT retry - caller handles retries.
+    """
     try:
         result = subprocess.run(
             [ARDUINO_CLI, "board", "list", "--format", "json"],
@@ -89,35 +114,60 @@ def resolve_fqbn(port):
         for detected in data.get("detected_ports", []):
             port_info = detected.get("port", {})
             if port_info.get("address") == port:
-                # Support both current and older arduino-cli formats
                 board_list = detected.get("matching_boards") or detected.get("boards", [])
-                
                 if board_list:
                     fqbn = board_list[0].get("fqbn")
                     if fqbn:
-                        print_log.pL("Flash", "Event", f"Detected board on {port}: {board_list[0].get('name')} → {fqbn}", "System", True, None)
+                        print_log.pL("Flash", "Event", f"arduino-cli detected board on {port}: {board_list[0].get('name')} → {fqbn}", "System", True, None)
                         return fqbn
-
-                print_log.pL("Flash", "Error", f"Port {port} found but no matching board", "System", True, None)
+                # Port found but arduino-cli couldn't identify it - fall through to None
                 return None
 
-        import serial.tools.list_ports
-        all_ports = serial.tools.list_ports.comports()
-        for p in all_ports:
-            if p.device == port:
-                if p.vid is not None and p.pid is not None:
-                    vid_pid = (hex(p.vid), hex(p.pid))
-                    return FQBN_MAP.get(vid_pid)
-
-        print_log.pL("Flash", "Error", f"No port matching {port} found in arduino-cli output", "System", True, None)
-        return None
+        return None  # Port not listed at all yet
 
     except json.JSONDecodeError as e:
         print_log.pL("Flash", "Error", f"Failed to parse JSON from arduino-cli: {e}", "System", True, None)
         return None
     except Exception as e:
-        print_log.pL("Flash", "Error", f"Unexpected error in resolve_fqbn: {e}", "System", True, None)
+        print_log.pL("Flash", "Error", f"Unexpected error in arduino-cli call: {e}", "System", True, None)
         return None
+
+def resolve_fqbn(port, retries=5, delay=1.0):
+    """
+    Resolve the FQBN for the Arduino on the given port.
+
+    Strategy:
+      1. Try pyserial VID/PID lookup first - fast, works without port open, reliable on Pi.
+      2. If that fails, retry arduino-cli board list up to `retries` times with `delay` seconds
+         between attempts. On Linux the port may still be releasing after the worker closed it,
+         so arduino-cli may not see it on the first try.
+
+    Args:
+        port:    Serial port path, e.g. "/dev/ttyACM0"
+        retries: How many times to attempt arduino-cli detection (default 5)
+        delay:   Seconds to wait between arduino-cli attempts (default 1.0)
+    """
+
+    # --- Step 1: pyserial VID/PID (fast, no port open, reads sysfs directly on Linux) ---
+    fqbn = _fqbn_from_pyserial(port)
+    if fqbn:
+        return fqbn
+
+    print_log.pL("Flash", "Event", f"pyserial VID/PID lookup failed for {port}, falling back to arduino-cli with {retries} retries...", "System", True, None)
+
+    # --- Step 2: arduino-cli with retry loop ---
+    # On Pi, the port may still be held by the OS briefly after the worker closes it.
+    # arduino-cli won't list a port it can't probe, so we retry with a delay.
+    for attempt in range(1, retries + 1):
+        print_log.pL("Flash", "Event", f"arduino-cli board detect attempt {attempt}/{retries} for {port}", "System", True, None)
+        fqbn = _fqbn_from_arduino_cli(port)
+        if fqbn:
+            return fqbn
+        if attempt < retries:
+            time.sleep(delay)
+
+    print_log.pL("Flash", "Error", f"Could not resolve FQBN for {port} after pyserial + {retries} arduino-cli attempts.", "System", True, None)
+    return None
 
 def program_controller(current_dcs, name, flash_queue, flash_lock):
     if name in current_dcs:
@@ -128,4 +178,3 @@ def program_controller(current_dcs, name, flash_queue, flash_lock):
             })
             return True
     return False
-

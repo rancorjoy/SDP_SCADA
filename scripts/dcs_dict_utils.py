@@ -1705,16 +1705,21 @@ def load_cont_to_prog(data_path, cont_name, prog_list, prog_name):
                 prog_list[prog_name]["int_config"][key_p] = cont["int_config"][key]
                                                                                                 
     for key in cont["software_points"]:
-        for key_p in prog_list[prog_name]["software_points"]:
-            if prog_list[prog_name]["software_points"][key_p]["_name"] == cont["software_points"][key]["_name"]:
-                prog_list[prog_name]["software_points"][key_p] = cont["software_points"][key]
-
-    for key in cont["arrays"]:
-        prog_list[cont_name]["arrays"][key] = cont["arrays"][key]
+        if cont["software_points"][key]["hardware"]:
+            # Hardware point: find matching slot in prog by _name and update it
+            for key_p in prog_list[prog_name]["software_points"]:
+                if prog_list[prog_name]["software_points"][key_p]["_name"] == cont["software_points"][key]["_name"]:
+                    prog_list[prog_name]["software_points"][key_p] = cont["software_points"][key]
+        else:
+            # Software point: doesn't exist in prog yet, copy it directly
+            prog_list[prog_name]["software_points"][key] = cont["software_points"][key]
 
     for key in cont["timers"]:
         if cont["timers"][key]["enabled"]:
             prog_list[prog_name]["timers"][key]["enabled"] = True
+
+    for key in cont["arrays"]:
+        prog_list[prog_name]["arrays"][key] = cont["arrays"][key]
 
     cont_block_lists = code_block_utils.find_lists_saved(data_path, cont_name)               # Find all block lists in program
     prog_block_lists = code_block_utils.find_lists(prog_list, prog_name)                     # Find all block lists in controller
