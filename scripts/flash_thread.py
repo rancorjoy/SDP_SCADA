@@ -9,6 +9,7 @@ import shutil   # Shell Utilities (High Level File Operations)
 import argparse # Allows Console Use of Functions with Variables
 import pickle       # Allows Dictionary to be saved to JSON
 import threading    # Multithreading for Commands Outside of Loop
+import time
 
 from . import dcs_flash_utils                               # Import the dcs_flash_utils script (current) folder
 from . import print_log
@@ -31,6 +32,7 @@ def flash_loop(event_queue, lock, datapath, is_init, worker_threads):
                 pause_event = threading.Event()
                 worker_threads[port]["cmd_queue"].put({"command": "pause", "ready": pause_event})
                 pause_event.wait()  # block flash thread until port is actually closed
+                time.sleep(0.5)
 
                 fqbn = dcs_flash_utils.resolve_fqbn(port)
 
