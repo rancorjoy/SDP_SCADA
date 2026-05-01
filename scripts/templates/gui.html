@@ -2371,7 +2371,7 @@ async function plotFetchHistorical() {
   const filtered = {};
   for (const [k, arr] of Object.entries(res.dict || {})) {
     filtered[k] = (arr || []).filter(r => {
-      const t = new Date(r.t).getTime();
+      const t = new Date(r.t || r.timestamp).getTime();
       return t >= new Date(fromISO).getTime() &&
              t <= new Date(toISO).getTime();
     });
