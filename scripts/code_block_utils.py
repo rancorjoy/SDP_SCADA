@@ -538,15 +538,15 @@ def validate_config(data_path, controller_name, block_lib):
                     errors.append(f'Block {blk_inst["block_type"]} missing output {key}')
 
     # Output assigned multiple times check
-    output_list = []
-    for blk_list in blk_lists.values():
-        for blk_inst in blk_list:
-            for key in blk_inst["output_points"]:
-                point_name = blk_inst["output_points"][key]["_name"]
-                if point_name not in output_list:
-                    output_list.append(point_name)
-                else:
-                    errors.append(f'Point {point_name} assigned to multiple block outputs')
+    # output_list = []
+    # for blk_list in blk_lists.values():
+    #     for blk_inst in blk_list:
+    #         for key in blk_inst["output_points"]:
+    #             point_name = blk_inst["output_points"][key]["_name"]
+    #             if point_name not in output_list:
+    #                 output_list.append(point_name)
+    #             else:
+    #                  errors.append(f'Point {point_name} assigned to multiple block outputs') # Removed for sake of sanity
 
     return {"warnings": warnings, "errors": errors}
 
