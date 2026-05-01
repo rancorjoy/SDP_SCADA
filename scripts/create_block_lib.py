@@ -191,20 +191,17 @@ def create_block_lib(block_lib):
     
     new_blk = code_block_utils.get_block_type()
     new_blk["input_points"] = {"reading" : "num", "index" : "int", "length" : "int", "arr" : "arr"}  # Block Inputs
-    new_blk["output_points"] = {"index" : "int", "avg" : "float"}                        # Block Outputs
-    new_blk["output_type_case"] = {"index" : "int", "avg" : "float"}
+    new_blk["output_points"] = {"index_out" : "int", "avg" : "float"}                        # Block Outputs
+    new_blk["output_type_case"] = {"index_out" : "int", "avg" : "float"}
     new_blk["type"] = "Array"                                             # Meta-Data to help with organizing
     new_blk["dep_list"] = []                                              # List of dependancies saved as strings
                                                                           # Logical code using point to represent points
     new_blk["code_str"] = textwrap.dedent(
     """               
-    index += 1;
-    if(index == length)
-    {
-        index = 0;
-    }
+    index_out = index + 1;
+    if(index_out == length) { index_out = 0; }
+    arr[index_out] = reading;
 
-    arr[index] = reading;
     float sum = 0;
     for (int i=0; i<length; i++)
     {
