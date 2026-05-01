@@ -13,7 +13,7 @@ import sys        # Allows Python CLI Arguments to be run via code
 
 from . import dcs_dict_utils
 from . import print_log
-from . import listSerialPorts
+from . import scan_serial
 
 ARDUINO_CLI = "arduino-cli"                                 # Define string
 
@@ -102,7 +102,7 @@ def resolve_fqbn(port):
                 return None
 
         # FALLBACK: If auto-detect fails, use list_serial_ports to get VID/PID
-        all_ports = listSerialPorts.list_serial_ports()
+        all_ports = scan_serial.listSerialPorts.list_serial_ports()
         for p in all_ports:
             if p['port'] == port:
                 vid_pid = (hex(p['vid']), hex(p['pid']))
