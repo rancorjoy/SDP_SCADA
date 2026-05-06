@@ -339,8 +339,15 @@
   #tab-content {
     flex: 1;
     overflow-y: auto;
-    padding: 0 16px 16px 16px;
+    padding: 8px 16px 16px 16px;
     position: relative;
+  }
+  /* Plot tab needs flex column so Plotly containers get real pixel heights */
+  #tab-content.plot-mode {
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   /* ── ENTITY HEADER ── */
@@ -675,6 +682,51 @@
   /* ── FADE IN ── */
   @keyframes fadein { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   .fadein { animation: fadein 0.2s ease forwards; isolation: isolate; }
+
+  /* ── PLOT TAB ── */
+  #plot-toolbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-wrap: wrap;
+  }
+  #plot-toolbar .pin-action-label { font-family: var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:0.1em; text-transform:uppercase; }
+  #trace-toggles { display:flex; flex-wrap:wrap; gap:5px; padding:6px 12px; border-bottom:1px solid var(--border); background:var(--bg2); flex-shrink:0; }
+  .trace-toggle {
+    display: inline-block;
+    padding: 3px 9px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .trace-toggle.hidden { opacity: 0.28; }
+  .trace-toggle:hover  { opacity: 0.75; }
+
+  /* Two-plot layout inside tab-content when on plot tab */
+  #plot-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+  #plot-analog { flex: 3; min-height: 0; overflow: hidden; }
+  #plot-bool   { flex: 2; min-height: 0; overflow: hidden; }
+  #plot-divider {
+    flex-shrink: 0;
+    height: 1px;
+    background: var(--border2);
+    margin: 0;
+  }
 </style>
 </head>
 <body>
@@ -823,10 +875,8 @@ const BASE = '';
 let currentState   = {};       // full dict from /list_current_state
 let selectedEntity = null;     // key string
 let activeTab      = 'pins';
-let plotInterval   = null;
-let traceVisible   = {};       // pointName -> bool
-let plotInitialized = false;
-let traceNames     = [];       // ordered list of active trace names
+let traceVisible   = {};       // pointName -> bool (legacy, unused by plot)
+let traceNames     = [];       // ordered list (legacy, unused by plot)
 let activeDCS = {};            // live connected controllers from list_dcs
 let selectedPin = null;         // pin name string, null when none selected
 let selectedTimer = null;       // timer name string, null when none selected
@@ -835,6 +885,8 @@ let selectedPoint = null;
 let selectedArray = null;
 let selectedBlock = null;  // { listName, index }
 let cachedBlockLists = null; // cached result of find_lists, cleared on tab switch
+let cachedArrays = null;      // cached result of list_dcs_arrays for the current entity
+let blockLib = null;           // block type library from dump_block_lib, loaded once at boot
 
 // Plotly color palette
 const TRACE_COLORS = [
@@ -866,8 +918,8 @@ async function fetchState() {
 
   setConnStatus(true);
   renderSidebar();
-  renderTabContent(); 
-  syncPlotTraces();
+  // Never re-render the plot tab from fetchState — the plot manages itself
+  if (activeTab !== 'plot') renderTabContent();
 }
 
 function setConnStatus(ok) {
@@ -888,11 +940,8 @@ async function command(cmd, args = []) {
     const data = await res.json();
     
     if (data.ok) {
-      // 1. Refresh the global currentState and activeDCS
+      // Refresh state + re-render active tab (fetchState skips plot tab render)
       await fetchState(); 
-      
-      // 2. Re-render the active tab to show/hide dynamic elements (like CH-C)
-      renderTabContent(); 
       
       // Handle Validation Terminal Logic
       if (cmd === 'validate_dcs') {
@@ -1025,6 +1074,7 @@ function selectEntity(name) {
   selectedEntity = name;
   selectedPin = null;
   cachedBlockLists = null;
+    cachedArrays = null;
   // Change the line below from 'pins' to 'actions'
   if (!activeTab) activeTab = 'actions'; 
   
@@ -1076,11 +1126,18 @@ function switchTab(tab) {
   if (tab !== 'blocks') {
     selectedBlock = null;
     cachedBlockLists = null;
+    cachedArrays = null;
     const bbar = document.getElementById('block-action-bar');
     if (bbar) bbar.style.display = 'none';
   }
   
-  // ... (rest of your plot cleanup logic) ...
+  // Stop live poll timer when leaving plot tab; do NOT clear plotInited —
+  // renderPlot uses it to skip rebuilding the DOM when returning to the same entity.
+  if (tab !== 'plot') {
+    _plotStop();
+    const tc = document.getElementById('tab-content');
+    if (tc) tc.classList.remove('plot-mode');
+  }
 
   // Update visual state of all tabs
   document.querySelectorAll('.tab').forEach(t =>
@@ -1100,7 +1157,16 @@ async function renderTabContent() {
   const ent = currentState[selectedEntity];
   if (!ent) return;
 
-  el.className = 'fadein';
+  // Plot tab: apply layout class, skip fadein (it resets styles and causes flicker)
+  if (activeTab === 'plot') {
+    el.classList.add('plot-mode');
+    renderPlot(ent);
+    return; // skip fadein and updateAllActionBars
+  }
+
+  // All other tabs: remove plot-mode class and do normal fadein
+  el.classList.remove('plot-mode');
+  el.className = el.className.replace('fadein','').trim() + ' fadein';
   void el.offsetWidth;
 
   switch(activeTab) {
@@ -1125,14 +1191,10 @@ async function renderTabContent() {
       el.innerHTML = renderArrays(ent); 
       break;
     case 'blocks':
-      await renderBlocks(ent);        // Fixed: Always render when tab is active
-      break;
-    case 'plot':   
-      renderPlot(ent);   
+      await renderBlocks(ent);
       break;
   }
 
-  // Re-apply action bars visibility after render
   updateAllActionBars();
 }
 
@@ -1768,7 +1830,7 @@ async function blockAction(cmd) {
 
 async function addBlock(cmd) {
   const listEl = document.getElementById('blk-list-select');
-  const typeEl = document.getElementById('blk-type-input');
+  const typeEl = document.getElementById('blk-type-select');
   if (!listEl || !typeEl) return;
   const listName = listEl.value.trim();
   const blockType = typeEl.value.trim();
@@ -1791,23 +1853,52 @@ async function renderBlocks(ent, forceRefresh) {
 
   // Only hit the server on first load or after a block-mutating command
   if (forceRefresh || cachedBlockLists === null) {
-    const res = await fetch('/command', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cmd: 'find_lists', args: [selectedEntity] })
-    });
-    const data = await res.json();
-    if (!data.ok) {
+    const [blkRes, arrRes] = await Promise.all([
+      fetch('/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cmd: 'find_lists', args: [selectedEntity] })
+      }),
+      fetch('/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cmd: 'list_dcs_arrays', args: [selectedEntity] })
+      })
+    ]);
+    const blkData = await blkRes.json();
+    const arrData = await arrRes.json();
+    if (!blkData.ok) {
       el.innerHTML = '<div class="empty-state">Could not load blocks</div>';
       return;
     }
-    cachedBlockLists = data.dict || {};
+    cachedBlockLists = blkData.dict || {};
+    cachedArrays = arrData.ok ? (arrData.dict || {}) : {};
   }
 
   const lists = cachedBlockLists;
+  const arrays = cachedArrays || {};
 
   // Build list name options for the add-block dropdown
   const listNames = Object.keys(lists);
+
+  // Build block type dropdown grouped by category from blockLib
+  let blockTypeOptions = '<option value="">— select type —</option>';
+  if (blockLib) {
+    const groups = {};
+    for (const [key, bt] of Object.entries(blockLib)) {
+      const cat = bt.type || 'Other';
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(key);
+    }
+    for (const [cat, keys] of Object.entries(groups)) {
+      blockTypeOptions += `<optgroup label="${cat}">`;
+      for (const key of keys) {
+        const desc = blockLib[key].description || '';
+        blockTypeOptions += `<option value="${key}" title="${desc}">${key}</option>`;
+      }
+      blockTypeOptions += `</optgroup>`;
+    }
+  }
 
   let html = `
     <div style="display:flex;gap:8px;align-items:center;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
@@ -1816,9 +1907,9 @@ async function renderBlocks(ent, forceRefresh) {
         ${listNames.map(l => `<option value="${l}">${l}</option>`).join('')}
       </select>
       <span class="pin-action-label" style="margin-left:8px;">Block Type:</span>
-      <div class="input-group">
-        <input type="text" id="blk-type-input" placeholder="e.g. ADD, SET..." style="width:120px;">
-      </div>
+      <select id="blk-type-select" style="background:var(--bg3);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:11px;padding:4px 8px;">
+        ${blockTypeOptions}
+      </select>
       <button class="pin-action-btn" onclick="addBlock('add_block_top')">+ Top</button>
       <button class="pin-action-btn" onclick="addBlock('add_block_bottom')">+ Bottom</button>
     </div>`;
@@ -1840,50 +1931,75 @@ async function renderBlocks(ent, forceRefresh) {
     blocks.forEach((blk, idx) => {
       const isSelected = selectedBlock && selectedBlock.listName === listName && selectedBlock.index === idx;
 
-      // One box per input key
-      const inputFields = Object.entries(blk.input_points || {}).map(([k, v]) => {
-        const safeId = `in-${listName}-${idx}-${k}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const pointName = v?._name || null;
+      // Get block type definition from lib (for canonical key lists)
+      const btDef = (blockLib && blockLib[blk.block_type]) || null;
+      const defInputKeys  = btDef ? Object.keys(btDef.input_points)  : Object.keys(blk.input_points  || {});
+      const defOutputKeys = btDef ? Object.keys(btDef.output_points) : Object.keys(blk.output_points || {});
+
+      // Helper: build one timer-field box for a point or array slot
+      const makeField = (dir, k, v, expectedType) => {
+        const isArr    = expectedType === 'arr';
+        const safeId   = `${dir}-${listName}-${idx}-${k}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const assigned = v?._name || null;
+        const labelColor = dir === 'in' ? 'var(--blue)' : 'var(--green)';
+        const setCmd   = isArr
+          ? (dir === 'in' ? 'add_input_array'  : 'add_output_array')
+          : (dir === 'in' ? 'add_input_point'  : 'add_output_point');
+        const remCmd   = dir === 'in' ? 'rem_input_point' : 'rem_output_point';
+
+        // For arrays: dropdown of available array names; for points: free-text input
+        const inputEl = isArr
+          ? `<select id="${safeId}"
+               style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;max-width:90px;outline:none;">
+               <option value="">— arr —</option>
+               ${Object.keys(arrays).map(a => `<option value="${a}"${assigned===a?' selected':''}>${a}</option>`).join('')}
+             </select>`
+          : `<input type="text" placeholder="point name" id="${safeId}"
+               style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">`;
+
         return `
           <div class="timer-field" style="min-width:130px;">
-            <div class="tf-label" style="color:var(--blue);font-size:9px;">IN · ${k}</div>
-            <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${pointName ? pointName : '<span style="color:var(--text-dim)">null</span>'}</div>
+            <div class="tf-label" style="color:${labelColor};font-size:9px;">${dir.toUpperCase()} · ${k}<span style="color:var(--text-dim);margin-left:4px;">${expectedType}</span></div>
+            <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${assigned ? assigned : '<span style="color:var(--text-dim)">unset</span>'}</div>
             <div style="display:flex;gap:3px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-              <input type="text" placeholder="point name" id="${safeId}"
-                style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">
+              ${inputEl}
               <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;"
-                onclick="blockPointCmd('add_input_point',[selectedEntity,'${listName}',${idx},'${k}',document.getElementById('${safeId}').value])">Set</button>
-              <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
-                onclick="blockPointCmd('rem_input_point',[selectedEntity,'${listName}',${idx},'${k}'])">✕</button>
+                onclick="blockPointCmd('${setCmd}',[selectedEntity,'${listName}',${idx},'${k}',document.getElementById('${safeId}').value])">Set</button>
+              ${assigned ? `<button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
+                onclick="blockPointCmd('${remCmd}',[selectedEntity,'${listName}',${idx},'${k}'])">✕</button>` : ''}
             </div>
           </div>`;
+      };
+
+      // One box per input key defined by the block type
+      const inputFields = defInputKeys.map(k => {
+        const v = (blk.input_points || {})[k];
+        const expectedType = btDef ? (btDef.input_points[k] || '') : '';
+        return makeField('in', k, v, expectedType);
       }).join('');
 
-      // One box per output key
-      const outputFields = Object.entries(blk.output_points || {}).map(([k, v]) => {
-        const safeId = `out-${listName}-${idx}-${k}`.replace(/[^a-zA-Z0-9_-]/g, '_');
-        const pointName = v?._name || null;
-        return `
-          <div class="timer-field" style="min-width:130px;">
-            <div class="tf-label" style="color:var(--green);font-size:9px;">OUT · ${k}</div>
-            <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${pointName ? pointName : '<span style="color:var(--text-dim)">null</span>'}</div>
-            <div style="display:flex;gap:3px;flex-wrap:wrap;" onclick="event.stopPropagation()">
-              <input type="text" placeholder="point name" id="${safeId}"
-                style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">
-              <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;"
-                onclick="blockPointCmd('add_output_point',[selectedEntity,'${listName}',${idx},'${k}',document.getElementById('${safeId}').value])">Set</button>
-              <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
-                onclick="blockPointCmd('rem_output_point',[selectedEntity,'${listName}',${idx},'${k}'])">✕</button>
-            </div>
-          </div>`;
+      // One box per output key defined by the block type
+      const outputFields = defOutputKeys.map(k => {
+        const v = (blk.output_points || {})[k];
+        const expectedType = btDef ? (btDef.output_points[k] || '') : '';
+        return makeField('out', k, v, expectedType);
       }).join('');
 
-      // One box for condition
+      // Condition field — editable, uses add_condition / rem_condition endpoints
       const condName = blk.condition?._name || null;
+      const condSafeId = `cond-${listName}-${idx}`.replace(/[^a-zA-Z0-9_-]/g, '_');
       const condField = `
         <div class="timer-field" style="min-width:130px;">
-          <div class="tf-label" style="color:var(--amber);font-size:9px;">CONDITION</div>
+          <div class="tf-label" style="color:var(--amber);font-size:9px;">CONDITION <span style="color:var(--text-dim)">bool</span></div>
           <div class="tf-val" style="font-size:11px;margin-bottom:4px;">${condName ? `<span style="color:var(--amber)">${condName}</span>` : '<span style="color:var(--text-dim)">none</span>'}</div>
+          <div style="display:flex;gap:3px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+            <input type="text" placeholder="bool point" id="${condSafeId}"
+              style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:2px 4px;width:80px;outline:none;">
+            <button class="pin-action-btn" style="padding:2px 5px;font-size:9px;"
+              onclick="blockPointCmd('add_condition',[selectedEntity,'${listName}',${idx},document.getElementById('${condSafeId}').value])">Set</button>
+            ${condName ? `<button class="pin-action-btn" style="padding:2px 5px;font-size:9px;color:var(--red);border-color:var(--red);"
+              onclick="blockPointCmd('rem_condition',[selectedEntity,'${listName}',${idx}])">✕</button>` : ''}
+          </div>
         </div>`;
 
       html += `
@@ -1892,7 +2008,8 @@ async function renderBlocks(ent, forceRefresh) {
           <div class="timer-block-header">
             <span style="color:var(--text-dim);font-family:var(--mono);font-size:10px;">[${idx}]</span>
             <span class="tname">${blk.block_type || '?'}</span>
-            ${condName ? `<span style="color:var(--amber);font-size:11px;margin-left:4px;">if ${condName}</span>` : ''}
+            ${btDef ? `<span style="color:var(--text-dim);font-size:10px;margin-left:6px;">${btDef.description || ''}</span>` : ''}
+            ${condName ? `<span style="color:var(--amber);font-size:11px;margin-left:auto;">if ${condName}</span>` : ''}
           </div>
           <div class="timer-block-body" style="flex-wrap:wrap;">
             ${inputFields}
@@ -1908,222 +2025,428 @@ async function renderBlocks(ent, forceRefresh) {
 }
 
 // = PLOT VIEW ===========================================================================
+// ── Plot state — lives outside renderPlot so polls survive tab switches ──────────────
+let plotMode        = 'live';   // 'live' | 'historical'
+let plotEntity      = null;     // entity the current figures belong to
+let plotPointNames  = [];       // all logged point names for this entity
+let plotBoolNames   = [];       // subset: bool type
+let plotAnalogNames = [];       // subset: numeric (int / float)
+let plotVisibleA    = {};       // name -> bool  (analog visibility state)
+let plotVisibleB    = {};       // name -> bool  (bool visibility state)
+let plotInited      = false;    // true once Plotly.newPlot has been called for this entity
+let plotInterval    = null;     // setInterval handle for live polling
+// lastSeen: tracks the latest ISO timestamp we have already rendered per point.
+// Used so live-poll can call Plotly.extendTraces with only the NEW rows, avoiding
+// a full re-render (and the visibility / axis-range wipe that came with it).
+let plotLastSeen    = {};       // name -> ISO string of last rendered row
+
+// ── Shared layout builder — called once at init; NOT passed to every update ───
+function _mkLayout(extra) {
+  return Object.assign({
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  '#0a0b0d',
+    font: { family: "'Share Tech Mono', monospace", size: 9, color: '#5a6070' },
+    showlegend: false,
+    hovermode: 'x unified',
+    hoverlabel: { bgcolor: '#15181d', bordercolor: '#2a3040',
+                  font: { family: "'Share Tech Mono', monospace", size: 9 } }
+  }, extra);
+}
+
+// ── Scaffold (HTML skeleton + Plotly figures) — built once per entity ─────────
 async function renderPlot(ent) {
   const el = document.getElementById('tab-content');
+
+  // If already inited for this entity, just re-arm the live timer and return.
+  // This is the common path when the user switches away and back to the Plot tab.
+  if (plotInited && plotEntity === selectedEntity) {
+    if (plotMode === 'live' && !plotInterval) _startLivePlot();
+    return;
+  }
+
+  // Entity changed (or first time) → full reset
+  _plotStop();
+  plotInited      = false;
+  plotEntity      = selectedEntity;
+  plotLastSeen    = {};
+
+  // ── Build DOM scaffold ────────────────────────────────────────────────────
   el.innerHTML = `
-    <div id="plot-container" style="width:100%;height:100%;min-height:400px;"></div>
+    <div id="plot-toolbar">
+      <span class="pin-action-label">Mode:</span>
+      <button id="plt-btn-live" class="pin-action-btn active" onclick="plotSetMode('live')">Live</button>
+      <button id="plt-btn-hist" class="pin-action-btn"        onclick="plotSetMode('historical')">Historical</button>
+
+      <span id="plt-hist-controls" style="display:none;align-items:center;gap:8px;">
+        <span class="pin-action-label" style="margin-left:8px;">From:</span>
+        <input type="datetime-local" id="plt-from"
+          style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
+        <span class="pin-action-label">To:</span>
+        <input type="datetime-local" id="plt-to"
+          style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
+        <button class="pin-action-btn" onclick="plotFetchHistorical()">Load</button>
+      </span>
+
+      <span class="pin-action-label" style="margin-left:12px;">Interval:</span>
+      <select id="plt-interval"
+        style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;"
+        onchange="plotSetInterval(this.value)">
+        <option value="1000">1 s</option>
+        <option value="2000" selected>2 s</option>
+        <option value="5000">5 s</option>
+        <option value="10000">10 s</option>
+      </select>
+
+      <span class="pin-action-label" style="margin-left:12px;">Window:</span>
+      <select id="plt-window"
+        style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
+        <option value="30">30 s</option>
+        <option value="60" selected>1 min</option>
+        <option value="300">5 min</option>
+        <option value="600">10 min</option>
+        <option value="3600">1 hr</option>
+      </select>
+    </div>
+
+    <div id="trace-toggles-analog"
+      style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:28px;">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">ANALOG/FLOAT:</span>
+    </div>
+
+    <div id="trace-toggles-bool"
+      style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:28px;">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">BOOL:</span>
+    </div>
+
+    <div id="plot-wrap">
+      <div id="plot-analog"></div>
+      <div id="plot-divider"></div>
+      <div id="plot-bool"></div>
+    </div>
   `;
 
-  // Fetch point names and data
-  const [pointsRes, dataRes] = await Promise.all([
-    command('get_plot_points', [selectedEntity]),
-    command('get_plot_data',   [selectedEntity])
-  ]);
-
-  if (!pointsRes.ok || !dataRes.ok) {
-    el.innerHTML = '<div class="empty-state">Could not load plot data</div>';
+  // ── Fetch the list of logged point names from the DB ──────────────────────
+  const pointsRes = await _rawCommand('get_plot_points', [selectedEntity]);
+  if (!pointsRes || !pointsRes.ok) {
+    el.innerHTML = '<div class="empty-state">Could not load point list</div>';
     return;
   }
 
-  const pointNames = pointsRes.dict;   // array of strings
-  const plotData   = dataRes.dict;     // { point_name: [{t, v}, ...] }
+  plotPointNames = pointsRes.dict || [];
 
-  if (!pointNames.length) {
-    el.innerHTML = '<div class="empty-state">No data logged yet</div>';
-    return;
-  }
+  // Classify using software_points type metadata; fall back to non-bool
+  const swPts = (currentState[selectedEntity] || {}).software_points || {};
+  plotBoolNames   = plotPointNames.filter(n => swPts[n] && swPts[n].type === 'bool');
+  plotAnalogNames = plotPointNames.filter(n => !plotBoolNames.includes(n));
 
-  // Build Plotly traces
-  const traces = pointNames.map((name, i) => ({
-    x:    (plotData[name] || []).map(r => r.t),
-    y:    (plotData[name] || []).map(r => parseFloat(r.v)),
-    name,
-    type: 'scatter',
-    mode: 'lines',
-    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 }
-  }));
+  // Preserve existing visibility choices when switching back to this entity
+  plotAnalogNames.forEach(n => { if (!(n in plotVisibleA)) plotVisibleA[n] = true; });
+  plotBoolNames.forEach(  n => { if (!(n in plotVisibleB)) plotVisibleB[n] = true; });
 
-  const layout = {
-    paper_bgcolor: 'transparent',
-    plot_bgcolor:  '#0a0b0d',
-    font: { family: "'Share Tech Mono', monospace", size: 10, color: '#5a6070' },
-    margin: { t: 10, b: 40, l: 50, r: 10 },
-    xaxis: { 
-      type: 'date', 
-      gridcolor: '#1e2328', 
-      zerolinecolor: '#1e2328', 
-      range: [ new Date(Date.now() - 60000).toISOString(), new Date().toISOString() ]
-      },
-    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', range: [0, 1024] },
-    legend: { orientation: 'h', y: -0.2, bgcolor: 'transparent' }
-  };
+  // ── Create Plotly figures with empty traces ───────────────────────────────
+  _initDualPlots();
 
-  Plotly.newPlot('plot-container', traces, layout, {
-    responsive: true,
-    displayModeBar: false
-  });
+  // ── Render toggle buttons ─────────────────────────────────────────────────
+  _renderToggles();
 
-  // Build toggle buttons
-  const toggleBar = document.createElement('div');
-  toggleBar.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:8px 0;';
-  pointNames.forEach((name, i) => {
-    const color = TRACE_COLORS[i % TRACE_COLORS.length];
-    const btn = document.createElement('span');
-    btn.className = 'trace-toggle';
-    btn.textContent = name;
-    btn.style.borderColor = color;
-    btn.style.color = color;
-    btn.onclick = () => {
-      const isVisible = btn.style.opacity !== '0.3';
-      btn.style.opacity = isVisible ? '0.3' : '1';
-      Plotly.restyle('plot-container', 
-        { visible: isVisible ? 'legendonly' : true }, [i]
-      );
-    };
-    toggleBar.appendChild(btn);
-  });
-  el.insertBefore(toggleBar, el.firstChild);
+  // ── Default datetime range for historical inputs ──────────────────────────
+  const now    = new Date();
+  const minus1 = new Date(now - 60 * 60 * 1000);
+  document.getElementById('plt-to').value   = _toLocalDT(now);
+  document.getElementById('plt-from').value = _toLocalDT(minus1);
 
-  // Start live polling — clears when user switches tab
-  if (plotInterval) clearInterval(plotInterval);
-  plotInterval = setInterval(async () => {
-    const res = await command('get_plot_data', [selectedEntity]);
-    if (!res.ok) return;
-    const fresh = res.dict;
+  plotInited = true;
 
-    const xUpdate = pointNames.map(n => (fresh[n] || []).map(r => r.t));
-    const yUpdate = pointNames.map(n => (fresh[n] || []).map(r => parseFloat(r.v)));
-
-    // Full redraw with fresh data (simpler than extendTraces for batch updates)
-    Plotly.react('plot-container', 
-      pointNames.map((name, i) => ({
-        x: xUpdate[i], y: yUpdate[i], name,
-        type: 'scatter', mode: 'lines',
-        line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 }
-      })),
-      layout
-    );
-  }, 2000);
+  if (plotMode === 'live') _startLivePlot();
+  else { document.getElementById('plt-hist-controls').style.display = 'flex'; }
 }
 
-// ── LIVE PLOT ────────────────────────────────────────────────────────────────
-function getAllHardwarePoints() {
-  // Collect all unique hardware point names across all entities
-  const names = new Set();
-  for (const ent of Object.values(currentState)) {
-    for (const [pname, pt] of Object.entries(ent.software_points || {})) {
-      if (pt.hardware) names.add(pname);
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function _toLocalDT(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Fetch wrapper that never triggers a fetchState() (avoids flicker)
+async function _rawCommand(cmd, args) {
+  try {
+    const res = await fetch('/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, args })
+    });
+    return await res.json();
+  } catch(e) { return null; }
+}
+
+// Stop the live timer (safe to call multiple times)
+function _plotStop() {
+  if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
+}
+
+// ── Plotly figure init — empty traces, correct layouts ───────────────────────
+function _initDualPlots() {
+  const cfg = { responsive: true, displayModeBar: false };
+
+  const analogTraces = plotAnalogNames.length
+    ? plotAnalogNames.map((name, i) => ({
+        x: [], y: [], name, type: 'scatter', mode: 'lines',
+        line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
+        visible: plotVisibleA[name] ? true : 'legendonly'
+      }))
+    : [{ x: [], y: [], type: 'scatter', mode: 'lines', showlegend: false }];
+
+  const boolTraces = plotBoolNames.length
+    ? plotBoolNames.map((name, i) => ({
+        x: [], y: [], name, type: 'scatter', mode: 'lines+markers',
+        line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
+        marker: { size: 3 },
+        visible: plotVisibleB[name] ? true : 'legendonly'
+      }))
+    : [{ x: [], y: [], type: 'scatter', mode: 'lines', showlegend: false }];
+
+  Plotly.newPlot('plot-analog', analogTraces, _mkLayout({
+    margin: { t: 6, b: 20, l: 52, r: 10 },
+    xaxis: { type: 'date', gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 }, showticklabels: false },
+    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } }
+  }), cfg);
+
+  Plotly.newPlot('plot-bool', boolTraces, _mkLayout({
+    margin: { t: 4, b: 28, l: 52, r: 10 },
+    xaxis: { type: 'date', gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } },
+    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 },
+             range: [-0.1, 1.1], tickvals: [0, 1], ticktext: ['0', '1'] }
+  }), cfg);
+}
+
+// ── Toggle buttons ────────────────────────────────────────────────────────────
+function _renderToggles() {
+  const stripA = document.getElementById('trace-toggles-analog');
+  const stripB = document.getElementById('trace-toggles-bool');
+  const labelA = stripA.querySelector('span');
+  const labelB = stripB.querySelector('span');
+  stripA.innerHTML = ''; stripA.appendChild(labelA);
+  stripB.innerHTML = ''; stripB.appendChild(labelB);
+
+  plotAnalogNames.forEach((name, i) => {
+    const color = TRACE_COLORS[i % TRACE_COLORS.length];
+    const btn = document.createElement('span');
+    btn.className = 'trace-toggle' + (plotVisibleA[name] ? '' : ' hidden');
+    btn.textContent = name;
+    btn.style.color = plotVisibleA[name] ? color : '#5a6070';
+    btn.style.borderColor = color;
+    btn.onclick = () => {
+      plotVisibleA[name] = !plotVisibleA[name];
+      btn.classList.toggle('hidden', !plotVisibleA[name]);
+      btn.style.color = plotVisibleA[name] ? color : '#5a6070';
+      // restyle only — never touches data or layout
+      Plotly.restyle('plot-analog', { visible: plotVisibleA[name] ? true : 'legendonly' }, [i]);
+    };
+    stripA.appendChild(btn);
+  });
+
+  plotBoolNames.forEach((name, i) => {
+    const color = TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length];
+    const btn = document.createElement('span');
+    btn.className = 'trace-toggle' + (plotVisibleB[name] ? '' : ' hidden');
+    btn.textContent = name;
+    btn.style.color = plotVisibleB[name] ? color : '#5a6070';
+    btn.style.borderColor = color;
+    btn.onclick = () => {
+      plotVisibleB[name] = !plotVisibleB[name];
+      btn.classList.toggle('hidden', !plotVisibleB[name]);
+      btn.style.color = plotVisibleB[name] ? color : '#5a6070';
+      Plotly.restyle('plot-bool', { visible: plotVisibleB[name] ? true : 'legendonly' }, [i]);
+    };
+    stripB.appendChild(btn);
+  });
+}
+
+// ── Full-replace render (historical mode + initial live load) ─────────────────
+// Uses Plotly.restyle to push data into existing traces so layout/visibility
+// are preserved. Does NOT pass a layout object — that was set at newPlot time.
+function _applyFullData(plotData) {
+  if (!plotInited || !plotData) return;
+
+  if (plotAnalogNames.length) {
+    const update = { x: [], y: [] };
+    plotAnalogNames.forEach(n => {
+      const rows = plotData[n] || [];
+      update.x.push(rows.map(r => r.t));
+      update.y.push(rows.map(r => parseFloat(r.v)));
+    });
+    Plotly.restyle('plot-analog', update, plotAnalogNames.map((_, i) => i));
+  }
+
+  if (plotBoolNames.length) {
+    const update = { x: [], y: [] };
+    plotBoolNames.forEach(n => {
+      const rows = plotData[n] || [];
+      update.x.push(rows.map(r => r.t));
+      update.y.push(rows.map(r => parseFloat(r.v)));
+    });
+    Plotly.restyle('plot-bool', update, plotBoolNames.map((_, i) => i));
+  }
+
+  // After a full load, record the latest timestamp per point so the next
+  // live poll can pick up only rows newer than this.
+  for (const [name, rows] of Object.entries(plotData)) {
+    if (rows && rows.length) plotLastSeen[name] = rows[rows.length - 1].t;
+  }
+}
+
+// ── Incremental extend (live mode after initial load) ─────────────────────────
+// Appends ONLY the new rows to each trace — Plotly keeps axis state intact.
+// Also prunes the trace to the configured time window to bound memory usage.
+function _extendLiveData(plotData, windowSec) {
+  if (!plotInited || !plotData) return;
+  const cutoff = new Date(Date.now() - windowSec * 1000).toISOString();
+
+  function extendPlot(divId, names) {
+    if (!names.length) return;
+    const newX = [], newY = [], indices = [];
+    names.forEach((name, i) => {
+      const all  = plotData[name] || [];
+      const last = plotLastSeen[name] || '';
+      // Only rows strictly newer than what we've already drawn
+      const fresh = all.filter(r => r.t > last);
+      if (fresh.length) {
+        newX.push(fresh.map(r => r.t));
+        newY.push(fresh.map(r => parseFloat(r.v)));
+        indices.push(i);
+        plotLastSeen[name] = fresh[fresh.length - 1].t;
+      }
+    });
+    if (indices.length) {
+      Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
+    }
+
+    // Trim old data outside the window from every trace
+    const fig = document.getElementById(divId)._fullData || [];
+    const trimX = [], trimY = [], trimIdx = [];
+    names.forEach((_, i) => {
+      const td = fig[i];
+      if (!td) return;
+      const xs = td.x || [], ys = td.y || [];
+      const start = xs.findIndex(t => t >= cutoff);
+      if (start > 0) {
+        trimX.push(xs.slice(start));
+        trimY.push(ys.slice(start));
+        trimIdx.push(i);
+      }
+    });
+    if (trimIdx.length) {
+      Plotly.restyle(divId, { x: trimX, y: trimY }, trimIdx);
     }
   }
-  return [...names].sort();
+
+  extendPlot('plot-analog', plotAnalogNames);
+  extendPlot('plot-bool',   plotBoolNames);
 }
 
-function syncPlotTraces() {
-  const newNames = getAllHardwarePoints();
-
-  // Add any new traces to visibility map (default visible)
-  for (const n of newNames) {
-    if (!(n in traceVisible)) traceVisible[n] = true;
-  }
-
-  // Only re-init if trace set changed
-  const changed = JSON.stringify(newNames) !== JSON.stringify(traceNames);
-  if (changed) {
-    traceNames = newNames;
-    initPlot();
-    renderTraceToggles();
-  }
+// ── Live mode ─────────────────────────────────────────────────────────────────
+function _startLivePlot() {
+  _plotStop(); // always cancel any existing timer first
+  const ms = parseInt((document.getElementById('plt-interval') || {}).value || '2000');
+  _livePoll(); // immediate first tick
+  plotInterval = setInterval(_livePoll, ms);
 }
 
-function initPlot() {
-  const traces = traceNames.map((name, i) => ({
-    x: [], y: [],
-    name,
-    type: 'scatter',
-    mode: 'lines',
-    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
-    visible: traceVisible[name] ? true : 'legendonly'
-  }));
+async function _livePoll() {
+  if (activeTab !== 'plot' || !plotInited) return;
+  const windowSec = parseInt((document.getElementById('plt-window') || {}).value || '60');
+  const res = await _rawCommand('get_plot_data', [selectedEntity]);
+  if (!res || !res.ok) return;
+  const data = res.dict || {};
 
-  const layout = {
-    paper_bgcolor: 'transparent',
-    plot_bgcolor:  '#0a0b0d',
-    font: { family: "'Share Tech Mono', monospace", size: 10, color: '#5a6070' },
-    margin: { t: 4, b: 30, l: 50, r: 10 },
-    xaxis: {
-      type: 'date',
-      gridcolor: '#1e2328',
-      zerolinecolor: '#1e2328',
-      tickfont: { size: 9 }
-    },
-    yaxis: {
-      gridcolor: '#1e2328',
-      zerolinecolor: '#1e2328',
-      tickfont: { size: 9 }
-    },
-    legend: { orientation: 'h', y: -0.15, font: { size: 9 }, bgcolor: 'transparent' },
-    showlegend: false
-  };
-
-  Plotly.newPlot('plot-container', traces, layout, {
-    responsive: true,
-    displayModeBar: false
-  });
-
-  plotInitialized = true;
-}
-
-function renderTraceToggles() {
-  const container = document.getElementById('trace-toggles');
-  container.innerHTML = '';
-  traceNames.forEach((name, i) => {
-    const color = TRACE_COLORS[i % TRACE_COLORS.length];
-    const btn = document.createElement('span');
-    btn.className = 'trace-toggle' + (traceVisible[name] ? '' : ' hidden');
-    btn.textContent = name;
-    btn.style.borderColor = color;
-    btn.style.color = traceVisible[name] ? color : '#5a6070';
-    btn.onclick = () => toggleTrace(name, i, color, btn);
-    container.appendChild(btn);
-  });
-}
-
-function toggleTrace(name, idx, color, btn) {
-  traceVisible[name] = !traceVisible[name];
-  btn.classList.toggle('hidden', !traceVisible[name]);
-  btn.style.color = traceVisible[name] ? color : '#5a6070';
-  Plotly.restyle('plot-container', { visible: traceVisible[name] ? true : 'legendonly' }, [idx]);
-}
-
-async function fetchAndPlot() {
-  if (!plotInitialized || !traceNames.length) return;
-  try {
-    const res  = await fetch(`${BASE}/get_data_snapshot`);  // <-- adjust to your actual endpoint
-    const data = await res.json();
-    // Expected: { timestamp: "ISO string", points: { "AP0": 0.5, "DP2": 1, ... } }
-    // Adjust parsing below to match your actual response shape
-
-    const t = data.timestamp || new Date().toISOString();
-    const pts = data.points || data;
-
-    const xUpdate = traceNames.map(() => [[t]]);
-    const yUpdate = traceNames.map(name => [[pts[name] ?? null]]);
-
-    Plotly.extendTraces('plot-container', { x: xUpdate, y: yUpdate },
-      traceNames.map((_, i) => i), 300);  // keep last 300 points
-  } catch(e) {
-    // Silently skip failed polls — connection status covers this
+  const hasLastSeen = Object.keys(plotLastSeen).length > 0;
+  if (!hasLastSeen) {
+    // First successful fetch: do a full load to populate the window, then
+    // switch to incremental extend for all subsequent ticks.
+    const cutoff = new Date(Date.now() - windowSec * 1000).toISOString();
+    const windowed = {};
+    for (const [k, arr] of Object.entries(data)) {
+      windowed[k] = (arr || []).filter(r => r.t >= cutoff);
+    }
+    _applyFullData(windowed);
+  } else {
+    _extendLiveData(data, windowSec);
   }
 }
 
-function restartPlotLoop() {
-  // if (plotInterval) clearInterval(plotInterval);
-  // const ms = parseInt(document.getElementById('plot-interval').value) || 1000;
-  // plotInterval = setInterval(fetchAndPlot, ms);
+// ── Historical mode ───────────────────────────────────────────────────────────
+async function plotFetchHistorical() {
+  const res = await _rawCommand('get_plot_data', [selectedEntity]);
+  if (!res || !res.ok) return;
+
+  const fromEl = document.getElementById('plt-from');
+  const toEl   = document.getElementById('plt-to');
+  const data   = res.dict || {};
+
+  if (fromEl && toEl && fromEl.value && toEl.value) {
+    const from = new Date(fromEl.value).toISOString();
+    const to   = new Date(toEl.value).toISOString();
+    const filtered = {};
+    for (const [k, arr] of Object.entries(data)) {
+      filtered[k] = (arr || []).filter(r => r.t >= from && r.t <= to);
+    }
+    _applyFullData(filtered);
+  } else {
+    _applyFullData(data);
+  }
+  // Reset lastSeen so the next switch to live does a full window load
+  plotLastSeen = {};
 }
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+function plotSetMode(mode) {
+  plotMode = mode;
+  const btnLive = document.getElementById('plt-btn-live');
+  const btnHist = document.getElementById('plt-btn-hist');
+  const histCtrl = document.getElementById('plt-hist-controls');
+  if (!btnLive) return;
+
+  if (mode === 'live') {
+    btnLive.classList.add('active');
+    btnHist.classList.remove('active');
+    if (histCtrl) histCtrl.style.display = 'none';
+    plotLastSeen = {}; // force a fresh window load on next poll
+    _startLivePlot();
+  } else {
+    btnHist.classList.add('active');
+    btnLive.classList.remove('active');
+    if (histCtrl) histCtrl.style.display = 'flex';
+    _plotStop();
+  }
+}
+
+function plotSetInterval(ms) {
+  if (plotMode === 'live') _startLivePlot(); // restarts with new interval
+}
+
+// ── Legacy stubs (kept so any stale call-sites don't throw) ──────────────────
+function getAllHardwarePoints() { return []; }
+function syncPlotTraces() {}
+function initPlot() {}
+function renderTraceToggles() {}
+function toggleTrace() {}
+async function fetchAndPlot() {}
+function restartPlotLoop() {}
 
 // ── BOOT ─────────────────────────────────────────────────────────────────────
 (async () => {
+  // Load block library once at startup — it never changes at runtime
+  try {
+    const blRes = await fetch('/command', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd: 'dump_block_lib', args: [] })
+    });
+    const blData = await blRes.json();
+    if (blData.ok) blockLib = blData.dict;
+  } catch(e) { console.warn('Could not load block lib:', e); }
+
   await fetchState();
   restartPlotLoop();
 })();

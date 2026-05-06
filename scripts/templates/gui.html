@@ -2106,6 +2106,9 @@ async function renderPlot(ent) {
         <option value="600">10 min</option>
         <option value="3600">1 hr</option>
       </select>
+
+      <!-- fetch status — updated by _setPlotStatus() -->
+      <span id="plt-status" style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:0.06em;">—</span>
     </div>
 
     <div id="trace-toggles-analog"
@@ -2133,6 +2136,14 @@ async function renderPlot(ent) {
   }
 
   plotPointNames = pointsRes.dict || [];
+
+  // Surface a warning immediately if there are no logged points at all
+  // (controller connected but nothing written to DB yet)
+  if (plotPointNames.length === 0) {
+    // Still build the scaffold — data may arrive later via live poll
+    // but show a hint in the toolbar once it's in the DOM
+    setTimeout(() => _setPlotStatus('empty', '— no points logged yet'), 50);
+  }
 
   // Classify using software_points type metadata; fall back to non-bool
   const swPts = (currentState[selectedEntity] || {}).software_points || {};
@@ -2183,6 +2194,22 @@ async function _rawCommand(cmd, args) {
 // Stop the live timer (safe to call multiple times)
 function _plotStop() {
   if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
+}
+
+// Status pill in the toolbar ─────────────────────────────────────────────────
+// state: 'ok' | 'err' | 'empty' | 'wait'
+function _setPlotStatus(state, detail) {
+  const el = document.getElementById('plt-status');
+  if (!el) return;
+  const map = {
+    wait:  { color: 'var(--text-dim)',   text: '● POLLING…' },
+    ok:    { color: 'var(--green)',      text: '● OK' },
+    empty: { color: 'var(--amber)',      text: '⚠ NO DATA' },
+    err:   { color: 'var(--red)',        text: '✕ FETCH ERR' },
+  };
+  const s = map[state] || map.err;
+  el.style.color = s.color;
+  el.textContent = detail ? `${s.text}  ${detail}` : s.text;
 }
 
 // ── Plotly figure init — empty traces, correct layouts ───────────────────────
@@ -2356,14 +2383,23 @@ function _startLivePlot() {
 async function _livePoll() {
   if (activeTab !== 'plot' || !plotInited) return;
   const windowSec = parseInt((document.getElementById('plt-window') || {}).value || '60');
+  _setPlotStatus('wait');
   const res = await _rawCommand('get_plot_data', [selectedEntity]);
-  if (!res || !res.ok) return;
+  if (!res || !res.ok) {
+    _setPlotStatus('err', res ? res.message || '' : 'no response');
+    return;
+  }
   const data = res.dict || {};
+  const totalRows = Object.values(data).reduce((s, a) => s + (a ? a.length : 0), 0);
+
+  if (totalRows === 0) {
+    _setPlotStatus('empty', '— no rows in DB yet');
+    return;
+  }
 
   const hasLastSeen = Object.keys(plotLastSeen).length > 0;
   if (!hasLastSeen) {
-    // First successful fetch: do a full load to populate the window, then
-    // switch to incremental extend for all subsequent ticks.
+    // First successful fetch: full window load, then switch to incremental extend.
     const cutoff = new Date(Date.now() - windowSec * 1000).toISOString();
     const windowed = {};
     for (const [k, arr] of Object.entries(data)) {
@@ -2373,29 +2409,43 @@ async function _livePoll() {
   } else {
     _extendLiveData(data, windowSec);
   }
+
+  const ts = new Date().toLocaleTimeString();
+  _setPlotStatus('ok', `${ts}  ${totalRows} rows`);
 }
 
 // ── Historical mode ───────────────────────────────────────────────────────────
 async function plotFetchHistorical() {
+  _setPlotStatus('wait');
   const res = await _rawCommand('get_plot_data', [selectedEntity]);
-  if (!res || !res.ok) return;
+  if (!res || !res.ok) {
+    _setPlotStatus('err', res ? res.message || '' : 'no response');
+    return;
+  }
 
   const fromEl = document.getElementById('plt-from');
   const toEl   = document.getElementById('plt-to');
   const data   = res.dict || {};
 
+  let display = data;
   if (fromEl && toEl && fromEl.value && toEl.value) {
     const from = new Date(fromEl.value).toISOString();
     const to   = new Date(toEl.value).toISOString();
-    const filtered = {};
+    display = {};
     for (const [k, arr] of Object.entries(data)) {
-      filtered[k] = (arr || []).filter(r => r.t >= from && r.t <= to);
+      display[k] = (arr || []).filter(r => r.t >= from && r.t <= to);
     }
-    _applyFullData(filtered);
-  } else {
-    _applyFullData(data);
   }
-  // Reset lastSeen so the next switch to live does a full window load
+
+  const totalRows = Object.values(display).reduce((s, a) => s + (a ? a.length : 0), 0);
+  if (totalRows === 0) {
+    _setPlotStatus('empty', '— no rows in selected range');
+  } else {
+    _setPlotStatus('ok', `${totalRows} rows`);
+  }
+
+  _applyFullData(display);
+  // Reset lastSeen so next switch to live does a fresh window load
   plotLastSeen = {};
 }
 
