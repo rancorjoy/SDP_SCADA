@@ -2290,38 +2290,36 @@ function _renderToggles() {
   });
 }
 
-// ── Normalize SQLite timestamp for JS/Plotly ──────────────────────────────────
-// SQLite CURRENT_TIMESTAMP stores "YYYY-MM-DD HH:MM:SS" (space, no tz).
-// JS ISO strings use 'T' separator. String comparison of space-format vs
-// T-format is always wrong because ' ' (32) < 'T' (84), so every windowed
-// filter would drop all rows. Normalize to T-format universally.
-function _normTs(ts) {
-  if (!ts) return ts;
-  return typeof ts === 'string' ? ts.replace(' ', 'T') : ts;
-}
-
 // ── Full-replace render (historical mode + initial live load) ─────────────────
-// NOTE: Plotly.restyle is for *style* properties only (color, width, etc.).
-// To update data arrays x/y on existing traces use Plotly.update instead.
+// Uses Plotly.restyle to push data into existing traces so layout/visibility
+// are preserved. Does NOT pass a layout object — that was set at newPlot time.
 function _applyFullData(plotData) {
   if (!plotInited || !plotData) return;
 
-  function applyTo(divId, names) {
-    if (!names.length) return;
-    const xArr   = names.map(n => (plotData[n] || []).map(r => _normTs(r.t)));
-    const yArr   = names.map(n => (plotData[n] || []).map(r => parseFloat(r.v)));
-    const indices = names.map((_, i) => i);
-    Plotly.update(divId, { x: xArr, y: yArr }, {}, indices);
+  if (plotAnalogNames.length) {
+    const update = { x: [], y: [] };
+    plotAnalogNames.forEach(n => {
+      const rows = plotData[n] || [];
+      update.x.push(rows.map(r => r.t));
+      update.y.push(rows.map(r => parseFloat(r.v)));
+    });
+    Plotly.restyle('plot-analog', update, plotAnalogNames.map((_, i) => i));
   }
 
-  applyTo('plot-analog', plotAnalogNames);
-  applyTo('plot-bool',   plotBoolNames);
+  if (plotBoolNames.length) {
+    const update = { x: [], y: [] };
+    plotBoolNames.forEach(n => {
+      const rows = plotData[n] || [];
+      update.x.push(rows.map(r => r.t));
+      update.y.push(rows.map(r => parseFloat(r.v)));
+    });
+    Plotly.restyle('plot-bool', update, plotBoolNames.map((_, i) => i));
+  }
 
-  // Record latest (normalised) timestamp per point for incremental extend
+  // After a full load, record the latest timestamp per point so the next
+  // live poll can pick up only rows newer than this.
   for (const [name, rows] of Object.entries(plotData)) {
-    if (rows && rows.length) {
-      plotLastSeen[name] = _normTs(rows[rows.length - 1].t);
-    }
+    if (rows && rows.length) plotLastSeen[name] = rows[rows.length - 1].t;
   }
 }
 
@@ -2330,9 +2328,7 @@ function _applyFullData(plotData) {
 // Also prunes the trace to the configured time window to bound memory usage.
 function _extendLiveData(plotData, windowSec) {
   if (!plotInited || !plotData) return;
-  // Use space-format to match SQLite timestamps for trimming
-  const cutoffDate = new Date(Date.now() - windowSec * 1000);
-  const cutoff = cutoffDate.toISOString().replace('T', ' ').substring(0, 19);
+  const cutoff = new Date(Date.now() - windowSec * 1000).toISOString();
 
   function extendPlot(divId, names) {
     if (!names.length) return;
@@ -2340,30 +2336,27 @@ function _extendLiveData(plotData, windowSec) {
     names.forEach((name, i) => {
       const all  = plotData[name] || [];
       const last = plotLastSeen[name] || '';
-      // Only rows strictly newer than what we've already drawn.
-      // plotLastSeen stores T-format; raw DB rows use space-format —
-      // _normTs makes both comparable.
-      const fresh = all.filter(r => _normTs(r.t) > last);
+      // Only rows strictly newer than what we've already drawn
+      const fresh = all.filter(r => r.t > last);
       if (fresh.length) {
-        newX.push(fresh.map(r => _normTs(r.t)));
+        newX.push(fresh.map(r => r.t));
         newY.push(fresh.map(r => parseFloat(r.v)));
         indices.push(i);
-        plotLastSeen[name] = _normTs(fresh[fresh.length - 1].t);
+        plotLastSeen[name] = fresh[fresh.length - 1].t;
       }
     });
     if (indices.length) {
       Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
     }
 
-    // Trim data outside the window from every trace (use T-format for Plotly)
-    const cutoffT = cutoffDate.toISOString().replace('Z','');
+    // Trim old data outside the window from every trace
     const fig = document.getElementById(divId)._fullData || [];
     const trimX = [], trimY = [], trimIdx = [];
     names.forEach((_, i) => {
       const td = fig[i];
       if (!td) return;
       const xs = td.x || [], ys = td.y || [];
-      const start = xs.findIndex(t => t >= cutoffT);
+      const start = xs.findIndex(t => t >= cutoff);
       if (start > 0) {
         trimX.push(xs.slice(start));
         trimY.push(ys.slice(start));
@@ -2371,7 +2364,7 @@ function _extendLiveData(plotData, windowSec) {
       }
     });
     if (trimIdx.length) {
-      Plotly.update(divId, { x: trimX, y: trimY }, {}, trimIdx);
+      Plotly.restyle(divId, { x: trimX, y: trimY }, trimIdx);
     }
   }
 
@@ -2407,12 +2400,10 @@ async function _livePoll() {
   const hasLastSeen = Object.keys(plotLastSeen).length > 0;
   if (!hasLastSeen) {
     // First successful fetch: full window load, then switch to incremental extend.
-    // Use space-format cutoff to match SQLite's "YYYY-MM-DD HH:MM:SS" strings.
-    const cutoffDate = new Date(Date.now() - windowSec * 1000);
-    const cutoff = cutoffDate.toISOString().replace('T', ' ').substring(0, 19);
+    const cutoff = new Date(Date.now() - windowSec * 1000).toISOString();
     const windowed = {};
     for (const [k, arr] of Object.entries(data)) {
-      windowed[k] = (arr || []).filter(r => (r.t || '') >= cutoff);
+      windowed[k] = (arr || []).filter(r => r.t >= cutoff);
     }
     _applyFullData(windowed);
   } else {
@@ -2438,13 +2429,11 @@ async function plotFetchHistorical() {
 
   let display = data;
   if (fromEl && toEl && fromEl.value && toEl.value) {
-    // datetime-local gives "YYYY-MM-DDTHH:MM"; SQLite stores "YYYY-MM-DD HH:MM:SS"
-    // Convert both to space-format for a consistent string comparison
-    const from = fromEl.value.replace('T', ' ');
-    const to   = toEl.value.replace('T', ' ') + ':59'; // inclusive to end of minute
+    const from = new Date(fromEl.value).toISOString();
+    const to   = new Date(toEl.value).toISOString();
     display = {};
     for (const [k, arr] of Object.entries(data)) {
-      display[k] = (arr || []).filter(r => (r.t || '') >= from && (r.t || '') <= to);
+      display[k] = (arr || []).filter(r => r.t >= from && r.t <= to);
     }
   }
 
