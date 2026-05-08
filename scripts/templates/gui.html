@@ -2092,6 +2092,8 @@ async function renderPlot(ent) {
       <select id="plt-interval"
         style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;"
         onchange="plotSetInterval(this.value)">
+        <option value="250">0.25 s</option>
+        <option value="500">0.5 s</option>
         <option value="1000">1 s</option>
         <option value="2000" selected>2 s</option>
         <option value="5000">5 s</option>
@@ -2100,6 +2102,7 @@ async function renderPlot(ent) {
 
       <span class="pin-action-label" style="margin-left:12px;">Window:</span>
       <select id="plt-window"
+        onchange="plotLastId = 0;"
         style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
         <option value="30">30 s</option>
         <option value="60" selected>1 min</option>
