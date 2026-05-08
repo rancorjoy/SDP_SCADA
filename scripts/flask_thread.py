@@ -128,10 +128,12 @@ COMMANDS = {
     "saved_block_config" :      (1,   1,    "saved_block_config <controller name>"),
 
     # Things exposed to the web-page that are not in the help menu
-    "find_lists":      (1,   1,     "find_lists <controller_name>"),
-    "get_plot_data":   (1, 2, "get_plot_data <controller_name> [n_rows]"),
-    "get_plot_points": (1, 1, "get_plot_points <controller_name>"),
-    "dump_block_lib":  (0, 0,   "dump_block_lib")
+    "find_lists":               (1,   1,   "find_lists <controller_name>"),
+    "get_plot_data":            (1,   2,   "get_plot_data <controller_name> [window_sec]"),
+    "get_plot_data_since":      (2,   2,   "get_plot_data_since <controller_name> <since_timestamp>"),
+    "get_plot_data_range":      (3,   3,   "get_plot_data_range <controller_name> <from_timestamp> <to_timestamp>"),
+    "get_plot_points":          (1,   1,   "get_plot_points <controller_name>"),
+    "dump_block_lib":           (0,   0,   "dump_block_lib")
 }
 
 def get_path():                                                 # Derives the data path when a function needs it from Pointer.json
@@ -324,7 +326,10 @@ def flask_loop(CurrentState):                               # Method is ran in e
         if error:
             return flask.jsonify({"ok": False, "message": error}), 400
         
-        print_log.pL("Server", "Event", f"{cmd}, {', '.join(args)} from {flask.request.remote_addr}.", "User", False, None)
+        # Silent commands should not be printed as they provide little insight and they clutter the server logs
+        silent_commands = ["get_plot_data", "get_plot_data_since", "get_plot_data_range"]
+        if cmd not in silent_commands:
+            print_log.pL("Server", "Event", f"{cmd}, {', '.join(args)} from {flask.request.remote_addr}.", "User", False, None)
 
         try:
             if cmd == "help":               return {"ok": True, "message": get_help()}
@@ -421,19 +426,20 @@ def flask_loop(CurrentState):                               # Method is ran in e
             if cmd == "rem_output_point":       return {"ok": True, "result": code_block_utils.remove_point_output(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), args[3])}
             if cmd == "add_condition":          return {"ok": True, "result": code_block_utils.add_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])), current_dict[args[0]]["software_points"][args[3]], current_dict[args[0]]["software_points"])}
             if cmd == "rem_condition":          return {"ok": True, "result": code_block_utils.rem_condition(code_block_utils.get_inst(current_dict, args[0], args[1], int(args[2])))}
-            if cmd == "list_block_types":     return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct
-            if cmd == "current_block_config": return {"ok": True, "message": code_block_utils.display_current_config(current_dict, args[0], block_lib)}
-            if cmd == "saved_block_config":   return {"ok": True, "message": code_block_utils.display_saved_config(get_path(), args[0], block_lib)}
+            if cmd == "list_block_types":       return {"ok": True, "message": code_block_utils.display_block_help(block_lib)}  # already correct
+            if cmd == "current_block_config":   return {"ok": True, "message": code_block_utils.display_current_config(current_dict, args[0], block_lib)}
+            if cmd == "saved_block_config":     return {"ok": True, "message": code_block_utils.display_saved_config(get_path(), args[0], block_lib)}
 
             # Things exposed to the web-page that are not in the help menu
             if cmd == "find_lists":             return {"ok": True, "dict": code_block_utils.find_lists(current_dict, args[0])}
-            if cmd == "get_plot_data":
-                n = int(args[1]) if len(args) > 1 else 300
-                return {"ok": True, "dict": sql_utils.get_plot_data(get_path(), args[0], n)}
-            if cmd == "dump_block_lib": return {"ok": True, "dict": block_lib}
+            if cmd == "get_plot_data_since":    return {"ok": True, "dict": sql_utils.get_plot_data_since(get_path(), args[0], args[1])}
+            if cmd == "dump_block_lib":         return {"ok": True, "dict": block_lib}
+            if cmd == "get_plot_points":        return {"ok": True, "dict": sql_utils.get_plot_points(get_path(), args[0])}
+            if cmd == "get_plot_data_range":    return {"ok": True, "dict": sql_utils.get_plot_data_range(get_path(), args[0], args[1], args[2])}
 
-            if cmd == "get_plot_points":
-                return {"ok": True, "dict": sql_utils.get_plot_points(get_path(), args[0])}
+            if cmd == "get_plot_data":
+                window = int(args[1]) if len(args) > 1 else 60
+                return {"ok": True, "dict": sql_utils.get_plot_data(get_path(), args[0], window)}
 
         except Exception as e:
             app.logger.error(f"CMD [{cmd}] raised: {e}")

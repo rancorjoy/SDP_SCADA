@@ -21,6 +21,7 @@ def worker(port, cmd_queue, sql_queue, current_dict):
     paused = False
 
     last_sample = 0 # Seconds since the thread has been enabled
+    burst_buf = {}  # Buffer from the arduino being read
 
     while True:
 
@@ -85,23 +86,23 @@ def worker(port, cmd_queue, sql_queue, current_dict):
         except queue.Empty:
             if not paused:
                 try:
-                    ser.write(b"poll\n")
-                    ser.flush()
-                    if ser.in_waiting:
-                        line = ser.readline().decode().strip()
-                        #print(f"ARDUINO: [{line}]")  # temporary debug
+                    line = ser.readline().decode().strip()
+                    if line:
                         parts = line.split()
                         if len(parts) == 2:
+                            burst_buf[parts[0]] = parts[1]
                             now = time.time()
-                            if now - last_sample >= sample_time:  # only log at sample_time rate
-                                sql_queue.put({
-                                    "port": port, 
-                                    "cont_name" : cont_name, 
-                                    "point_name": parts[0], 
-                                    "val": parts[1]
+                            if now - last_sample >= sample_time:
+                                for point_name, val in burst_buf.items():
+                                    sql_queue.put({
+                                        "port":       port,
+                                        "cont_name":  cont_name,
+                                        "point_name": point_name,
+                                        "val":        val
                                     })
                                 last_sample = now
-                            # if not time yet, line is just discarded -> buffer still drained
+                                burst_buf = {}
+
                 except serial.SerialException:
                     print_log.pL(f"Worker ({port})", "Event", "Worker thread stopping", "System", True, None)
                     ser.close()

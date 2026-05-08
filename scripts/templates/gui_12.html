@@ -2326,31 +2326,37 @@ function _applyFullData(plotData) {
 }
 
 // ── Incremental extend (live mode after initial load) ─────────────────────────
-// The backend already returns ONLY rows newer than our since-timestamp,
-// so we just append everything and trim the front to the window.
+// Appends ONLY the new rows to each trace — Plotly keeps axis state intact.
+// Also prunes the trace to the configured time window to bound memory usage.
 function _extendLiveData(plotData, windowSec) {
   if (!plotInited || !plotData) return;
+  // Use space-format to match SQLite timestamps for trimming
   const cutoffDate = new Date(Date.now() - windowSec * 1000);
-  // T-format for Plotly axis comparisons
-  const cutoffT = cutoffDate.toISOString().substring(0, 19);
+  const cutoff = cutoffDate.toISOString().replace('T', ' ').substring(0, 19);
 
   function extendPlot(divId, names) {
     if (!names.length) return;
     const newX = [], newY = [], indices = [];
     names.forEach((name, i) => {
-      const rows = plotData[name] || [];
-      if (rows.length) {
-        newX.push(rows.map(r => _normTs(r.t)));
-        newY.push(rows.map(r => parseFloat(r.v)));
+      const all  = plotData[name] || [];
+      const last = plotLastSeen[name] || '';
+      // Only rows strictly newer than what we've already drawn.
+      // plotLastSeen stores T-format; raw DB rows use space-format —
+      // _normTs makes both comparable.
+      const fresh = all.filter(r => _normTs(r.t) > last);
+      if (fresh.length) {
+        newX.push(fresh.map(r => _normTs(r.t)));
+        newY.push(fresh.map(r => parseFloat(r.v)));
         indices.push(i);
-        plotLastSeen[name] = _normTs(rows[rows.length - 1].t);
+        plotLastSeen[name] = _normTs(fresh[fresh.length - 1].t);
       }
     });
     if (indices.length) {
       Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
     }
 
-    // Trim data that's scrolled outside the window
+    // Trim data outside the window from every trace (use T-format for Plotly)
+    const cutoffT = cutoffDate.toISOString().replace('Z','');
     const fig = document.getElementById(divId)._fullData || [];
     const trimX = [], trimY = [], trimIdx = [];
     names.forEach((_, i) => {
@@ -2384,76 +2390,73 @@ function _startLivePlot() {
 async function _livePoll() {
   if (activeTab !== 'plot' || !plotInited) return;
   const windowSec = parseInt((document.getElementById('plt-window') || {}).value || '60');
-
-  const hasLastSeen = Object.keys(plotLastSeen).length > 0;
-  let res;
-
-  if (!hasLastSeen) {
-    // ── Initial load: fetch the full configured time window ───────────────
-    res = await _rawCommand('get_plot_data', [selectedEntity, String(windowSec)]);
-  } else {
-    // ── Incremental: fetch ONLY rows newer than the newest we've drawn ───
-    // Find the oldest plotLastSeen value so we don't miss any point.
-    // (All points share one DB table; using the min guarantees no gaps.)
-    const since = Object.values(plotLastSeen).sort()[0];
-    // Convert T-format back to SQLite space-format for the query
-    const sinceSql = since.replace('T', ' ');
-    res = await _rawCommand('get_plot_data_since', [selectedEntity, sinceSql]);
-  }
-
+  _setPlotStatus('wait');
+  const res = await _rawCommand('get_plot_data', [selectedEntity]);
   if (!res || !res.ok) {
     _setPlotStatus('err', res ? res.message || '' : 'no response');
     return;
   }
-
   const data = res.dict || {};
   const totalRows = Object.values(data).reduce((s, a) => s + (a ? a.length : 0), 0);
 
-  if (!hasLastSeen && totalRows === 0) {
+  if (totalRows === 0) {
     _setPlotStatus('empty', '— no rows in DB yet');
     return;
   }
 
+  const hasLastSeen = Object.keys(plotLastSeen).length > 0;
   if (!hasLastSeen) {
-    _applyFullData(data);
+    // First successful fetch: full window load, then switch to incremental extend.
+    // Use space-format cutoff to match SQLite's "YYYY-MM-DD HH:MM:SS" strings.
+    const cutoffDate = new Date(Date.now() - windowSec * 1000);
+    const cutoff = cutoffDate.toISOString().replace('T', ' ').substring(0, 19);
+    const windowed = {};
+    for (const [k, arr] of Object.entries(data)) {
+      windowed[k] = (arr || []).filter(r => (r.t || '') >= cutoff);
+    }
+    _applyFullData(windowed);
   } else {
     _extendLiveData(data, windowSec);
   }
 
-  // Build a compact value summary: "A0=512 P6=128 con4=4"
-  const summary = Object.entries(data)
-    .map(([k, arr]) => arr && arr.length ? `${k}=${arr[arr.length-1].v}` : null)
-    .filter(Boolean).join('  ');
   const ts = new Date().toLocaleTimeString();
-  _setPlotStatus('ok', `${ts}  ${summary || '(no new rows)'}`);
+  _setPlotStatus('ok', `${ts}  ${totalRows} rows`);
 }
 
 // ── Historical mode ───────────────────────────────────────────────────────────
 async function plotFetchHistorical() {
-  const fromEl = document.getElementById('plt-from');
-  const toEl   = document.getElementById('plt-to');
-
-  if (!fromEl || !toEl || !fromEl.value || !toEl.value) {
-    _setPlotStatus('err', 'set From and To first');
-    return;
-  }
-
-  // Convert datetime-local ("YYYY-MM-DDTHH:MM") to SQLite space-format
-  const fromSql = fromEl.value.replace('T', ' ') + ':00';
-  const toSql   = toEl.value.replace('T', ' ')   + ':59';
-
-  const res = await _rawCommand('get_plot_data_range', [selectedEntity, fromSql, toSql]);
+  _setPlotStatus('wait');
+  const res = await _rawCommand('get_plot_data', [selectedEntity]);
   if (!res || !res.ok) {
     _setPlotStatus('err', res ? res.message || '' : 'no response');
     return;
   }
 
-  const data = res.dict || {};
-  const totalRows = Object.values(data).reduce((s, a) => s + (a ? a.length : 0), 0);
-  _setPlotStatus(totalRows === 0 ? 'empty' : 'ok',
-                 totalRows === 0 ? '— no rows in range' : `${totalRows} rows`);
+  const fromEl = document.getElementById('plt-from');
+  const toEl   = document.getElementById('plt-to');
+  const data   = res.dict || {};
 
-  _applyFullData(data);
+  let display = data;
+  if (fromEl && toEl && fromEl.value && toEl.value) {
+    // datetime-local gives "YYYY-MM-DDTHH:MM"; SQLite stores "YYYY-MM-DD HH:MM:SS"
+    // Convert both to space-format for a consistent string comparison
+    const from = fromEl.value.replace('T', ' ');
+    const to   = toEl.value.replace('T', ' ') + ':59'; // inclusive to end of minute
+    display = {};
+    for (const [k, arr] of Object.entries(data)) {
+      display[k] = (arr || []).filter(r => (r.t || '') >= from && (r.t || '') <= to);
+    }
+  }
+
+  const totalRows = Object.values(display).reduce((s, a) => s + (a ? a.length : 0), 0);
+  if (totalRows === 0) {
+    _setPlotStatus('empty', '— no rows in selected range');
+  } else {
+    _setPlotStatus('ok', `${totalRows} rows`);
+  }
+
+  _applyFullData(display);
+  // Reset lastSeen so next switch to live does a fresh window load
   plotLastSeen = {};
 }
 
