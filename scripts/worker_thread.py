@@ -15,6 +15,14 @@ from . import print_log
 from . import dcs_dict_utils
 from . import worker_thread_utils
 
+# Function to get list of active points for logging
+def get_active(current_dict, cont_name):
+    active_points = dcs_dict_utils.list_points(
+    current_dict[cont_name]["pin_config"],
+    current_dict[cont_name]["software_points"],
+    current_dict[cont_name]["timers"])
+    return active_points
+
 # Function that defines a worker thread
 def worker(port, cmd_queue, sql_queue, current_dict, data_path):
 
@@ -24,6 +32,10 @@ def worker(port, cmd_queue, sql_queue, current_dict, data_path):
 
     last_sample = 0 # Seconds since the thread has been enabled
     burst_buf = {}  # Buffer from the arduino being read
+
+    active_points = {}  # The current list of active points
+    valid_points = set()
+    expected = 0
 
     # Ensure a connection to the sql database and make one if it got removed!
     db_conn = sqlite3.connect(str(pathlib.Path(data_path) / "data.db"), check_same_thread=False)
@@ -50,6 +62,10 @@ def worker(port, cmd_queue, sql_queue, current_dict, data_path):
             if current_dict[key]["port"] == port:
                 cont_name = key
         sample_time = current_dict[cont_name]["sample_time"]
+
+        active_points = get_active(current_dict, cont_name)
+        valid_points = set(active_points.keys())
+        expected = len(valid_points)
                                            
         try:                                # CHECK FOR COMMANDS 
             cmd = cmd_queue.get_nowait()    # Check if the command queue has received a message
@@ -73,7 +89,12 @@ def worker(port, cmd_queue, sql_queue, current_dict, data_path):
             # Continue Command
             if cmd["command"] == "continue":            # If the comtinue command has been read...
                 print_log.pL(f"Worker ({port})", "Event", "Worker thread continuing, reopening port", "System", True, None)
+                
                 ser = worker_thread_utils.connect(port) # Reopen port
+                active_points = get_active(current_dict, cont_name)
+                valid_points = set(active_points.keys())
+                
+                expected = len(valid_points)
                 ser.reset_input_buffer()                # clear reset garbage after reconnect only
                 paused = False
 
@@ -114,19 +135,19 @@ def worker(port, cmd_queue, sql_queue, current_dict, data_path):
                         if ser.in_waiting:
                             ser.read(ser.in_waiting)
                     else:
-                        # Read until we see a duplicate key (= second burst started)
                         burst_buf = {}
                         ser.timeout = 0.3
                         while True:
                             line = ser.readline().decode('utf-8', errors='ignore').strip()
                             if not line:
-                                break  # timeout — no more data
+                                break
                             parts = line.split()
                             if len(parts) == 2:
                                 key, val = parts[0], parts[1]
-                                if key in burst_buf:
-                                    break  # second cycle started, we have a clean burst
-                                burst_buf[key] = val
+                                if key in valid_points:      # ← only accept known points
+                                    if key in burst_buf:
+                                        break                # second burst started
+                                    burst_buf[key] = val
                         ser.timeout = None
 
                         if burst_buf:

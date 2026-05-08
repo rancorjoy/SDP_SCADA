@@ -52,34 +52,39 @@ def get_plot_points(data_path, controller_name):
         return []
 
 def get_plot_data(data_path, controller_name, window_sec=60):
-    """
-    Returns data for every logged point within the last window_sec seconds.
-    Result: { point_name: [ {"t": "YYYY-MM-DD HH:MM:SS", "v": "value"}, ... ] }
-    Ordered oldest-first within each point so the frontend can append directly.
-    Uses a per-point subquery so no point starves another of rows.
-    """
     try:
         conn = _get_read_conn(data_path)
         cur = conn.cursor()
         cur.execute("""
-            SELECT timestamp, point_name, val
+            SELECT id, timestamp, point_name, val
             FROM point_log
             WHERE cont_name = ?
               AND timestamp >= datetime('now', 'localtime', ? || ' seconds')
             ORDER BY id ASC
         """, (controller_name, f'-{int(window_sec)}'))
         rows = cur.fetchall()
-        conn.close()
 
         result = {}
-        for timestamp, point_name, val in rows:
+        last_id = 0
+        for row_id, timestamp, point_name, val in rows:
             if point_name not in result:
                 result[point_name] = []
             result[point_name].append({"t": timestamp, "v": val})
-        return result
+            if row_id > last_id:
+                last_id = row_id
+
+        # If window returned no rows, still get the global max id
+        # so we don't re-fetch old data on the next poll
+        if last_id == 0:
+            cur.execute("SELECT MAX(id) FROM point_log WHERE cont_name = ?", (controller_name,))
+            row = cur.fetchone()
+            last_id = row[0] or 0
+
+        conn.close()
+        return {"data": result, "last_id": last_id}
     except Exception as e:
         print(f"[sql_utils] get_plot_data error: {e}")
-        return {}
+        return {"data": {}, "last_id": 0}
 
 def get_plot_data_range(data_path, controller_name, from_timestamp, to_timestamp):
     """
@@ -110,31 +115,29 @@ def get_plot_data_range(data_path, controller_name, from_timestamp, to_timestamp
         print(f"[sql_utils] get_plot_data_range error: {e}")
         return {}
 
-def get_plot_data_since(data_path, controller_name, since_timestamp):
-    """
-    Returns all rows strictly newer than since_timestamp for this controller.
-    since_timestamp: "YYYY-MM-DD HH:MM:SS" (SQLite format).
-    Used by the live-poll incremental update — no row cap, no missed data.
-    """
+def get_plot_data_since(data_path, controller_name, since_id):
     try:
         conn = _get_read_conn(data_path)
         cur = conn.cursor()
         cur.execute("""
-            SELECT timestamp, point_name, val
+            SELECT id, timestamp, point_name, val
             FROM point_log
             WHERE cont_name = ?
-              AND timestamp > ?
+              AND id > ?
             ORDER BY id ASC
-        """, (controller_name, since_timestamp))
+        """, (controller_name, int(since_id)))
         rows = cur.fetchall()
         conn.close()
 
         result = {}
-        for timestamp, point_name, val in rows:
+        last_id = int(since_id)
+        for row_id, timestamp, point_name, val in rows:
             if point_name not in result:
                 result[point_name] = []
             result[point_name].append({"t": timestamp, "v": val})
-        return result
+            if row_id > last_id:
+                last_id = row_id
+        return {"data": result, "last_id": last_id}
     except Exception as e:
         print(f"[sql_utils] get_plot_data_since error: {e}")
-        return {}
+        return {"data": {}, "last_id": since_id}

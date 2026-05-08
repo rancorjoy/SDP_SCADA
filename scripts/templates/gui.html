@@ -887,6 +887,7 @@ let selectedBlock = null;  // { listName, index }
 let cachedBlockLists = null; // cached result of find_lists, cleared on tab switch
 let cachedArrays = null;      // cached result of list_dcs_arrays for the current entity
 let blockLib = null;           // block type library from dump_block_lib, loaded once at boot
+let plotLastId = 0;
 
 // Plotly color palette
 const TRACE_COLORS = [
@@ -2219,6 +2220,7 @@ function _initDualPlots() {
   const analogTraces = plotAnalogNames.length
     ? plotAnalogNames.map((name, i) => ({
         x: [], y: [], name, type: 'scatter', mode: 'lines',
+        connectgaps: true,
         line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
         visible: plotVisibleA[name] ? true : 'legendonly'
       }))
@@ -2227,6 +2229,7 @@ function _initDualPlots() {
   const boolTraces = plotBoolNames.length
     ? plotBoolNames.map((name, i) => ({
         x: [], y: [], name, type: 'scatter', mode: 'lines+markers',
+        connectgaps: true,
         line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
         marker: { size: 3 },
         visible: plotVisibleB[name] ? true : 'legendonly'
@@ -2379,42 +2382,36 @@ async function _livePoll() {
   if (activeTab !== 'plot' || !plotInited) return;
   const windowSec = parseInt((document.getElementById('plt-window') || {}).value || '60');
 
-  const hasLastSeen = Object.keys(plotLastSeen).length > 0;
   let res;
 
-  if (!hasLastSeen) {
-    // ── Initial load: fetch the full configured time window ───────────────
+  if (plotLastId === 0) {
+    // Initial load: fetch the full configured time window
     res = await _rawCommand('get_plot_data', [selectedEntity, String(windowSec)]);
-  } else {
-    // ── Incremental: fetch ONLY rows newer than the newest we've drawn ───
-    // Find the oldest plotLastSeen value so we don't miss any point.
-    // (All points share one DB table; using the min guarantees no gaps.)
-    const since = Object.values(plotLastSeen).sort()[0];
-    // Convert T-format back to SQLite space-format for the query
-    const sinceSql = since.replace('T', ' ');
-    res = await _rawCommand('get_plot_data_since', [selectedEntity, sinceSql]);
-  }
-
-  if (!res || !res.ok) {
-    _setPlotStatus('err', res ? res.message || '' : 'no response');
-    return;
-  }
-
-  const data = res.dict || {};
-  const totalRows = Object.values(data).reduce((s, a) => s + (a ? a.length : 0), 0);
-
-  if (!hasLastSeen && totalRows === 0) {
-    _setPlotStatus('empty', '— no rows in DB yet');
-    return;
-  }
-
-  if (!hasLastSeen) {
+    if (!res || !res.ok) {
+      _setPlotStatus('err', res ? res.message || '' : 'no response');
+      return;
+    }
+    const data = res.dict?.data || {};
+    const totalRows = Object.values(data).reduce((s, a) => s + (a ? a.length : 0), 0);
+    if (totalRows === 0) {
+      _setPlotStatus('empty', '— no rows in DB yet');
+      return;
+    }
     _applyFullData(data);
+    plotLastId = res.dict?.last_id || 0;
   } else {
+    // Incremental: fetch only rows newer than last seen id
+    res = await _rawCommand('get_plot_data_since', [selectedEntity, String(plotLastId)]);
+    if (!res || !res.ok) {
+      _setPlotStatus('err', res ? res.message || '' : 'no response');
+      return;
+    }
+    const data = res.dict?.data || {};
     _extendLiveData(data, windowSec);
+    plotLastId = res.dict?.last_id || plotLastId;
   }
 
-  // Build a compact value summary: "A0=512 P6=128 con4=4"
+  const data = res.dict?.data || {};
   const summary = Object.entries(data)
     .map(([k, arr]) => arr && arr.length ? `${k}=${arr[arr.length-1].v}` : null)
     .filter(Boolean).join('  ');
