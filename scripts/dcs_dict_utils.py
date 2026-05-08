@@ -1197,28 +1197,35 @@ def add_point(point_dict, name):
     return True
 
 def rem_point(current_dict, cont_name, point_name):
-    # 1. Controller Existence Check
+    # Controller Existence Check
     if cont_name not in current_dict:
         # This prevents indexing current_dict[cont_name] if the name is wrong
         return False
         
-    # 2. Get the points dictionary for THIS controller
+    # Get the points dictionary for THIS controller
     points = current_dict[cont_name].get("software_points")
     if points is None or point_name not in points:
         return False
 
-    # 3. Hardware check: Use .get() to be safe
+    # Hardware check: Use .get() to be safe
     point_data = points[point_name]
     
     # If point_data is not a dict (which would happen if JSON is corrupted), 
     # it would cause the "string indices" error. We check type first.
     if isinstance(point_data, dict) and point_data.get("hardware") == False:
         
-        # 4. CRITICAL: Cleanup blocks while the point still exists
-        # If you delete it before calling this, the cleanup can't verify the point
+        # CRITICAL: Cleanup blocks while the point still exists
         rem_point_from_blocks(point_name, current_dict, cont_name)
+
+        # CRITICAL: Cleanup arrays while the point still exists
+        arr_dict = current_dict[cont_name]["arrays"]
+        for key in arr_dict:
+            if arr_dict[key]["size_point"] != None:
+                if arr_dict[key]["size_point"]["_name"] == point_name:
+                    arr_dict[key]["size_point"] = None
+
         
-        # 5. Now delete from master list
+        # Now delete from master list
         del points[point_name]
         return True
         
@@ -1261,18 +1268,21 @@ def rem_point_from_blocks(point_name, current_dict, cont_name):
 def change_point_const(point_dict, point, value, array_dict):
     if point in point_dict:
 
+        # Prevent a size point from being changed when applied to an array
         for key in array_dict:
-            if array_dict[key]["size_point"] is point:
-                return False
+            if array_dict[key]["size_point"] != None:
+                if array_dict[key]["size_point"]["_name"] == point:
+                    return False
 
         if point_dict[point]["hardware"]:
             return False
-        
-        if value:
+
+        # If the point is being set constant
+        if value == True:
             point_dict[point]["min_en"] = False
             point_dict[point]["max_en"] = False
             #point_dict[point]["hold"] = False
-        
+
         point_dict[point]["const"] = value
         return True
     
