@@ -8,13 +8,15 @@ import queue
 import threading
 import time
 import datetime
+import sqlite3
+import pathlib
 
 from . import print_log
 from . import dcs_dict_utils
 from . import worker_thread_utils
 
 # Function that defines a worker thread
-def worker(port, cmd_queue, sql_queue, current_dict):
+def worker(port, cmd_queue, sql_queue, current_dict, data_path):
 
     print_log.pL(f"Worker ({port})", "Event", "Worker thread initializing, opening port", "System", True, None)
     ser = worker_thread_utils.connect(port)  # establish serial connection once at thread start
@@ -22,6 +24,25 @@ def worker(port, cmd_queue, sql_queue, current_dict):
 
     last_sample = 0 # Seconds since the thread has been enabled
     burst_buf = {}  # Buffer from the arduino being read
+
+    # Ensure a connection to the sql database and make one if it got removed!
+    db_conn = sqlite3.connect(str(pathlib.Path(data_path) / "data.db"), check_same_thread=False)
+    db_conn.execute("PRAGMA journal_mode=WAL")
+    db_conn.execute("PRAGMA synchronous=NORMAL")
+    db_conn.execute("""
+        CREATE TABLE IF NOT EXISTS point_log (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME,
+            port      TEXT,
+            cont_name TEXT,
+            point_name TEXT,
+            val       TEXT
+        )
+    """)
+    db_conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_point_log_lookup
+        ON point_log (cont_name, timestamp)
+    """)
 
     while True:
 
@@ -86,22 +107,42 @@ def worker(port, cmd_queue, sql_queue, current_dict):
         except queue.Empty:
             if not paused:
                 try:
-                    line = ser.readline().decode().strip()
-                    if line:
-                        parts = line.split()
-                        if len(parts) == 2:
-                            burst_buf[parts[0]] = parts[1]
-                            now = time.time()
-                            if now - last_sample >= sample_time:
-                                for point_name, val in burst_buf.items():
-                                    sql_queue.put({
-                                        "port":       port,
-                                        "cont_name":  cont_name,
-                                        "point_name": point_name,
-                                        "val":        val
-                                    })
-                                last_sample = now
-                                burst_buf = {}
+                    now = time.time()
+
+                    if now - last_sample < sample_time:
+                        # Drain — keep serial buffer from backing up
+                        if ser.in_waiting:
+                            ser.read(ser.in_waiting)
+                    else:
+                        # Read until we see a duplicate key (= second burst started)
+                        burst_buf = {}
+                        ser.timeout = 0.3
+                        while True:
+                            line = ser.readline().decode('utf-8', errors='ignore').strip()
+                            if not line:
+                                break  # timeout — no more data
+                            parts = line.split()
+                            if len(parts) == 2:
+                                key, val = parts[0], parts[1]
+                                if key in burst_buf:
+                                    break  # second cycle started, we have a clean burst
+                                burst_buf[key] = val
+                        ser.timeout = None
+
+                        if burst_buf:
+                            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+                            db_conn.executemany(
+                                "INSERT INTO point_log (port, cont_name, point_name, val, timestamp) VALUES (?, ?, ?, ?, ?)",
+                                [(port, cont_name, name, val, ts) for name, val in burst_buf.items()]
+                            )
+                            while True:
+                                try:
+                                    db_conn.commit()
+                                    break
+                                except sqlite3.OperationalError:
+                                    time.sleep(0.01)
+
+                        last_sample = time.time()
 
                 except serial.SerialException:
                     print_log.pL(f"Worker ({port})", "Event", "Worker thread stopping", "System", True, None)

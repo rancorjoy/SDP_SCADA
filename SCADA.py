@@ -19,10 +19,10 @@ from scripts import dcs_flash_utils
 from scripts import flask_thread
 from scripts import flash_thread
 from scripts import serial_thread
-from scripts import sql_thread
 from scripts import create_block_lib
 from scripts import worker_thread_utils
 from scripts import print_log
+from scripts import sql_utils
 from scripts.current_state import CurrentState
 
 def main():                                                         # Main Method - Program Entry Point
@@ -74,11 +74,13 @@ def main():                                                         # Main Metho
         write_thread.daemon = True                              # Dies when main program dies
         write_thread.start()                                    # Start the new thread
 
+        # SQL Operations moved to the worker threads themselves!
                                                                 # Create a thread that runs the SQL database
                                                                 # Pass the thread the SQL event queue so it can be scheduled
-        db_thread = threading.Thread(target=sql_thread.sql_worker, args=(path, sql_queue))
-        db_thread.daemon = True                                 # Dies when main program dies
-        db_thread.start()                                       # Start the new thread
+        #db_thread = threading.Thread(target=sql_thread.sql_worker, args=(path, sql_queue))
+        #db_thread.daemon = True                                 # Dies when main program dies
+        #db_thread.start()                                       # Start the new thread
+        init_sql = sql_utils.init_sql                            # Make sure the sql server is initialized
 
         while True:                                             # Main Loop
         
@@ -103,7 +105,7 @@ def main():                                                         # Main Metho
                                 is_loaded = dcs_dict_utils.load_dcs(path, device["port"], current_dcs, current_dict, current_dict_lock)
 
                                 port = device["port"]
-                                worker_thread_utils.add_worker(port, worker_threads, sql_queue, current_dict)
+                                worker_thread_utils.add_worker(port, worker_threads, sql_queue, current_dict, path)
 
                     # Disconnected devices
                     for device in previous_devices.values():

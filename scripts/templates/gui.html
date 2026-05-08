@@ -2330,9 +2330,7 @@ function _applyFullData(plotData) {
 // so we just append everything and trim the front to the window.
 function _extendLiveData(plotData, windowSec) {
   if (!plotInited || !plotData) return;
-  const cutoffDate = new Date(Date.now() - windowSec * 1000);
-  // T-format for Plotly axis comparisons
-  const cutoffT = cutoffDate.toISOString().substring(0, 19);
+  const cutoffT = new Date(Date.now() - windowSec * 1000).toISOString().replace('T', ' ');
 
   function extendPlot(divId, names) {
     if (!names.length) return;
@@ -2346,27 +2344,23 @@ function _extendLiveData(plotData, windowSec) {
         plotLastSeen[name] = _normTs(rows[rows.length - 1].t);
       }
     });
-    if (indices.length) {
-      Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
-    }
+    if (indices.length) Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
 
-    // Trim data that's scrolled outside the window
-    const fig = document.getElementById(divId)._fullData || [];
+    // Trim using the graph's actual data, not _fullData
+    const gd = document.getElementById(divId);
     const trimX = [], trimY = [], trimIdx = [];
-    names.forEach((_, i) => {
-      const td = fig[i];
-      if (!td) return;
-      const xs = td.x || [], ys = td.y || [];
-      const start = xs.findIndex(t => t >= cutoffT);
+    names.forEach((name, i) => {
+      const trace = gd.data && gd.data[i];
+      if (!trace) return;
+      const xs = trace.x || [], ys = trace.y || [];
+      const start = xs.findIndex(t => t >= _normTs(cutoffT));
       if (start > 0) {
         trimX.push(xs.slice(start));
         trimY.push(ys.slice(start));
         trimIdx.push(i);
       }
     });
-    if (trimIdx.length) {
-      Plotly.update(divId, { x: trimX, y: trimY }, {}, trimIdx);
-    }
+    if (trimIdx.length) Plotly.update(divId, { x: trimX, y: trimY }, {}, trimIdx);
   }
 
   extendPlot('plot-analog', plotAnalogNames);

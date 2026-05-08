@@ -3,33 +3,47 @@
 
 # Import Needed Libraries
 import sqlite3
+import pathlib
 
 def get_db_path(data_path):
     return data_path / "data.db"
 
-_read_conn = {}
+def init_sql(data_path):
+    conn = sqlite3.connect(pathlib.Path(data_path) / "data.db")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS point_log (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            port        TEXT,
+            cont_name   Text,
+            point_name  TEXT,
+            val         TEXT
+        )
+    """)
+    conn.commit()
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_point_log_lookup
+        ON point_log (cont_name, timestamp)
+    """)
+    conn.commit()
+    return conn
+
 def _get_read_conn(data_path):
-    key = str(data_path)
-    if key not in _read_conn:
-        conn = sqlite3.connect(str(get_db_path(data_path)), check_same_thread=False)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA read_uncommitted=1")
-        _read_conn[key] = conn
-    return _read_conn[key]
+    conn = sqlite3.connect(str(get_db_path(data_path)), check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
 
 def get_plot_points(data_path, controller_name):
     # Returns list of unique point names logged for this controller
     try:
         conn = _get_read_conn(data_path)
         cur = conn.cursor()
-        conn.execute("BEGIN")
         cur.execute("""
             SELECT DISTINCT point_name 
             FROM point_log 
             WHERE cont_name = ?
             ORDER BY point_name
         """, (controller_name,))
-        conn.execute("ROLLBACK")
         points = [row[0] for row in cur.fetchall()]
         conn.close()
         return points
@@ -47,7 +61,6 @@ def get_plot_data(data_path, controller_name, window_sec=60):
     try:
         conn = _get_read_conn(data_path)
         cur = conn.cursor()
-        conn.execute("BEGIN")
         cur.execute("""
             SELECT timestamp, point_name, val
             FROM point_log
@@ -55,7 +68,6 @@ def get_plot_data(data_path, controller_name, window_sec=60):
               AND timestamp >= datetime('now', 'localtime', ? || ' seconds')
             ORDER BY id ASC
         """, (controller_name, f'-{int(window_sec)}'))
-        conn.execute("ROLLBACK")
         rows = cur.fetchall()
         conn.close()
 
@@ -77,7 +89,6 @@ def get_plot_data_range(data_path, controller_name, from_timestamp, to_timestamp
     try:
         conn = _get_read_conn(data_path)
         cur = conn.cursor()
-        conn.execute("BEGIN")
         cur.execute("""
             SELECT timestamp, point_name, val
             FROM point_log
@@ -86,7 +97,6 @@ def get_plot_data_range(data_path, controller_name, from_timestamp, to_timestamp
               AND timestamp <= ?
             ORDER BY id ASC
         """, (controller_name, from_timestamp, to_timestamp))
-        conn.execute("ROLLBACK")
         rows = cur.fetchall()
         conn.close()
 
@@ -109,7 +119,6 @@ def get_plot_data_since(data_path, controller_name, since_timestamp):
     try:
         conn = _get_read_conn(data_path)
         cur = conn.cursor()
-        conn.execute("BEGIN")
         cur.execute("""
             SELECT timestamp, point_name, val
             FROM point_log
@@ -117,7 +126,6 @@ def get_plot_data_since(data_path, controller_name, since_timestamp):
               AND timestamp > ?
             ORDER BY id ASC
         """, (controller_name, since_timestamp))
-        conn.execute("ROLLBACK")
         rows = cur.fetchall()
         conn.close()
 
