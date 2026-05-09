@@ -1751,8 +1751,6 @@ async function _holdPoll() {
   if (!res || !res.ok) return;
 
   const allData = res.dict?.data || {};
-  console.log('[holdPoll] lastId:', holdPollLastId, 'data:', JSON.stringify(allData));
-
   let changed = false;
   for (const [key, rows] of Object.entries(allData)) {
     if (key.endsWith(' hold') && rows && rows.length) {
@@ -1766,10 +1764,26 @@ async function _holdPoll() {
   }
   holdPollLastId = res.dict?.last_id || holdPollLastId;
 
-  if (changed && activeTab === 'points') {
-    const ent = currentState[selectedEntity];
-    if (ent) document.getElementById('tab-content').innerHTML = renderPoints(ent);
+  if (changed) {
+    // Update points tab if open
+    if (activeTab === 'points') {
+      const ent = currentState[selectedEntity];
+      if (ent) document.getElementById('tab-content').innerHTML = renderPoints(ent);
+    }
+    // Update plot traces if inited
+    if (plotInited) {
+      plotAnalogNames.forEach((name, i) => {
+        const isHeld = pointHoldState[name] || false;
+        Plotly.restyle('plot-analog', { line: { dash: isHeld ? 'dot' : 'solid' } }, [i]);
+      });
+      plotBoolNames.forEach((name, i) => {
+        const isHeld = pointHoldState[name] || false;
+        Plotly.restyle('plot-bool', { line: { dash: isHeld ? 'dot' : 'solid' } }, [i]);
+      });
+    }
   }
+
+  holdPollLastId = res.dict?.last_id || holdPollLastId;
 }
 
 async function toggleHold(pointName) {
@@ -2437,12 +2451,6 @@ function _applyFullData(plotData) {
     const yArr    = names.map(n => (cleanData[n] || []).map(r => parseFloat(r.v)));
     const indices = names.map((_, i) => i);
     Plotly.update(divId, { x: xArr, y: yArr }, {}, indices);
-
-    // Apply hold styling from pointHoldState (sole owner: _holdPoll)
-    names.forEach((name, i) => {
-      const isHeld = pointHoldState[name] || false;
-      Plotly.restyle(divId, { 'line.dash': isHeld ? 'dot' : 'solid' }, [i]);
-    });
   }
 
   applyTo('plot-analog', plotAnalogNames);
@@ -2465,6 +2473,10 @@ function _extendLiveData(plotData, windowSec) {
 
   function extendPlot(divId, names) {
     if (!names.length) return;
+
+    const gd = document.getElementById(divId);
+    if (!gd) return;
+
     const newX = [], newY = [], indices = [];
     names.forEach((name, i) => {
       const rows = cleanData[name] || [];
@@ -2477,7 +2489,6 @@ function _extendLiveData(plotData, windowSec) {
     if (indices.length) Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
 
     // Trim
-    const gd = document.getElementById(divId);
     const trimX = [], trimY = [], trimIdx = [];
     names.forEach((name, i) => {
       const trace = gd.data && gd.data[i];
@@ -2491,12 +2502,6 @@ function _extendLiveData(plotData, windowSec) {
       }
     });
     if (trimIdx.length) Plotly.update(divId, { x: trimX, y: trimY }, {}, trimIdx);
-
-    // Apply hold styling from pointHoldState (sole owner: _holdPoll)
-    names.forEach((name, i) => {
-      const isHeld = pointHoldState[name] || false;
-      Plotly.restyle(divId, { 'line.dash': isHeld ? 'dot' : 'solid' }, [i]);
-    });
   }
 
   extendPlot('plot-analog', plotAnalogNames);
