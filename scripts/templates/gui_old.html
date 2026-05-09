@@ -342,6 +342,13 @@
     padding: 8px 16px 16px 16px;
     position: relative;
   }
+  /* Plot tab needs flex column so Plotly containers get real pixel heights */
+  #tab-content.plot-mode {
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+  }
 
   /* ── ENTITY HEADER ── */
   .entity-header {
@@ -868,10 +875,8 @@ const BASE = '';
 let currentState   = {};       // full dict from /list_current_state
 let selectedEntity = null;     // key string
 let activeTab      = 'pins';
-let plotInterval   = null;
-let traceVisible   = {};       // pointName -> bool
-let plotInitialized = false;
-let traceNames     = [];       // ordered list of active trace names
+let traceVisible   = {};       // pointName -> bool (legacy, unused by plot)
+let traceNames     = [];       // ordered list (legacy, unused by plot)
 let activeDCS = {};            // live connected controllers from list_dcs
 let selectedPin = null;         // pin name string, null when none selected
 let selectedTimer = null;       // timer name string, null when none selected
@@ -882,6 +887,7 @@ let selectedBlock = null;  // { listName, index }
 let cachedBlockLists = null; // cached result of find_lists, cleared on tab switch
 let cachedArrays = null;      // cached result of list_dcs_arrays for the current entity
 let blockLib = null;           // block type library from dump_block_lib, loaded once at boot
+let plotLastId = 0;
 
 // Plotly color palette
 const TRACE_COLORS = [
@@ -913,8 +919,8 @@ async function fetchState() {
 
   setConnStatus(true);
   renderSidebar();
-  renderTabContent(); 
-  syncPlotTraces();
+  // Never re-render the plot tab from fetchState — the plot manages itself
+  if (activeTab !== 'plot') renderTabContent();
 }
 
 function setConnStatus(ok) {
@@ -935,11 +941,8 @@ async function command(cmd, args = []) {
     const data = await res.json();
     
     if (data.ok) {
-      // 1. Refresh the global currentState and activeDCS
+      // Refresh state + re-render active tab (fetchState skips plot tab render)
       await fetchState(); 
-      
-      // 2. Re-render the active tab to show/hide dynamic elements (like CH-C)
-      renderTabContent(); 
       
       // Handle Validation Terminal Logic
       if (cmd === 'validate_dcs') {
@@ -1129,18 +1132,12 @@ function switchTab(tab) {
     if (bbar) bbar.style.display = 'none';
   }
   
-  // Stop live plot when leaving plot tab; reset so switching back re-inits
+  // Stop live poll timer when leaving plot tab; do NOT clear plotInited —
+  // renderPlot uses it to skip rebuilding the DOM when returning to the same entity.
   if (tab !== 'plot') {
-    if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
-    plotInited = false;
-    // Restore tab-content normal styling
+    _plotStop();
     const tc = document.getElementById('tab-content');
-    if (tc) {
-      tc.style.overflowY = '';
-      tc.style.padding   = '';
-      tc.style.display   = '';
-      tc.style.flexDirection = '';
-    }
+    if (tc) tc.classList.remove('plot-mode');
   }
 
   // Update visual state of all tabs
@@ -1161,7 +1158,16 @@ async function renderTabContent() {
   const ent = currentState[selectedEntity];
   if (!ent) return;
 
-  el.className = 'fadein';
+  // Plot tab: apply layout class, skip fadein (it resets styles and causes flicker)
+  if (activeTab === 'plot') {
+    el.classList.add('plot-mode');
+    await renderPlot(ent);
+    return; // skip fadein and updateAllActionBars
+  }
+
+  // All other tabs: remove plot-mode class and do normal fadein
+  el.classList.remove('plot-mode');
+  el.className = el.className.replace('fadein','').trim() + ' fadein';
   void el.offsetWidth;
 
   switch(activeTab) {
@@ -1186,14 +1192,10 @@ async function renderTabContent() {
       el.innerHTML = renderArrays(ent); 
       break;
     case 'blocks':
-      await renderBlocks(ent);        // Fixed: Always render when tab is active
+      await renderBlocks(ent);
       break;
-    case 'plot':   
-      renderPlot(ent);
-      return; // skip updateAllActionBars for plot tab
   }
 
-  // Re-apply action bars visibility after render
   updateAllActionBars();
 }
 
@@ -2024,55 +2026,53 @@ async function renderBlocks(ent, forceRefresh) {
 }
 
 // = PLOT VIEW ===========================================================================
-// Plot state — kept outside renderPlot so live updates don't re-init
-let plotMode       = 'live';      // 'live' | 'historical'
-let plotEntity     = null;        // which entity the current plot belongs to
-let plotPointNames = [];          // all point names for this entity
-let plotBoolNames  = [];          // subset: bool type
-let plotAnalogNames= [];          // subset: non-bool
-let plotVisibleA   = {};          // analogPlot traceIdx -> bool (visible)
-let plotVisibleB   = {};          // boolPlot traceIdx -> bool (visible)
-let plotInited     = false;
+// ── Plot state — lives outside renderPlot so polls survive tab switches ──────────────
+let plotMode        = 'live';   // 'live' | 'historical'
+let plotEntity      = null;     // entity the current figures belong to
+let plotPointNames  = [];       // all logged point names for this entity
+let plotBoolNames   = [];       // subset: bool type
+let plotAnalogNames = [];       // subset: numeric (int / float)
+let plotVisibleA    = {};       // name -> bool  (analog visibility state)
+let plotVisibleB    = {};       // name -> bool  (bool visibility state)
+let plotInited      = false;    // true once Plotly.newPlot has been called for this entity
+let plotInterval    = null;     // setInterval handle for live polling
+// lastSeen: tracks the latest ISO timestamp we have already rendered per point.
+// Used so live-poll can call Plotly.extendTraces with only the NEW rows, avoiding
+// a full re-render (and the visibility / axis-range wipe that came with it).
+let plotLastSeen    = {};       // name -> ISO string of last rendered row
 
-// Common base layout template
-function _plotLayout(opts) {
+// ── Shared layout builder — called once at init; NOT passed to every update ───
+function _mkLayout(extra) {
   return Object.assign({
     paper_bgcolor: 'transparent',
     plot_bgcolor:  '#0a0b0d',
     font: { family: "'Share Tech Mono', monospace", size: 9, color: '#5a6070' },
-    margin: { t: 6, b: 28, l: 52, r: 10 },
-    xaxis: { type: 'date', gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } },
-    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } },
     showlegend: false,
     hovermode: 'x unified',
-    hoverlabel: { bgcolor: '#15181d', bordercolor: '#2a3040', font: { family: "'Share Tech Mono', monospace", size: 9 } }
-  }, opts);
+    hoverlabel: { bgcolor: '#15181d', bordercolor: '#2a3040',
+                  font: { family: "'Share Tech Mono', monospace", size: 9 } }
+  }, extra);
 }
 
+// ── Scaffold (HTML skeleton + Plotly figures) — built once per entity ─────────
 async function renderPlot(ent) {
   const el = document.getElementById('tab-content');
 
-  // ── Build the static scaffold once (or when entity changes) ──────────────
+  // If already inited for this entity, just re-arm the live timer and return.
+  // This is the common path when the user switches away and back to the Plot tab.
   if (plotInited && plotEntity === selectedEntity) {
-    // Already set up — just ensure the poll/fetch is running
-    if (plotMode === 'live') _startLivePlot();
+    if (plotMode === 'live' && !plotInterval) _startLivePlot();
     return;
   }
 
-  // Clear old interval before re-building
-  if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
-  plotInited = false;
-  plotEntity = selectedEntity;
+  // Entity changed (or first time) → full reset
+  _plotStop();
+  plotInited      = false;
+  plotEntity      = selectedEntity;
+  plotLastSeen    = {};
 
-  // ── Scaffold HTML ─────────────────────────────────────────────────────────
-  // We take over tab-content completely (no overflow-y scroll needed for plot)
-  el.style.overflowY = 'hidden';
-  el.style.padding   = '0';
-  el.style.display   = 'flex';
-  el.style.flexDirection = 'column';
-
+  // ── Build DOM scaffold ────────────────────────────────────────────────────
   el.innerHTML = `
-    <!-- Toolbar -->
     <div id="plot-toolbar">
       <span class="pin-action-label">Mode:</span>
       <button id="plt-btn-live" class="pin-action-btn active" onclick="plotSetMode('live')">Live</button>
@@ -2092,6 +2092,8 @@ async function renderPlot(ent) {
       <select id="plt-interval"
         style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;"
         onchange="plotSetInterval(this.value)">
+        <option value="250">0.25 s</option>
+        <option value="500">0.5 s</option>
         <option value="1000">1 s</option>
         <option value="2000" selected>2 s</option>
         <option value="5000">5 s</option>
@@ -2100,6 +2102,7 @@ async function renderPlot(ent) {
 
       <span class="pin-action-label" style="margin-left:12px;">Window:</span>
       <select id="plt-window"
+        onchange="plotLastId = 0;"
         style="background:var(--bg);border:1px solid var(--border2);color:var(--text-bright);font-family:var(--mono);font-size:10px;padding:3px 6px;outline:none;border-radius:2px;">
         <option value="30">30 s</option>
         <option value="60" selected>1 min</option>
@@ -2107,21 +2110,21 @@ async function renderPlot(ent) {
         <option value="600">10 min</option>
         <option value="3600">1 hr</option>
       </select>
+
+      <!-- fetch status — updated by _setPlotStatus() -->
+      <span id="plt-status" style="margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--text-dim);letter-spacing:0.06em;">—</span>
     </div>
 
-    <!-- Toggle strip: analog/float points -->
     <div id="trace-toggles-analog"
       style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:28px;">
       <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">ANALOG/FLOAT:</span>
     </div>
 
-    <!-- Toggle strip: bool points -->
     <div id="trace-toggles-bool"
       style="display:flex;flex-wrap:wrap;gap:5px;padding:5px 12px;border-bottom:1px solid var(--border);background:var(--bg2);flex-shrink:0;min-height:28px;">
       <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);align-self:center;margin-right:4px;">BOOL:</span>
     </div>
 
-    <!-- Two stacked plots -->
     <div id="plot-wrap">
       <div id="plot-analog"></div>
       <div id="plot-divider"></div>
@@ -2129,7 +2132,7 @@ async function renderPlot(ent) {
     </div>
   `;
 
-  // ── Fetch point names ─────────────────────────────────────────────────────
+  // ── Fetch the list of logged point names from the DB ──────────────────────
   const pointsRes = await _rawCommand('get_plot_points', [selectedEntity]);
   if (!pointsRes || !pointsRes.ok) {
     el.innerHTML = '<div class="empty-state">Could not load point list</div>';
@@ -2138,44 +2141,49 @@ async function renderPlot(ent) {
 
   plotPointNames = pointsRes.dict || [];
 
-  // Classify: bool vs analog/float
-  // We infer bool from the software_points type data; fall back to value range heuristic
+  // Surface a warning immediately if there are no logged points at all
+  // (controller connected but nothing written to DB yet)
+  if (plotPointNames.length === 0) {
+    // Still build the scaffold — data may arrive later via live poll
+    // but show a hint in the toolbar once it's in the DOM
+    setTimeout(() => _setPlotStatus('empty', '— no points logged yet'), 50);
+  }
+
+  // Classify using software_points type metadata; fall back to non-bool
   const swPts = (currentState[selectedEntity] || {}).software_points || {};
-  plotBoolNames   = plotPointNames.filter(n => (swPts[n] && swPts[n].type === 'bool'));
+  plotBoolNames   = plotPointNames.filter(n => swPts[n] && swPts[n].type === 'bool');
   plotAnalogNames = plotPointNames.filter(n => !plotBoolNames.includes(n));
 
-  // Build visibility maps (preserve existing choices on re-render)
-  plotAnalogNames.forEach((n, i) => { if (!(n in plotVisibleA)) plotVisibleA[n] = true; });
-  plotBoolNames.forEach(  (n, i) => { if (!(n in plotVisibleB)) plotVisibleB[n] = true; });
+  // Preserve existing visibility choices when switching back to this entity
+  plotAnalogNames.forEach(n => { if (!(n in plotVisibleA)) plotVisibleA[n] = true; });
+  plotBoolNames.forEach(  n => { if (!(n in plotVisibleB)) plotVisibleB[n] = true; });
 
-  // ── Init both Plotly figures (empty — data filled by fetch) ───────────────
+  // ── Create Plotly figures with empty traces ───────────────────────────────
   _initDualPlots();
 
-  // ── Render toggle strips ──────────────────────────────────────────────────
+  // ── Render toggle buttons ─────────────────────────────────────────────────
   _renderToggles();
 
-  // ── Default time range for historical inputs ──────────────────────────────
-  const now   = new Date();
-  const minus1 = new Date(now - 60*60*1000);
+  // ── Default datetime range for historical inputs ──────────────────────────
+  const now    = new Date();
+  const minus1 = new Date(now - 60 * 60 * 1000);
   document.getElementById('plt-to').value   = _toLocalDT(now);
   document.getElementById('plt-from').value = _toLocalDT(minus1);
 
   plotInited = true;
 
-  // ── Kick off live or historical ───────────────────────────────────────────
   if (plotMode === 'live') _startLivePlot();
-  else _applyHistControls();
+  else { document.getElementById('plt-hist-controls').style.display = 'flex'; }
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function _toLocalDT(d) {
-  // Returns "YYYY-MM-DDTHH:MM" in local time for datetime-local input
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// Raw fetch — does NOT call fetchState() to avoid flicker
+// Fetch wrapper that never triggers a fetchState() (avoids flicker)
 async function _rawCommand(cmd, args) {
   try {
     const res = await fetch('/command', {
@@ -2187,46 +2195,68 @@ async function _rawCommand(cmd, args) {
   } catch(e) { return null; }
 }
 
-function _initDualPlots() {
-  const baseConfig = { responsive: true, displayModeBar: false };
-
-  const analogTraces = plotAnalogNames.map((name, i) => ({
-    x: [], y: [], name,
-    type: 'scatter', mode: 'lines',
-    line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
-    visible: plotVisibleA[name] ? true : 'legendonly'
-  }));
-
-  const boolTraces = plotBoolNames.map((name, i) => ({
-    x: [], y: [], name,
-    type: 'scatter', mode: 'lines+markers',
-    line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
-    marker: { size: 3 },
-    visible: plotVisibleB[name] ? true : 'legendonly'
-  }));
-
-  const analogLayout = _plotLayout({
-    margin: { t: 6, b: 20, l: 52, r: 10 },
-    xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8}, showticklabels: false },
-    yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} }
-  });
-
-  const boolLayout = _plotLayout({
-    margin: { t: 4, b: 28, l: 52, r: 10 },
-    xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} },
-    yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8},
-             range: [-0.1, 1.1], tickvals: [0, 1], ticktext: ['0','1'] }
-  });
-
-  Plotly.newPlot('plot-analog', analogTraces.length ? analogTraces : [{ x:[], y:[], type:'scatter', mode:'lines', showlegend:false }], analogLayout, baseConfig);
-  Plotly.newPlot('plot-bool',   boolTraces.length   ? boolTraces   : [{ x:[], y:[], type:'scatter', mode:'lines', showlegend:false }], boolLayout,   baseConfig);
+// Stop the live timer (safe to call multiple times)
+function _plotStop() {
+  if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
 }
 
+// Status pill in the toolbar ─────────────────────────────────────────────────
+// state: 'ok' | 'err' | 'empty' | 'wait'
+function _setPlotStatus(state, detail) {
+  const el = document.getElementById('plt-status');
+  if (!el) return;
+  const map = {
+    wait:  { color: 'var(--text-dim)',   text: '● POLLING…' },
+    ok:    { color: 'var(--green)',      text: '● OK' },
+    empty: { color: 'var(--amber)',      text: '⚠ NO DATA' },
+    err:   { color: 'var(--red)',        text: '✕ FETCH ERR' },
+  };
+  const s = map[state] || map.err;
+  el.style.color = s.color;
+  el.textContent = detail ? `${s.text}  ${detail}` : s.text;
+}
+
+// ── Plotly figure init — empty traces, correct layouts ───────────────────────
+function _initDualPlots() {
+  const cfg = { responsive: true, displayModeBar: false };
+
+  const analogTraces = plotAnalogNames.length
+    ? plotAnalogNames.map((name, i) => ({
+        x: [], y: [], name, type: 'scatter', mode: 'lines',
+        connectgaps: true,
+        line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5 },
+        visible: plotVisibleA[name] ? true : 'legendonly'
+      }))
+    : [{ x: [], y: [], type: 'scatter', mode: 'lines', showlegend: false }];
+
+  const boolTraces = plotBoolNames.length
+    ? plotBoolNames.map((name, i) => ({
+        x: [], y: [], name, type: 'scatter', mode: 'lines+markers',
+        connectgaps: true,
+        line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
+        marker: { size: 3 },
+        visible: plotVisibleB[name] ? true : 'legendonly'
+      }))
+    : [{ x: [], y: [], type: 'scatter', mode: 'lines', showlegend: false }];
+
+  Plotly.newPlot('plot-analog', analogTraces, _mkLayout({
+    margin: { t: 6, b: 20, l: 52, r: 10 },
+    xaxis: { type: 'date', gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 }, showticklabels: false },
+    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } }
+  }), cfg);
+
+  Plotly.newPlot('plot-bool', boolTraces, _mkLayout({
+    margin: { t: 4, b: 28, l: 52, r: 10 },
+    xaxis: { type: 'date', gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 } },
+    yaxis: { gridcolor: '#1e2328', zerolinecolor: '#1e2328', tickfont: { size: 8 },
+             range: [-0.1, 1.1], tickvals: [0, 1], ticktext: ['0', '1'] }
+  }), cfg);
+}
+
+// ── Toggle buttons ────────────────────────────────────────────────────────────
 function _renderToggles() {
   const stripA = document.getElementById('trace-toggles-analog');
   const stripB = document.getElementById('trace-toggles-bool');
-
-  // Keep the label span, remove old buttons
   const labelA = stripA.querySelector('span');
   const labelB = stripB.querySelector('span');
   stripA.innerHTML = ''; stripA.appendChild(labelA);
@@ -2243,6 +2273,7 @@ function _renderToggles() {
       plotVisibleA[name] = !plotVisibleA[name];
       btn.classList.toggle('hidden', !plotVisibleA[name]);
       btn.style.color = plotVisibleA[name] ? color : '#5a6070';
+      // restyle only — never touches data or layout
       Plotly.restyle('plot-analog', { visible: plotVisibleA[name] ? true : 'legendonly' }, [i]);
     };
     stripA.appendChild(btn);
@@ -2265,105 +2296,162 @@ function _renderToggles() {
   });
 }
 
-function _applyData(plotData) {
-  if (!plotInited) return;
+// ── Normalize SQLite timestamp for JS/Plotly ──────────────────────────────────
+// SQLite CURRENT_TIMESTAMP stores "YYYY-MM-DD HH:MM:SS" (space, no tz).
+// JS ISO strings use 'T' separator. String comparison of space-format vs
+// T-format is always wrong because ' ' (32) < 'T' (84), so every windowed
+// filter would drop all rows. Normalize to T-format universally.
+function _normTs(ts) {
+  if (!ts) return ts;
+  return typeof ts === 'string' ? ts.replace(' ', 'T') : ts;
+}
 
-  // Build update arrays for analog plot
-  if (plotAnalogNames.length) {
-    const xA = plotAnalogNames.map(n => (plotData[n] || []).map(r => r.t));
-    const yA = plotAnalogNames.map(n => (plotData[n] || []).map(r => parseFloat(r.v)));
-    Plotly.react('plot-analog',
-      plotAnalogNames.map((name, i) => ({
-        x: xA[i], y: yA[i], name,
-        type: 'scatter', mode: 'lines',
-        line: { color: TRACE_COLORS[i % TRACE_COLORS.length], width: 1.5, shape: 'linear' },
-        visible: plotVisibleA[name] ? true : 'legendonly'
-      })),
-      _plotLayout({
-        margin: { t: 6, b: 20, l: 52, r: 10 },
-        xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8}, showticklabels: false },
-        yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} }
-      })
-    );
+// ── Full-replace render (historical mode + initial live load) ─────────────────
+// NOTE: Plotly.restyle is for *style* properties only (color, width, etc.).
+// To update data arrays x/y on existing traces use Plotly.update instead.
+function _applyFullData(plotData) {
+  if (!plotInited || !plotData) return;
+
+  function applyTo(divId, names) {
+    if (!names.length) return;
+    const xArr   = names.map(n => (plotData[n] || []).map(r => _normTs(r.t)));
+    const yArr   = names.map(n => (plotData[n] || []).map(r => parseFloat(r.v)));
+    const indices = names.map((_, i) => i);
+    Plotly.update(divId, { x: xArr, y: yArr }, {}, indices);
   }
 
-  // Build update arrays for bool plot
-  if (plotBoolNames.length) {
-    const xB = plotBoolNames.map(n => (plotData[n] || []).map(r => r.t));
-    const yB = plotBoolNames.map(n => (plotData[n] || []).map(r => parseFloat(r.v)));
-    Plotly.react('plot-bool',
-      plotBoolNames.map((name, i) => ({
-        x: xB[i], y: yB[i], name,
-        type: 'scatter', mode: 'lines+markers',
-        line:   { color: TRACE_COLORS[(plotAnalogNames.length + i) % TRACE_COLORS.length], width: 1.5, shape: 'hv' },
-        marker: { size: 3 },
-        visible: plotVisibleB[name] ? true : 'legendonly'
-      })),
-      _plotLayout({
-        margin: { t: 4, b: 28, l: 52, r: 10 },
-        xaxis: { type:'date', gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8} },
-        yaxis: { gridcolor:'#1e2328', zerolinecolor:'#1e2328', tickfont:{size:8},
-                 range: [-0.1, 1.1], tickvals:[0,1], ticktext:['0','1'] }
-      })
-    );
+  applyTo('plot-analog', plotAnalogNames);
+  applyTo('plot-bool',   plotBoolNames);
+
+  // Record latest (normalised) timestamp per point for incremental extend
+  for (const [name, rows] of Object.entries(plotData)) {
+    if (rows && rows.length) {
+      plotLastSeen[name] = _normTs(rows[rows.length - 1].t);
+    }
   }
 }
 
-// ── Live mode ──────────────────────────────────────────────────────────────────
+// ── Incremental extend (live mode after initial load) ─────────────────────────
+// The backend already returns ONLY rows newer than our since-timestamp,
+// so we just append everything and trim the front to the window.
+function _extendLiveData(plotData, windowSec) {
+  if (!plotInited || !plotData) return;
+  const cutoffT = new Date(Date.now() - windowSec * 1000).toISOString().replace('T', ' ');
+
+  function extendPlot(divId, names) {
+    if (!names.length) return;
+    const newX = [], newY = [], indices = [];
+    names.forEach((name, i) => {
+      const rows = plotData[name] || [];
+      if (rows.length) {
+        newX.push(rows.map(r => _normTs(r.t)));
+        newY.push(rows.map(r => parseFloat(r.v)));
+        indices.push(i);
+        plotLastSeen[name] = _normTs(rows[rows.length - 1].t);
+      }
+    });
+    if (indices.length) Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
+
+    // Trim using the graph's actual data, not _fullData
+    const gd = document.getElementById(divId);
+    const trimX = [], trimY = [], trimIdx = [];
+    names.forEach((name, i) => {
+      const trace = gd.data && gd.data[i];
+      if (!trace) return;
+      const xs = trace.x || [], ys = trace.y || [];
+      const start = xs.findIndex(t => t >= _normTs(cutoffT));
+      if (start > 0) {
+        trimX.push(xs.slice(start));
+        trimY.push(ys.slice(start));
+        trimIdx.push(i);
+      }
+    });
+    if (trimIdx.length) Plotly.update(divId, { x: trimX, y: trimY }, {}, trimIdx);
+  }
+
+  extendPlot('plot-analog', plotAnalogNames);
+  extendPlot('plot-bool',   plotBoolNames);
+}
+
+// ── Live mode ─────────────────────────────────────────────────────────────────
 function _startLivePlot() {
-  if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
+  _plotStop(); // always cancel any existing timer first
   const ms = parseInt((document.getElementById('plt-interval') || {}).value || '2000');
-  _livePoll(); // immediate first fetch
+  _livePoll(); // immediate first tick
   plotInterval = setInterval(_livePoll, ms);
 }
 
 async function _livePoll() {
   if (activeTab !== 'plot' || !plotInited) return;
   const windowSec = parseInt((document.getElementById('plt-window') || {}).value || '60');
-  const res = await _rawCommand('get_plot_data', [selectedEntity]);
-  if (!res || !res.ok) return;
 
-  // Trim to window
-  const now = Date.now();
-  const cutoff = new Date(now - windowSec * 1000).toISOString();
-  const trimmed = {};
-  for (const [k, arr] of Object.entries(res.dict || {})) {
-    trimmed[k] = (arr || []).filter(r => r.t >= cutoff);
-  }
-  _applyData(trimmed);
-}
+  let res;
 
-// ── Historical mode ────────────────────────────────────────────────────────────
-function _applyHistControls() {
-  const ctrl = document.getElementById('plt-hist-controls');
-  if (ctrl) ctrl.style.display = 'flex';
-}
-
-async function plotFetchHistorical() {
-  if (!plotInited) return;
-  const fromVal = document.getElementById('plt-from').value;
-  const toVal   = document.getElementById('plt-to').value;
-  if (!fromVal || !toVal) { alert('Please select both From and To times.'); return; }
-
-  const fromISO = new Date(fromVal).toISOString();
-  const toISO   = new Date(toVal).toISOString();
-
-  const res = await _rawCommand('get_plot_data_range', [selectedEntity, fromISO, toISO]);
-  if (!res || !res.ok) {
-    // Fallback: use get_plot_data and client-side filter
-    const res2 = await _rawCommand('get_plot_data', [selectedEntity]);
-    if (!res2 || !res2.ok) return;
-    const filtered = {};
-    for (const [k, arr] of Object.entries(res2.dict || {})) {
-      filtered[k] = (arr || []).filter(r => r.t >= fromISO && r.t <= toISO);
+  if (plotLastId === 0) {
+    // Initial load: fetch the full configured time window
+    res = await _rawCommand('get_plot_data', [selectedEntity, String(windowSec)]);
+    if (!res || !res.ok) {
+      _setPlotStatus('err', res ? res.message || '' : 'no response');
+      return;
     }
-    _applyData(filtered);
+    const data = res.dict?.data || {};
+    const totalRows = Object.values(data).reduce((s, a) => s + (a ? a.length : 0), 0);
+    if (totalRows === 0) {
+      _setPlotStatus('empty', '— no rows in DB yet');
+      return;
+    }
+    _applyFullData(data);
+    plotLastId = res.dict?.last_id || 0;
   } else {
-    _applyData(res.dict || {});
+    // Incremental: fetch only rows newer than last seen id
+    res = await _rawCommand('get_plot_data_since', [selectedEntity, String(plotLastId)]);
+    if (!res || !res.ok) {
+      _setPlotStatus('err', res ? res.message || '' : 'no response');
+      return;
+    }
+    const data = res.dict?.data || {};
+    _extendLiveData(data, windowSec);
+    plotLastId = res.dict?.last_id || plotLastId;
   }
+
+  const data = res.dict?.data || {};
+  const summary = Object.entries(data)
+    .map(([k, arr]) => arr && arr.length ? `${k}=${arr[arr.length-1].v}` : null)
+    .filter(Boolean).join('  ');
+  const ts = new Date().toLocaleTimeString();
+  _setPlotStatus('ok', `${ts}  ${summary || '(no new rows)'}`);
 }
 
-// ── Mode switching ─────────────────────────────────────────────────────────────
+// ── Historical mode ───────────────────────────────────────────────────────────
+async function plotFetchHistorical() {
+  const fromEl = document.getElementById('plt-from');
+  const toEl   = document.getElementById('plt-to');
+
+  if (!fromEl || !toEl || !fromEl.value || !toEl.value) {
+    _setPlotStatus('err', 'set From and To first');
+    return;
+  }
+
+  // Convert datetime-local ("YYYY-MM-DDTHH:MM") to SQLite space-format
+  const fromSql = fromEl.value.replace('T', ' ') + ':00';
+  const toSql   = toEl.value.replace('T', ' ')   + ':59';
+
+  const res = await _rawCommand('get_plot_data_range', [selectedEntity, fromSql, toSql]);
+  if (!res || !res.ok) {
+    _setPlotStatus('err', res ? res.message || '' : 'no response');
+    return;
+  }
+
+  const data = res.dict || {};
+  const totalRows = Object.values(data).reduce((s, a) => s + (a ? a.length : 0), 0);
+  _setPlotStatus(totalRows === 0 ? 'empty' : 'ok',
+                 totalRows === 0 ? '— no rows in range' : `${totalRows} rows`);
+
+  _applyFullData(data);
+  plotLastSeen = {};
+}
+
+// ── Mode switching ────────────────────────────────────────────────────────────
 function plotSetMode(mode) {
   plotMode = mode;
   const btnLive = document.getElementById('plt-btn-live');
@@ -2375,24 +2463,23 @@ function plotSetMode(mode) {
     btnLive.classList.add('active');
     btnHist.classList.remove('active');
     if (histCtrl) histCtrl.style.display = 'none';
+    plotLastSeen = {}; // force a fresh window load on next poll
     _startLivePlot();
   } else {
     btnHist.classList.add('active');
     btnLive.classList.remove('active');
     if (histCtrl) histCtrl.style.display = 'flex';
-    if (plotInterval) { clearInterval(plotInterval); plotInterval = null; }
-    _applyHistControls();
+    _plotStop();
   }
 }
 
 function plotSetInterval(ms) {
-  if (plotMode === 'live') _startLivePlot();
+  if (plotMode === 'live') _startLivePlot(); // restarts with new interval
 }
 
-// ── LEGACY stubs (syncPlotTraces / initPlot / renderTraceToggles etc.) ─────────
-// These were wired to fetchState(). We replace with no-ops to avoid flicker.
+// ── Legacy stubs (kept so any stale call-sites don't throw) ──────────────────
 function getAllHardwarePoints() { return []; }
-function syncPlotTraces() { /* no-op: plot is self-managed */ }
+function syncPlotTraces() {}
 function initPlot() {}
 function renderTraceToggles() {}
 function toggleTrace() {}

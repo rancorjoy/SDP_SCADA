@@ -85,9 +85,11 @@ def hold_en_worker(port, worker_threads, point_name, value, current_dict, data_p
     if value == True:
         worker_threads[port]["cmd_queue"].put({"command": f"hold_en {point_name} true"})
         return True
+    
     elif value == False:
         worker_threads[port]["cmd_queue"].put({"command": f"hold_en {point_name} false"})
         return True
+    
     elif value.lower() == "true" or value.lower() == "false":
         if port in worker_threads:
             worker_threads[port]["cmd_queue"].put({"command": f"hold_en {point_name} {value.lower()}"})

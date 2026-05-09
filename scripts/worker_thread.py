@@ -144,10 +144,13 @@ def worker(port, cmd_queue, sql_queue, current_dict, data_path):
                             parts = line.split()
                             if len(parts) == 2:
                                 key, val = parts[0], parts[1]
-                                if key in valid_points:      # ← only accept known points
+                                if key in valid_points:      # only accept known points
                                     if key in burst_buf:
                                         break                # second burst started
                                     burst_buf[key] = val
+                            elif len(parts) == 3 and parts[1] == 'hold' and parts[0] in valid_points:
+                                hold_key = f"{parts[0]} hold"
+                                burst_buf[hold_key] = parts[2]
                         ser.timeout = None
 
                         if burst_buf:

@@ -551,6 +551,26 @@ def get_write_block(cont):
 
     return code_str
 
+# Get block of code to transmit all current holds to SCADA
+def get_hold_block(cont):
+    code_str = f""
+
+    for key, val in cont["software_points"].items():
+        if not val["hardware"]:                             # software point are always active
+            code_str += textwrap.indent(f"Serial.print(\"{key} hold \");\nSerial.println({key}.hold_en);\n", "\t\t")
+
+        elif key in cont["pin_config"]:                     # pin hardware point
+            if cont["pin_config"][key]["enabled"]:
+                code_str += textwrap.indent(f"Serial.print(\"{key} hold \");\nSerial.println({key}.hold_en);\n", "\t\t")
+
+        else:                                               # timer hardware point
+            timer_name = key.split('_')[0]
+            if timer_name in cont["timers"] and cont["timers"][timer_name]["enabled"]:
+                code_str += textwrap.indent(f"Serial.print(\"{key} hold \");\nSerial.println({key}.hold_en);\n", "\t\t")
+
+    return code_str
+
+
 # Function that assembles generated code for Aduino
 def get_code(data_path, cont_name, block_lib, curr_dict):
     cont = dcs_dict_utils.get_dict(data_path, cont_name)
@@ -673,6 +693,7 @@ if (Serial.available()) {{
     if (millis() - lastSend_var >= 100) {{
         // Transmit all values to SCADA over serial connection
 {get_write_block(cont)}
+{get_hold_block(cont)}
         lastSend_var = millis();
     }}
 

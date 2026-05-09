@@ -767,8 +767,8 @@
       <div class="tab"        data-tab="blocks"  onclick="switchTab('blocks')">Blocks</div>
       <div class="tab"        data-tab="plot"    onclick="switchTab('plot')">Plot</div>
     </div>
-<div id="points-header-cover" style="display:none;background:#0f1114;flex-shrink:0;border-bottom:1px solid #1e2328;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#5a6070;display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;">
-  <span>Name</span><span>Type</span><span>Source</span><span>Default</span><span>Const</span><span>Min En</span><span>Min</span><span>Max En</span><span>Max</span>
+<div id="points-header-cover" style="display:none;background:#0f1114;flex-shrink:0;border-bottom:1px solid #1e2328;padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:#5a6070;display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;">
+  <span>Name</span><span>Type</span><span>Source</span><span>Default</span><span>Const</span><span>Min En</span><span>Min</span><span>Max En</span><span>Max</span><span>Hold En</span><span>Hold Val</span>
 </div>
 <div id="tab-content">
       <div class="empty-state">Select an entity from the sidebar</div>
@@ -888,6 +888,12 @@ let cachedBlockLists = null; // cached result of find_lists, cleared on tab swit
 let cachedArrays = null;      // cached result of list_dcs_arrays for the current entity
 let blockLib = null;           // block type library from dump_block_lib, loaded once at boot
 let plotLastId = 0;
+let plotLastSeen    = {};       // name -> ISO string of last rendered row
+let pointHoldState  = {};       // point name -> bool, populated from DB hold rows
+let holdPollInterval = null;
+let holdPollLastId   = 0;
+let _lastActiveDCS = {};  // track previous connection state
+let plotScaffoldHTML = '';
 
 // Plotly color palette
 const TRACE_COLORS = [
@@ -919,8 +925,16 @@ async function fetchState() {
 
   setConnStatus(true);
   renderSidebar();
-  // Never re-render the plot tab from fetchState — the plot manages itself
+
+  // Never re-render the plot tab from fetchState - the plot manages itself
   if (activeTab !== 'plot') renderTabContent();
+  // Only call _holdSync for controllers that just came online
+  for (const key of Object.keys(activeDCS)) {
+    if (!_lastActiveDCS[key]) {
+      await _holdSync(key);
+    }
+  }
+  _lastActiveDCS = { ...activeDCS };
 }
 
 function setConnStatus(ok) {
@@ -1139,6 +1153,10 @@ function switchTab(tab) {
     const tc = document.getElementById('tab-content');
     if (tc) tc.classList.remove('plot-mode');
   }
+  // Replace with just always-on:
+  if (!holdPollInterval) {
+      holdPollInterval = setInterval(_holdPoll, 1000);
+  }
 
   // Update visual state of all tabs
   document.querySelectorAll('.tab').forEach(t =>
@@ -1161,7 +1179,7 @@ async function renderTabContent() {
   // Plot tab: apply layout class, skip fadein (it resets styles and causes flicker)
   if (activeTab === 'plot') {
     el.classList.add('plot-mode');
-    renderPlot(ent);
+    await renderPlot(ent);
     return; // skip fadein and updateAllActionBars
   }
 
@@ -1407,7 +1425,6 @@ async function pinAction(cmd, arg) {
   updatePinActionBar(ent);
 }
 
-// ── TIMER VIEW ───────────────────────────────────────────────────────────────
 // ── TIMER VIEW ───────────────────────────────────────────────────────────────
 function renderTimers(ent) {
   const timers = ent.timers || {};
@@ -1659,6 +1676,17 @@ function renderPoints(ent) {
             style="background:transparent;border:none;border-bottom:1px solid ${p.max_en ? 'var(--border2)' : 'transparent'};color:${p.max_en ? 'var(--text-bright)' : 'var(--text-dim)'};font-family:var(--mono);font-size:12px;width:70px;outline:none;"
             onchange="command('edit_point_max', [selectedEntity, '${p._name}', this.value])">
         </td>
+        <td onclick="toggleHold('${p._name}')" style="text-align:center;">
+          <button class="pin-action-btn ${pointHoldState[p._name] ? 'active' : ''}"
+            style="padding:2px 8px;font-size:10px;border-color:var(--amber);color:${pointHoldState[p._name] ? 'var(--amber)' : ''};"
+            ${pointHoldState[p._name] ? 'HOLD' : '—'}
+          </button>
+        </td>
+        <td onclick="event.stopPropagation()">
+          <input type="number" placeholder="hold val"
+            style="background:transparent;border:none;border-bottom:1px solid ${pointHoldState[p._name] ? 'var(--amber)' : 'var(--border2)'};color:${pointHoldState[p._name] ? 'var(--amber)' : 'var(--text-bright)'};font-family:var(--mono);font-size:12px;width:70px;outline:none;"
+            onchange="command('edit_point_hold', [selectedEntity, '${p._name}', this.value])">
+        </td>
       </tr>`;
   }).join('');
 
@@ -1668,6 +1696,7 @@ return `<table class="sp-table" style="border-collapse:collapse;width:100%;">
         <th>Default</th><th>Const</th>
         <th>Min En</th><th>Min</th>
         <th>Max En</th><th>Max</th>
+        <th>Hold En</th><th>Hold Val</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -1714,6 +1743,75 @@ async function pointAction(cmd, arg) {
   const ent = currentState[selectedEntity];
   document.getElementById('tab-content').innerHTML = renderPoints(ent);
   updatePointActionBar(ent);
+}
+
+async function _holdPoll() {
+  if (!selectedEntity) return;
+  const res = await _rawCommand('get_plot_data_since', [selectedEntity, String(holdPollLastId)]);
+  if (!res || !res.ok) return;
+
+  const allData = res.dict?.data || {};
+  console.log('[holdPoll] lastId:', holdPollLastId, 'data:', JSON.stringify(allData));
+
+  let changed = false;
+  for (const [key, rows] of Object.entries(allData)) {
+    if (key.endsWith(' hold') && rows && rows.length) {
+      const pointName = key.slice(0, -5);
+      const newVal = rows[rows.length - 1].v === '1';
+      if (pointHoldState[pointName] !== newVal) {
+        pointHoldState[pointName] = newVal;
+        changed = true;
+      }
+    }
+  }
+  holdPollLastId = res.dict?.last_id || holdPollLastId;
+
+  if (changed && activeTab === 'points') {
+    const ent = currentState[selectedEntity];
+    if (ent) document.getElementById('tab-content').innerHTML = renderPoints(ent);
+  }
+}
+
+async function toggleHold(pointName) {
+  const current = pointHoldState[pointName] || false;
+  pointHoldState[pointName] = !current;  // optimistic update
+  // re-render immediately so button reflects new state
+  const ent = currentState[selectedEntity];
+  if (ent) document.getElementById('tab-content').innerHTML = renderPoints(ent);
+  // then send to server
+  await _rawCommand('edit_point_hold_enable', [selectedEntity, pointName, String(!current)]);
+}
+
+async function _holdSync(entityName) {
+  entityName = entityName || selectedEntity;
+  if (!entityName) return;
+
+  const res = await _rawCommand('get_plot_data', [entityName, '300']);
+  if (!res || !res.ok) return;
+
+  const allData = res.dict?.data || {};
+  holdPollLastId = res.dict?.last_id || 0;
+
+  for (const [key, rows] of Object.entries(allData)) {
+    if (!key.endsWith(' hold') || !rows || !rows.length) continue;
+    const pointName = key.slice(0, -5);
+    const isHeld = rows[rows.length - 1].v === '1';
+    pointHoldState[pointName] = isHeld;
+
+    if (isHeld) {
+      const valRows = allData[pointName];
+      if (valRows && valRows.length) {
+        const lastVal = valRows[valRows.length - 1].v;
+        await _rawCommand('edit_point_hold',        [entityName, pointName, lastVal]);
+        await _rawCommand('edit_point_hold_enable', [entityName, pointName, 'true']);
+      }
+    }
+  }
+
+  if (activeTab === 'points' && entityName === selectedEntity) {
+    const ent = currentState[selectedEntity];
+    if (ent) document.getElementById('tab-content').innerHTML = renderPoints(ent);
+  }
 }
 
 // ── ARRAYS VIEW ──────────────────────────────────────────────────────────────
@@ -2039,7 +2137,7 @@ let plotInterval    = null;     // setInterval handle for live polling
 // lastSeen: tracks the latest ISO timestamp we have already rendered per point.
 // Used so live-poll can call Plotly.extendTraces with only the NEW rows, avoiding
 // a full re-render (and the visibility / axis-range wipe that came with it).
-let plotLastSeen    = {};       // name -> ISO string of last rendered row
+plotLastSeen    = {};       // name -> ISO string of last rendered row
 
 // ── Shared layout builder — called once at init; NOT passed to every update ───
 function _mkLayout(extra) {
@@ -2061,7 +2159,19 @@ async function renderPlot(ent) {
   // If already inited for this entity, just re-arm the live timer and return.
   // This is the common path when the user switches away and back to the Plot tab.
   if (plotInited && plotEntity === selectedEntity) {
-    if (plotMode === 'live' && !plotInterval) _startLivePlot();
+    // Restore the scaffold HTML — switching tabs wipes el.innerHTML
+    el.innerHTML = plotScaffoldHTML;
+    // Restore datetime inputs
+    const now    = new Date();
+    const minus1 = new Date(now - 60 * 60 * 1000);
+    document.getElementById('plt-to').value   = _toLocalDT(now);
+    document.getElementById('plt-from').value = _toLocalDT(minus1);
+    // Rebuild Plotly into the fresh DOM nodes
+    _initDualPlots();
+    _renderToggles();
+    plotLastId = 0;  // force fresh data load
+    if (plotMode === 'live') _startLivePlot();
+    else document.getElementById('plt-hist-controls').style.display = 'flex';
     return;
   }
 
@@ -2131,6 +2241,8 @@ async function renderPlot(ent) {
       <div id="plot-bool"></div>
     </div>
   `;
+
+  plotScaffoldHTML = el.innerHTML;
 
   // ── Fetch the list of logged point names from the DB ──────────────────────
   const pointsRes = await _rawCommand('get_plot_points', [selectedEntity]);
@@ -2309,50 +2421,62 @@ function _normTs(ts) {
 // ── Full-replace render (historical mode + initial live load) ─────────────────
 // NOTE: Plotly.restyle is for *style* properties only (color, width, etc.).
 // To update data arrays x/y on existing traces use Plotly.update instead.
+
 function _applyFullData(plotData) {
   if (!plotInited || !plotData) return;
 
+  // Filter out hold rows — pointHoldState is owned by _holdPoll exclusively
+  const cleanData = {};
+  for (const [key, rows] of Object.entries(plotData)) {
+    if (!key.endsWith(' hold')) cleanData[key] = rows;
+  }
+
   function applyTo(divId, names) {
     if (!names.length) return;
-    const xArr   = names.map(n => (plotData[n] || []).map(r => _normTs(r.t)));
-    const yArr   = names.map(n => (plotData[n] || []).map(r => parseFloat(r.v)));
+    const xArr    = names.map(n => (cleanData[n] || []).map(r => _normTs(r.t)));
+    const yArr    = names.map(n => (cleanData[n] || []).map(r => parseFloat(r.v)));
     const indices = names.map((_, i) => i);
     Plotly.update(divId, { x: xArr, y: yArr }, {}, indices);
+
+    // Apply hold styling from pointHoldState (sole owner: _holdPoll)
+    names.forEach((name, i) => {
+      const isHeld = pointHoldState[name] || false;
+      Plotly.restyle(divId, { 'line.dash': isHeld ? 'dot' : 'solid' }, [i]);
+    });
   }
 
   applyTo('plot-analog', plotAnalogNames);
   applyTo('plot-bool',   plotBoolNames);
-
-  // Record latest (normalised) timestamp per point for incremental extend
-  for (const [name, rows] of Object.entries(plotData)) {
-    if (rows && rows.length) {
-      plotLastSeen[name] = _normTs(rows[rows.length - 1].t);
-    }
-  }
 }
 
 // ── Incremental extend (live mode after initial load) ─────────────────────────
 // The backend already returns ONLY rows newer than our since-timestamp,
 // so we just append everything and trim the front to the window.
+
 function _extendLiveData(plotData, windowSec) {
   if (!plotInited || !plotData) return;
   const cutoffT = new Date(Date.now() - windowSec * 1000).toISOString().replace('T', ' ');
+
+  // Filter out hold rows — pointHoldState is owned by _holdPoll exclusively
+  const cleanData = {};
+  for (const [key, rows] of Object.entries(plotData)) {
+    if (!key.endsWith(' hold')) cleanData[key] = rows;
+  }
 
   function extendPlot(divId, names) {
     if (!names.length) return;
     const newX = [], newY = [], indices = [];
     names.forEach((name, i) => {
-      const rows = plotData[name] || [];
+      const rows = cleanData[name] || [];
       if (rows.length) {
         newX.push(rows.map(r => _normTs(r.t)));
         newY.push(rows.map(r => parseFloat(r.v)));
         indices.push(i);
-        plotLastSeen[name] = _normTs(rows[rows.length - 1].t);
       }
     });
     if (indices.length) Plotly.extendTraces(divId, { x: newX, y: newY }, indices);
 
-    // Trim using the graph's actual data, not _fullData
+    // Trim
     const gd = document.getElementById(divId);
     const trimX = [], trimY = [], trimIdx = [];
     names.forEach((name, i) => {
@@ -2367,6 +2491,12 @@ function _extendLiveData(plotData, windowSec) {
       }
     });
     if (trimIdx.length) Plotly.update(divId, { x: trimX, y: trimY }, {}, trimIdx);
+
+    // Apply hold styling from pointHoldState (sole owner: _holdPoll)
+    names.forEach((name, i) => {
+      const isHeld = pointHoldState[name] || false;
+      Plotly.restyle(divId, { 'line.dash': isHeld ? 'dot' : 'solid' }, [i]);
+    });
   }
 
   extendPlot('plot-analog', plotAnalogNames);
