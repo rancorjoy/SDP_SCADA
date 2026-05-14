@@ -1,0 +1,33 @@
+\contentsline {section}{\numberline {I}Introduction}{1}{}%
+\contentsline {subsection}{\numberline {\mbox {I-A}}Project Overview}{1}{}%
+\contentsline {subsection}{\numberline {\mbox {I-B}}Public Health, Safety, and Welfare Impact}{1}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}1}PCB Manufacturing Energy Consumption}{1}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}2}PCB Manufacturing Waste Production}{1}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}3}PCB End of Life Concerns}{1}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}4}Cables Manufacturing Concerns}{2}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}5}Logistics Concerns}{2}{}%
+\contentsline {subsection}{\numberline {\mbox {I-C}}Global Impact}{2}{}%
+\contentsline {subsection}{\numberline {\mbox {I-D}}Cultural and Societal Impact}{2}{}%
+\contentsline {subsection}{\numberline {\mbox {I-E}}Environmental Impact}{2}{}%
+\contentsline {subsection}{\numberline {\mbox {I-F}}Economic Impact}{2}{}%
+\contentsline {subsection}{\numberline {\mbox {I-G}}Ethical and Professional Responsibility Judgment}{2}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-G}1}Environmental vs Economic Impact}{2}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-G}2}Accessibility vs. Safety}{2}{}%
+\contentsline {subsubsection}{\numberline {\mbox {I-G}3}Open-source Transparency vs. Security Risks}{2}{}%
+\contentsline {section}{\numberline {II}Background}{3}{}%
+\contentsline {section}{\numberline {III}Related Works}{3}{}%
+\contentsline {subsection}{\numberline {\mbox {III-A}}Current Open Source SCADA Solutions}{3}{}%
+\contentsline {subsubsection}{\numberline {\mbox {III-A}1}RapidSCADA}{3}{}%
+\contentsline {subsubsection}{\numberline {\mbox {III-A}2}OpenSCADA}{3}{}%
+\contentsline {subsubsection}{\numberline {\mbox {III-A}3}Proposed Solution}{3}{}%
+\contentsline {subsection}{\numberline {\mbox {III-B}}Current Open Source DCS Solutions}{3}{}%
+\contentsline {subsubsection}{\numberline {\mbox {III-B}1}RapidSCADA}{3}{}%
+\contentsline {subsubsection}{\numberline {\mbox {III-B}2}TANGO Controls}{3}{}%
+\contentsline {subsubsection}{\numberline {\mbox {III-B}3}Proposed Solution}{3}{}%
+\contentsline {section}{\numberline {IV}System Overview}{3}{}%
+\contentsline {section}{\numberline {V}Design}{3}{}%
+\contentsline {section}{\numberline {VI}Integration and Test Results}{3}{}%
+\contentsline {section}{\numberline {VII}Standards and Constraints}{3}{}%
+\contentsline {section}{\numberline {VIII}Project Planning and Task Definition}{3}{}%
+\contentsline {section}{\numberline {IX}Conclusion}{3}{}%
+\contentsline {section}{References}{3}{}%

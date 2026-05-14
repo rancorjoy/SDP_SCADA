@@ -1,0 +1,71 @@
+\documentclass[../main.tex]{subfiles}
+\graphicspath{{\subfix{}}}
+
+\begin{document}
+
+\section{Introduction}
+\label{sec:intro}
+
+\par Supervisory Control and Data Acquisition (SCADA) systems are ubiquitous in industrial automation and utility management, and in recent years similar technologies are finding uses in consumer applications such as ``smart homes". Direct Control Systems (DCS) typically use a computer to directly control a plant (such as an HVAC system), these systems are typically smaller in scope than the SCADA system(s) they interact with.
+
+\subsection{Project Overview}
+\par As part of a Senior Design Project (SDP), this paper outlines the production of a simple and scalable Wi-Fi-accessible SCADA system that can supervise numerous simple Direct Control Systems. The SCADA implementation is deployed on a Raspberry Pi Model 4, while each DCS is implemented using an Arduino UNO Rev3 microcontroller. Communication between the SCADA system and each DCS is established using USB serial connections (USB to UNO). The SCADA software can issue commands such as modifying setpoints or receiving real-time telemetry data from all connected DCS units, and will interface with an application which can be run on a separate device over Wi-Fi to allow wireless communication with the SCADA system.
+
+\subsection{Public Health, Safety, and Welfare Impact}\label{sec_health_safety-4810FP}
+\par The development and potential future manufacturing of this SCADA and DCS system would involve the same externalities that come with the manufacturing its components. 
+
+\subsubsection{PCB Manufacturing Energy Consumption}
+``Manufacturing PCBs consumes a notable amount of energy, particularly during high-temperature processes like reflow soldering. These ovens and other assembly equipment often rely on non-renewable electricity sources, further amplifying the pcb environmental impact. Emissions are also a concern. Processes such as soldering and cleaning can release volatile organic compounds (VOCs) and other airborne pollutants."\cite{b1}. Although manufacturers are taking steps to reduce these concerns\cite{b1}, the environmental impact(s) of PCB production are not insignificant. ``Unfortunately, the impact of PCB manufacturing itself is just a small percentage of the impact created by the entire electronics industry."\cite{b2}
+
+\subsubsection{PCB Manufacturing Waste Production}
+PCB production also results in a significant amount of waste production ``including trimmed materials, defective boards, and excess components."\cite{b1} This is a significant issue in the PCB manufacturing industry because ``without proper waste management, PCB manufacturing contributes to hazardous waste which may affect human health and safety."\cite{b2} This is in part due to ``[t]he assembly process for PCBs [which] involves a range of chemicals — from fluxes to cleaning agents — that can pose environmental risks. If mishandled, these substances may contaminate water sources or soil. Some also pose health risks to workers when not properly managed"\cite{b1}.
+
+\subsubsection{PCB End of Life Concerns}
+As previously mentioned, PCB manufacturing produces significant electronic and chemical waste. "More concerning, however, is what happens when PCBs reach the end of their lifecycle. Improper disposal contributes to the growing global issue of e-waste, with toxic materials leaching into soil and groundwater"\cite{b1}. This issue can be partially mitigated by recycling, which is growing in popularity due to the presence of ``[v]aluable metals such as gold, silver, and copper can be recovered from old boards.''\cite{b1}, as well as growing local requirements\cite{b1}.
+
+\subsubsection{Cables Manufacturing Concerns}
+The manufacturing of the needed cables, such as serial cables (USB-UNO) and power cables comes with many of the same impacts that result from PCB manufacturing\cite{b3}.
+
+\subsubsection{Logistics Concerns}
+All of the industrial activities mentioned above, and others (such as those needed to manufacture the sensors being used) require large quantities of materials to be transported during each supply chain. This is an environmental concern due to the required power-usage, the resulting emission, and other environmental costs of industrial logistics.
+
+\subsection{Global Impact}
+The global impact of this project is expected to be relatively small, as industrial automation using SCADA and DCS systems is already widespread. Moreover, the Raspberry Pi Version 4 and Arduino UNO Rev3 are consumer grade electronics and are not designed for industrial applications. As such, this system is better suited for consumer electronics or home automation scenarios as opposed to true industrial deployment.
+
+\subsection{Cultural and Societal Impact}\label{subsec_societal_imp-4810FP}
+A scalable, open-source, and user-friendly SCADA and DCS system deployable on consumer-grade hardware could have a wide-sweeping and positive social impact. Intended users, who are expected to have some familiarity with SCADA and DCS systems, would be able to implement these systems efficiently and at low cost. Potential applications include data collection and control for smart homes, small offices, non-industrial locations, or small businesses. 
+
+\par The system capabilities for each plant (DCS system) are limited only by the limitations of the Arduino UNO Rev3, which supports a substantial range of simple or DIY applications. Compared to commercial SCADA systems, such a setup is significantly less expensive than a traditional PLC based setup, increasing accessibility for scenarios with limited budgets.
+
+\subsection{Environmental Impact}
+The environmental impact of this project was addressed extensively in Section \ref{sec_health_safety-4810FP}, where it was stated that this project would have the same environmental impact as the production of all the standard components within it. The Raspberry Pi Model 4, the one or multiple Arduino UNO Rev3 boards, and all the cables required to configure this SCADA and DCS are environmentally costly to produce (as are any consumer electronics).
+
+\subsection{Economic Impact}
+\par This project is not expected to have a significant economic impact on existing SCADA or DCS providers. As established in Section \ref{subsec_societal_imp-4810FP}, this system cannot be deployed in industrial environments because the electronic components used are consumer grade. Consequently, the system is better suited for small-scale, educational, or low-cost applications, and is unlikely to cause any meaningful market disruption.
+
+\par The hardware required to implement the SCADA and DCS systems developed in this project is inexpensive and widely available. Both Raspberry Pi Model 4 units and Arduino UNO Rev3 boards are produced at scale and can be obtained at low cost, supporting the accessibility of this design.
+
+\subsection{Ethical and Professional Responsibility Judgment}
+
+\subsubsection{Environmental vs Economic Impact}
+\par The affordability of this SCADA and DCS system relies on low-cost PCBs and wiring, which may come from environmentally unsustainable manufacturing processes. IEEE Code of Ethics item~1 highlights the need to consider these impacts:
+\begin{itemize}
+    \item This raises concern in accordance with the 1$^\text{st}$ IEEE Code of Ethics, "to hold paramount the safety, health, and welfare of the public, to strive to comply with ethical design and sustainable development practices, to protect the privacy of others, and to disclose promptly factors that might endanger the public or the environment"\cite{b4}.
+\end{itemize}
+\noindent While inexpensive components may pose environmental concerns, the impact is comparable to that of common consumer-grade electronics using similar parts. Responsible sourcing and transparent documentation can help mitigate this concern.
+
+\subsubsection{Accessibility vs. Safety}
+\par Making this SCADA and DCS system inexpensive and accessible also increases the risk of inappropriate or unsafe use, particularly by individuals without adequate technical background or for industrial uses. This concern is covered by the same IEEE Code of Ethics item~1~\cite{b4}. Additionally, item~5 is relevant:
+\begin{itemize}
+    \item The 5$^\text{th}$ IEEE Code of Ethics, "to seek, accept, and offer honest criticism of technical work, to acknowledge and correct errors, to be honest and realistic in stating claims or estimates based on available data, and to credit properly the contributions of others;"\cite{b4}
+\end{itemize}
+\noindent To comply with these requirements, the project's GitHub repository and application client must clearly state that the system is intended for non-industrial and hobbyist use only, and that risks such as fire or electrical hazards are the responsibility of the user to manage. Transparency about limitations is essential to meeting the obligation to be ``honest and realistic in stating claims".
+
+\subsubsection{Open-source Transparency vs. Security Risks}
+\par The open-source nature of the project's software paired with the affordability of its required components enables rapid adoption of this SCADA and DCS system, but also exposes users to potential cybersecurity threats, including unauthorized access or data breaches. IEEE Code of Ethics items~1 and~5 apply here~\cite{b4}. Item~6 is also relevant:
+\begin{itemize}
+    \item The 6$^\text{th}$ IEEE Code of Ethics, "to maintain and improve our technical competence and to undertake technological tasks for others only if qualified by training or experience, or after full disclosure of pertinent limitations"\cite{b4}
+\end{itemize}
+\noindent The contributors do not possess extensive cybersecurity expertise, and therefore cannot guarantee secure operation of the SCADA and DCS system, especially when exposed to Wi-Fi. Users integrating the project into their own environments must assume responsibility for securing their deployments. Full disclosure of these limitations is required to meet ethical obligations.
+
+\end{document}

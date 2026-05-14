@@ -1,0 +1,31 @@
+\documentclass[../main.tex]{subfiles}
+\graphicspath{{\subfix{}}}
+
+\begin{document}
+
+\section{Related Works}
+\label{sec:rel}
+
+\subsection{Current Open Source SCADA Solutions}
+
+\subsubsection{RapidSCADA}\label{subsubsec_rapidSCADA-4810FP}
+\par ``RapidSCADA is an open source industrial automation platform"\cite{b5} that provides the tools needed for creation, monitoring and control for potentially large systems. ``Rapid SCADA is a perfect choice for creating large distributed industrial automation systems. Rapid SCADA runs on servers, embedded computers and in the cloud"\cite{b5}. RapidSCADA can run industrial automation systems, internet-of-things projects, and direct control systems. RapidSCADA is built to run on large-scale server hardware, which makes it computationally inaccessible for low-budget or low complexity project.
+
+\subsubsection{OpenSCADA}
+\par OpenSCADA is another open-source framework for industrial process monitoring and control ``and HMI (Human-Machine Interface) systems"\cite{b6}. It emphasizes modularity, offering separate modules for data acquisition, visualization, database logging, scripting, protocol translation, and device communication. OpenSCADA is often used as part of larger automation ecosystems and supports industrial-grade protocols and hardware interfaces. Its architecture is designed for long-term reliability, making it suitable for factories, utility systems, and distributed monitoring networks. Unlike our project OpenSCADA requires significant compute resources to run and significant technical knowledge to configure properly.
+
+\subsubsection{Proposed Solution}
+\par Both Open Source SCADA Solutions above emphasize industrial applicability, feature richness and significant scalability. The system in this project does not aim to compete directly with full-featured platforms like OpenSCADA and RapidSCADA. Instead our project prioritizes ease of deployment on low-cost hardware such as a Raspberry Pi and Arduino, enabling experimentation and small-scale automation tasks with as little knowledge as possible.
+
+\subsection{Current Open Source DCS Solutions}
+
+\subsubsection{RapidSCADA}
+\par As described in Section \ref{subsubsec_rapidSCADA-4810FP}, RapidSCADA\cite{b5} is capable of running DCS systems, however the hardware requirements for such a system are not accessible for low cost and low complexity applications.
+
+\subsubsection{TANGO Controls}
+\par ``Tango is an Open Source solution for SCADA and DCS. Open Source means you get all the source code under an Open Source free licence (LGPL and GPL). Supervisory Control and Data Acquisition (SCADA) systems are typically industrial type systems using standard hardware. Distributed Control Systems (DCS) are more flexible control systems used in more complex environments"\cite{b7}. Tango requires an operating system to install, meaning that any DCS controller device must be sufficiently powerful.
+
+\subsubsection{Proposed Solution}
+\par The DCS system we propose is designed to run on the Arduino UNO Rev3 hardware. This Arduino model is an affordable, available, and easy to configure platform for low-compute projects. All other commonly cited open source DCS applications require an operating system for installation, our DCS implementation will run directly on the Arduino UNO Rev3's ATmega328P microcontroller.
+
+\end{document}

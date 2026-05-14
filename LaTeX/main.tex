@@ -1,0 +1,93 @@
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage[dvipsnames]{xcolor}
+
+%Figure Packages (Tikz)
+\usepackage{tikz} %Plots and Diagrams
+\usetikzlibrary{patterns}
+\usetikzlibrary{shapes.geometric}
+\usetikzlibrary{arrows.meta,decorations.markings}
+\usetikzlibrary{decorations.markings}
+\usetikzlibrary{positioning}
+\usepackage{circuitikz} %Circuit Schematics
+
+\usepackage{subfiles}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+    
+\begin{document}
+
+\title{Open Source SCADA and DCS System on Raspberry Pi Model 4 and Arduino Mega 2560 R3}
+\author{
+\IEEEauthorblockN{Brandon Esebag, Karina Francis, Marlene Pimienta Herrera, Carlos Chavez, Armando Rodriguez, Steven Soto}
+{biesebag@ieee.org, karina.marie.francis@gmail.com, xx, Carlosc3980@gmail.com, xx, stevensotowk220@gmail.com}
+    \IEEEauthorblockA{\textit{Department of Electrical and Computer Engineering} \\
+    \textit{California State Polytechnic University, Pomona}\\
+    Pomona, CA, USA \\ }}
+
+
+
+
+% --- BEGIN TITLE PAGE ---
+\begin{titlepage}
+\begin{center}
+    \includegraphics[scale=0.35]{com/CPP_Logo}\\[1cm]
+    
+    \large \textbf{California Polytechnic State University, Pomona}\\
+    \normalsize DEPARTMENT OF ELECTRICAL AND COMPUTER ENGINEERING\\[2\baselineskip]
+    
+    \huge{Open Source SCADA and DCS System on Raspberry Pi Model 4 and Arduino Mega 2560 R3}\\[2\baselineskip]
+    
+    \large
+    Senior Project Semester 2\\
+    EGR 4830 Spring 26\\[2\baselineskip]
+    
+	\textbf{Supervised by:}\\  
+	Dr. Olsen\\
+	\vspace{1\baselineskip}  
+    
+    \textbf{Prepared by:}\\
+    Brandon Esebag, Karina Francis, Marlene Pimienta Herrera,\\ Carlos Chavez, Armando Rodriguez, Steven Soto
+\end{center}
+\end{titlepage}
+% --- END TITLE PAGE ---
+
+% --- TABLE OF CONTENTS ---
+\pagenumbering{roman} % Roman numerals for TOC
+\onecolumn            % Force TOC to be full width
+\tableofcontents
+\newpage
+% -------------------------
+
+\twocolumn            % Switch back to IEEE standard 2-column
+\pagenumbering{arabic}% Start page 1 here
+\setcounter{page}{1}
+\maketitle
+
+
+\begin{IEEEkeywords}
+Raspberry Pi, Arduino, SCADA, DCS, Wi-Fi, Consumer-Grade, Automation
+\end{IEEEkeywords}
+
+\input{sec/0_abstract}
+\subfile{sec/1_intro}
+\subfile{sec/2_background}
+\subfile{sec/3_related_work}
+\subfile{sec/4_req_and_spec}
+\subfile{sec/5_design}
+\subfile{sec/6_int_and_test}
+\subfile{sec/7_standards}
+\subfile{sec/8_planning}
+\subfile{sec/9_conc}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}

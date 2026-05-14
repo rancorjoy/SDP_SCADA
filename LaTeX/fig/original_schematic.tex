@@ -1,0 +1,290 @@
+\begin{circuitikz}
+
+% Arduino
+\node [draw,
+    fill=Peach!30,
+    minimum width=5cm,
+    minimum height=4cm,
+] at (0, -4.25) (Arduino) {Arduino UNO Rev3};	
+
+% TankA
+\node [draw,
+    fill=Cerulean!30,
+    minimum width=5cm,
+    minimum height=4cm,
+] (TankA) {Tank A: Utility Tank};
+
+% TankB
+\node [draw,
+    fill=Cerulean!30,
+    minimum width=5cm,
+    minimum height=4cm,
+    above=3cm of TankA,
+] (TankB) {Tank B: Storage Tank};
+
+% Arduino East Positions
+\coordinate (east_up2) at ([yshift=14pt]Arduino.east);
+\coordinate (east_up1) at ([yshift=7pt]Arduino.east);
+\coordinate (east_down) at ([yshift=-7pt]Arduino.east);
+
+% TankA Water Level Sensor Wire
+\draw[-{Latex}] (2.5, -1.25) -- (3.3, -1.25) coordinate (tsa) -- (tsa|-east_up2) -- (east_up2);
+% Flow Rate Sensor Up Wire
+\draw[-{Latex}] (3.5, 5) -- (5, 5) -- (5, -1.25) coordinate (fsa) -- (fsa|-east_up1) -- (east_up1);
+% TankB Water Level Sensor Wire
+\draw[-{Latex}] (2.5, 8.25) -- (5.3, 8.25) -- (5.3, -1.25) coordinate (tsb) -- (tsb|-Arduino.east) -- (Arduino.east);
+% Flow Rate Sensor Down Wire
+\draw[-{Latex}] (-3.5, 5) -- (-5, 5) -- (-5, 9.3) -- (5.6, 9.3) coordinate (fsb) -- (fsb|-east_down) -- (east_down);
+
+% TankA Water Level Sensor
+\fill[white] (2,-0.75) rectangle (3,-1.75);
+\draw (2,-0.75) rectangle (3,-1.75);
+\node[align=right] at (3.75,-0.7) (TankA_level) {Water Level\\ Sensor};
+
+% TankB Water Level Sensor
+\fill[white] (2,7.75) rectangle (3,8.75);
+\draw (2,7.75) rectangle (3,8.75);
+\node at (3.8,9.65) (TankB_level) {Water Level Sensor};
+
+% Valve Pipe
+  % Outer black outline
+  \draw[line width=2.4mm, black]
+      (TankB.south) --
+      (TankA.north);
+
+  % Inner colored pipe
+  \draw[line width=2mm, Cerulean!30]
+      ([yshift= 5pt]TankB.south) --
+      ([yshift=-5pt]TankA.north);
+      
+% Left Pipe
+  % Outer black outline
+  \draw[line width=2.4mm, black]
+      (TankB.west) --
+      ($(TankB.west)+(-1,0)$) --
+      ($(TankA.west)+(-1,0)$) --
+      (TankA.west);
+
+  % Inner colored pipe
+  \draw[line width=2mm, Cerulean!30]
+      ([xshift=5pt]TankB.west) --
+      ($(TankB.west)+(-1,0)$) --
+      ($(TankA.west)+(-1,0)$) --
+      ([xshift=5pt]TankA.west);
+      
+% Right Pipe
+  % Outer black outline
+  \draw[line width=2.4mm, black]
+      (TankB.east) --
+      ($(TankB.east)+(1,0)$) --
+      ($(TankA.east)+(1,0)$) --
+      (TankA.east);
+
+  % Inner colored pipe
+  \draw[line width=2mm, Cerulean!30]
+      ([xshift=-5pt]TankB.east) --
+      ($(TankB.east)+(1,0)$) --
+      ($(TankA.east)+(1,0)$) --
+      ([xshift=-5pt]TankA.east);
+
+% Valve
+  \coordinate(valvePos) at (-0.75,2.5);	
+  % White Circle
+  \node[draw,
+      circle,
+      minimum size=1cm,
+      draw=White,
+      fill=White] (back_circle) at ($(valvePos)+(1,1)$){};
+  % Main valve body - two triangles meeting at center
+  % Bottom triangle (pointing up)
+  \draw[thick, fill=white] (valvePos) -- ++(1.5,0) -- ++(-0.75,1) -- cycle;
+  % Top triangle (pointing down)
+  \draw[thick, fill=white] (valvePos) ++(0, 2) -- ++(1.5,0) -- ++(-0.75,-1) -- cycle;
+  
+  % Solenoid block on the right
+  \draw[thick, fill=gray!20] ($(valvePos)+(2,0.5)$) rectangle ($(valvePos)+(2.8,1.5)$);
+  \node at ($(valvePos)+(2.4,1)$) {\textbf{S}};
+  
+  % Connection from solenoid to valve meeting point
+  \draw[thick] ($(valvePos)+(2,1)$) -- ($(valvePos)+(0.75,1)$);
+  
+  % Label
+  \node[align=left] at ($(valvePos)+(-1,1.5)$) {Solenoid\\ Valve};
+	
+	
+	
+% Power Section
+\coordinate (powerPos) at (-4.25, -9);
+\draw[dashed] ($(powerPos)+(0.75,1.5)$) rectangle ($(powerPos)+(7.75, -4)$);
+
+% Mosfets
+\draw ($(powerPos)+(1,0)$) node (mosfet1) [nfet, anchor=G] {$Q_1$};
+\draw (mosfet1.S) -- ++(0, -0.5) coordinate(S1);
+\draw (mosfet1.D) [short, -|] to ++(0,0.15) node[above]{5V};
+\coordinate (arduino_up) at ([yshift=7pt]Arduino.west);
+\draw[{Latex}-] (mosfet1.G) -- ++ (-2, 0) coordinate (S1b)-- (S1b |- arduino_up) -- (arduino_up);
+
+\draw ($(powerPos)+(3,0)$) node (mosfet2) [nfet, anchor=G] {$Q_2$};
+\draw (mosfet2.S) -- ++(0, -0.5) coordinate(S2);
+\draw (mosfet2.D) [short, -|] to ++(0,0.15) node[above]{5V};
+\draw[{Latex}-] (mosfet2.G) -- ++(0, 2) -- ++(-3.7,0) coordinate (S2b) -- (S2b |- Arduino.west) -- (Arduino.west);
+
+
+\draw ($(powerPos)+(5,0)$) node (mosfet3) [nfet, anchor=G] {$Q_3$};
+\draw (mosfet3.S) -- ++(0, -0.5) coordinate(S3);
+\draw (mosfet3.D) [short, -|] to ++(0,0.15) node[above]{5V};
+\coordinate (arduino_down) at ([yshift=-7pt]Arduino.west);
+\draw[{Latex}-] (mosfet3.G) -- ++(0, 2.3) -- ++ (-5.4,0) coordinate (S3b) -- (S3b |- arduino_down) -- (arduino_down);
+
+
+% Relay 1
+\coordinate (relay1coil) at (S1);
+
+	% Coil - draws downward from relay1coil, with bottom grounded
+	\draw (relay1coil) to[inductor] ++(0,-2) node[ground]{};
+
+	% Normally open switch positioned to the right of the coil
+	\draw ($(relay1coil)+(0.7,0)$) coordinate (relay1top) to[nos] ++(0,-2) coordinate (relay1bottom);
+
+	% Dashed line showing mechanical linkage
+	\draw[dashed] ($(relay1coil)+(0,-1)$) -- ($(relay1coil)+(0.7,-1)$);
+
+	% Box around relay assembly (optional)
+	\draw ($(relay1coil)+(-0.4,-0.25)$) rectangle ($(relay1coil)+(1.1,-1.75)$);
+	
+% Relay 2
+\coordinate (relay2coil) at (S2);
+
+	% Coil - draws downward from relay1coil, with bottom grounded
+	\draw (relay2coil) to[inductor] ++(0,-2) node[ground]{};
+
+	% Normally open switch positioned to the right of the coil
+	\draw ($(relay2coil)+(0.7,0)$) coordinate (relay2top) to[nos] ++(0,-2) coordinate (relay2bottom);
+
+	% Dashed line showing mechanical linkage
+	\draw[dashed] ($(relay2coil)+(0,-1)$) -- ($(relay2coil)+(0.7,-1)$);
+
+	% Box around relay assembly (optional)
+	\draw ($(relay2coil)+(-0.4,-0.25)$) rectangle ($(relay2coil)+(1.1,-1.75)$);
+	
+% Relay 3
+\coordinate (relay3coil) at (S3);
+
+	% Coil - draws downward from relay1coil, with bottom grounded
+	\draw (relay3coil) to[inductor] ++(0,-2) node[ground]{};
+
+	% Normally open switch positioned to the right of the coil
+	\draw ($(relay3coil)+(0.7,0)$) coordinate (relay3top) to[nos] ++(0,-2) coordinate (relay3bottom);
+
+	% Dashed line showing mechanical linkage
+	\draw[dashed] ($(relay3coil)+(0,-1)$) -- ($(relay3coil)+(0.7,-1)$);
+
+	% Box around relay assembly (optional)
+	\draw ($(relay3coil)+(-0.4,-0.25)$) rectangle ($(relay3coil)+(1.1,-1.75)$);
+	
+%Relay Grounds
+\draw (relay1top) -- ++(0, 0.5) -- ++(0.65, 0) node[ground]{};
+\draw (relay2top) -- ++(0, 0.5) -- ++(0.65, 0) node[ground]{};
+\draw (relay3top) -- ++(0, 0.5) -- ++(0.65, 0) node[ground]{};
+
+%Relay to Powered Elements
+\draw (relay1bottom) -- ++(0, -1.2) -- ++ (-4, 0) -- ++(0, 15.25) -- ++(1.75, 0) coordinate (pumpL);
+\draw (relay3bottom) -- ++(0, -1.2) -- ++ (4, 0) -- ++(0, 15.25) -- ++(-0.6, 0) coordinate (end1)
+	[open] to ++(-1.2, 0) coordinate (end2) -- ++(-0.6, 0);
+\coordinate (s_h) at (0, 3.5);
+\draw (relay2bottom) -- ++(0, -1.5) -- ++ (6.3, 0) coordinate (r2b) -- (r2b |-s_h) -- ++(-0.9,0) coordinate (end3)
+	[open] to ++(-1.2, 0) coordinate (end4) -- ++(-0.65,0) coordinate (end5) [open] to ++(-0.85, 0) coordinate (end6)
+	-- ++(-1.1, 0);
+
+\draw[dashed, Gray] (end1) -- (end2);
+\draw[dashed, Gray] (end3) -- (end4);
+\draw[dashed, Gray] (end5) -- (end6);
+
+
+%12V Connections
+\draw ($(pumpL)+(0, 0.5)$) -- ++(-0.4, 0) [short, -|] to ++(0, 0.4) node[above]{12V};
+\draw ($(end2)+(-0.6, 0.5)$) -- ++(0.4, 0) [short, -|] to ++(0, 0.4) node[above]{12V};
+\draw ($(end6)+(-1.1, 0.25)$) -- ++(0.4, 0) [short, -|] to ++(0, 0.4) node[above]{12V};
+ 
+ 
+ 
+ 
+ 
+ % Right Pump
+		\coordinate(left_pumpPos) at (3.5, 2);
+		% Rectangle behind
+        \draw[fill=gray!20] ($(left_pumpPos)+(-0.4,-0.8)$) rectangle ($(left_pumpPos)+(0.4,0.8)$);
+
+        % Circle (on top)
+        \draw[fill=white, thick] ($(left_pumpPos)+(0,0)$) circle (0.6);
+
+        % Up arrow inside the circle
+        \draw[thick] ($(left_pumpPos)+(0,-0.3)$) -- ($(left_pumpPos)+(0,0.3)$);
+        \draw[thick] ($(left_pumpPos)+(-0.2,0.1)$) -- ($(left_pumpPos)+(0,0.3)$) -- ($(left_pumpPos)+(0.2,0.1)$);
+        
+         % Label
+    		%\node[align=left] at ($(left_pumpPos)+(3.5,0.75)$) {Water Pump};
+        
+% Left Pump
+		\coordinate(right_pumpPos) at (-3.5, 2);
+		% Rectangle behind
+        \draw[fill=gray!20] ($(right_pumpPos)+(-0.4,-0.8)$) rectangle ($(right_pumpPos)+(0.4,0.8)$);
+
+        % Circle (on top)
+        \draw[fill=white, thick] ($(right_pumpPos)+(0,0)$) circle (0.6);
+
+        % Down arrow inside the circle
+        \draw[thick] ($(right_pumpPos)+(0,-0.3)$) -- ($(right_pumpPos)+(0,0.3)$);
+        \draw[thick] ($(right_pumpPos)+(-0.2,-0.1)$) -- ($(right_pumpPos)+(0,-0.3)$) -- ($(right_pumpPos)+(0.2,-0.1)$);
+        
+        % Label
+    		\node[align=left] at ($(right_pumpPos)+(-2.45, 0.3)$) {Water Pump};
+
+% Right Flow Sensor
+	% Flow sensor symbol centered at (flowPos)
+	\begin{scope}
+    		\coordinate (flowPos) at (3.5,5);
+
+		% Fill circle behind
+		\fill[white] (flowPos) circle (0.6);
+
+    		% Clip everything to the front circle
+    		\begin{scope}
+        		\clip (flowPos) circle (0.6);
+
+        		% Two behind circles
+        		\draw[thick] ($(flowPos)+(-0.6,0)$) circle (0.45);
+        		\draw[thick] ($(flowPos)+(0.6,0)$) circle (0.45);
+    		\end{scope}
+
+    		% Front circle border
+    		\draw[thick] (flowPos) circle (0.6);
+    		
+    		% Label
+    		\node[align=left] at ($(flowPos)+(3.25,1)$) {Flow Rate\\ Sensor};
+	\end{scope}
+
+% Left Flow Sensor
+	% Flow sensor symbol centered at (flowPos)
+	\begin{scope}
+    		\coordinate (flowPos) at (-3.5,5);
+
+		% Fill circle behind
+		\fill[white] (flowPos) circle (0.6);
+
+    		% Clip everything to the front circle
+    		\begin{scope}
+        		\clip (flowPos) circle (0.6);
+
+        		% Two behind circles
+        		\draw[thick] ($(flowPos)+(-0.6,0)$) circle (0.45);
+        		\draw[thick] ($(flowPos)+(0.6,0)$) circle (0.45);
+    		\end{scope}
+
+    		% Front circle border
+    		\draw[thick] (flowPos) circle (0.6);
+    		
+    		% Label
+    		\node[align=right] at ($(flowPos)+(-2.75,1)$) {Flow Rate\\ Sensor};
+	\end{scope}
+\end{circuitikz}
