@@ -48,7 +48,7 @@ This code is free to use for any purposes, such as modification or improvement. 
 If you found this paper or code to be useful or interesting and would like to cite it or derive from it, the citation (in BibTex) is shown below. This paper is not published as it is a class paper however it will be hosted here indefinitely:
 ```
 @misc{SCADA_paper,
-  author       = {Brandon Esebag, Karina Francis, Marlene Pimienta Herrera,\\ Carlos Chavez, Armando Rodriguez, Steven Soto},
+  author       = {Brandon Esebag, Karina Francis, Marlene Pimienta Herrera, Carlos Chavez, Armando Rodriguez, Steven Soto},
   title        = {Open Source SCADA and DCS System on Raspberry Pi Model 4 and Arduino Mega 2560 R3},
   year         = {2026},
   publisher    = {GitHub},
