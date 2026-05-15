@@ -1,4 +1,4 @@
-# obSTAtten: overlapping-block Spiking Transformer with Spatial-Temporal Attention
+# SDP_SCADA: A simple mini-scada system for Raspberry Pi deployment and Arduino controller usage
 
 <p align="center">
 <img src="GUI_1.PNG" width="500">
