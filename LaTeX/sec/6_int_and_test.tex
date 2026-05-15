@@ -50,7 +50,16 @@ V_{analog} = \text{ADC}_{val}\cdot\frac{V_{in}}{1024}
 V_{analog} = 824\cdot\frac{5~\text{V}}{1024}\approx 4.02~\text{V}
 \end{equation}
 
- From testing both physical resistance from multimeter and serially printed Analog Values we were able to verify and calculate the minimum and maximum ranges of our system’s water level.
+To confirm this finding, these calculations can be run in the reverse direction, returning the original input voltage, shown below. From testing both physical resistance from multimeter and serially printed Analog Values we were able to verify and calculate the minimum and maximum ranges of our system’s water level.
+
+\begin{equation}
+V_{in}=V_{analog}\cdot\frac{560\Omega+R_{sense}}{R_{sense}}
+\end{equation}
+
+\begin{equation}
+V_{in}=4.02~\text{V}\cdot\frac{560\Omega+2.2~k\Omega}{2.2~k\Omega}\approx5.04~\text{V}
+\end{equation}
+
 
 \subsubsection{Testing of Flow Rate Sensor}
 While not used in the final implementation of the project, a flow rate sensor was also used which sent variable length pulses to the Arduino’s digital input based on the rate of water flowing through the sensor. In order to verify results of the flow rate sensor and operational code we took timed trials of the system filling a 1.5 Liter bottle and divided the volume of the bottle by the time it took to fill the bottle in minutes to get the Liters per minute flow rate of our pumps. We verified that the pumps were operating far below the advertised 4 L/min and were consistently running at 0.78 L/min which was consistent with the numbers observed on the Arduino IDE Serial Terminal.

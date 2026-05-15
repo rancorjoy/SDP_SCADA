@@ -60,5 +60,51 @@ To isolate our network (for SSH and GUI connection purposes), a TP-Link nano-rou
 \clearpage
 
 \subsection{Software Design}
+The design of the SCADA software was done in piece-wise as new features were added, however the code-base utilizes multithreading to ensure all asynchronous operations are non-blocking to the main thread. The code-base is comprised of the following major sections.
+
+\subsubsection{Main Thread} The main thread (and entry point) is the contained in the executable SCADA.py. When this is initialized it will ensure a data path (outside of the repository path) is established for data and settings to be stored inside of on the host system. It will then initialize all other needed threads and facilitate pass-by-reference communication with and between all other threads.
+
+\subsubsection{Serial Thread} The serial (monitor) thread is the first thread to launch, it continuously monitors the host system's serial ports, updating the main thread when connection or disconnection events occur. This allows the main thread to run a set of functions for each event to determine whether the detection is an Arduino or if it should be ignored.
+
+\subsubsection{Flask Thread} The Flask thread launches a Flask backend-server that accepts POST commands (and filters inputs for invalid requests), this is the entry point to the software, both the CLI and the GUI simply access exposed commands in the Flask thread and it facilitates the rest of the SCADA-side logic. This thread also opens port 5000 for CLI and GUI connections.
+
+\subsubsection{Worker Thread(s)} When a serial connection event is detected in the main thread, and this connection happens to be an Arduino, a worker thread is created for the Arduino' port. This thread both sends hold commands requested (via the Flask thread) and collects data at a user-specified polling rate and stores it in the SQL database (in the created data-path). This thread terminates itself when the Arduino is disconnected.
+
+\subsubsection{Controller Initialization} When a controller is connected for the first time, a JSON file containing all port configurations, user defined code blocks and settings is saved with default settings into the data path in a folder called ``dcs\_info". This and all settings modifications are defined in a python file called dcs\_dict\_utils which is by far the longest back-end file in this project. The functions in this section determine rules for pin and point interactions and settings, as well as the use of arrays, timers, ISRs and more. The combination(s) of settings achievable is detailed enough for code-generation, but there would be no implemented logic.
+
+\subsubsection{Code Blocks} Code blocks are semi-generically typed blocks that can be placed into any region in the controller's code, such as setup, loop, and inside of any ISR. The available ISRs are kept in a list (via many functions working in tandem within dcs\_dict\_utils) and update based on pin-driven interrupt settings and timer settings. Code blocks, such as the addition block, have some inputs (the two input numbers in this case), sometimes a number of outputs (in this case the sum), and a slot for a boolean variable that is used as a conditional statement. Some code blocks require an array as an input or output and cannot accept a point.
+
+\subsubsection{Points} Points as defined in the code-base are essentially software variables that can represent hardware (such as the points locked to pins or timer registers) or can be user defined (such as a user defined int, float, or bool). Points can be held over serial (via the worker threads) to a user-defined value, and points can be configured with a minimum and maximum. Internally to the Arduino, all points are a 5-value struct, but they are treated as a single variable using getter and setter commands (in generated code).
+
+\subsubsection{Code Validation} Before code can be generated, many simple rules are evaluated to determine whether the user-defined code-script makes sense. For example, a point being the output of two code-blocks causes a conflict, as such the validation will return a string listing that error. When an empty string is returned, the code-generation pipeline can proceed.
+
+\subsubsection{Code Generation} Using the configuration generated from the rules in dcs\_dict\_utils, and using the code-block logic defined in code\_block\_utils, the file ino\_utils can be used to generate (mostly) feature complete Arduino AVR C++ code. All points and arrays get defined at the top and evaluated for whether they need to be constants or volatile based on the user-defined settings saved to file. Then a generic form of each code block (only those used at least once) is defined once in setup. Then in each section code-blocks were placed, a call to that block using the point getter function for each input (except for arrays) is used, and the outputs are assigned via the point setter function. Finally at the end of loop the Arduino is told to print all point values so that the worker thread can log them, and checks if the worker thread wrote a hold command which gets set to the specified point.
+
+\subsubsection{Uploading Code to an Arduino} Once an ino file is generated (which will share the same name as the controller in question), upon command the Flask server can push a queue request for a controller to be flashed by port name, this is passed to the main thread where the main thread passes it to both the worker in question and the flash thread. The worker must close its port before the flash thread can continue, but regains port control once flashing is complete (or fails).
+
+\subsubsection{Command Line Interface}
+During development and debugging the CLI was used to interact with the Flask server. Though the CLI is feature complete in terms of usability, it is far less pleasant than the GUI. The GUI was one of the last features added to the code, which meant the CLI received a lot of use. To use the CLI it can be run as a separate python file on the host machine, and when `help' is entered it lists all valid commands.
+
+\subsubsection{Graphical User Interface}
+The GUI is a simple web-UI that is launched at localhost:5000 on the host machine, and can be accessed by typing ``http://\{ip\}:5000" into the searchbar of any browser where \{ip\} is the local IP address of the host system, or ``localhost" if launching from the host system. This GUI allows the code-block system to be used as a visual code editor, compiled and uploaded with the push of two buttons, and verified with live-updating and historical plotting for all connected controllers simultaneously.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 \end{document}

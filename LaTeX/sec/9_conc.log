@@ -1,9 +1,9 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (MiKTeX 24.4) (preloaded format=pdflatex 2026.5.12)  14 MAY 2026 18:59
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (MiKTeX 24.4) (preloaded format=pdflatex 2026.5.12)  14 MAY 2026 19:33
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
-**./5_design.tex
-(5_design.tex
+**./9_conc.tex
+(9_conc.tex
 LaTeX2e <2024-11-01> patch level 1
 L3 programming layer <2024-12-25>
 
@@ -963,8 +963,8 @@ ckend-pdftex.def
 File: l3backend-pdftex.def 2024-05-08 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count339
 \l__pdf_internal_box=\box74
-) (5_design.aux)
-\openout1 = `5_design.aux'.
+) (9_conc.aux)
+\openout1 = `9_conc.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 4.
 LaTeX Font Info:    ... okay on input line 4.
@@ -1013,69 +1013,11 @@ pdf-sys.cfg
 File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 ))
 Package hyperref Info: Link coloring OFF on input line 4.
- (5_design.out) (5_design.out)
+ (9_conc.out) (9_conc.out)
 \@outlinefile=\write4
-\openout4 = `5_design.out'.
-
- (../fig/hw_tabs.tex
-LaTeX Font Info:    Trying to load font information for U+msa on input line 18.
+\openout4 = `9_conc.out'.
 
 
-(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.
-fd
-File: umsa.fd 2013/01/14 v3.01 AMS symbols A
-)
-LaTeX Font Info:    Trying to load font information for U+msb on input line 18.
-
-
-(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.
-fd
-File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-)
-LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 1
-80.
-
-(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/psnfss\ot1pcr.
-fd
-File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
-))
-
-
-
-[1
-
-{C:/Users/Brandon Esebag/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}{C:/U
-sers/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/base/8r.enc}
-
-] [2]
-<../fig/Initial_Schem.png, id=131, 459.7175pt x 317.185pt>
-File: ../fig/Initial_Schem.png Graphic file (type png)
-<use ../fig/Initial_Schem.png>
-Package pdftex.def Info: ../fig/Initial_Schem.png  used on input line 47.
-(pdftex.def)             Requested size: 645.0pt x 445.04811pt.
- [3 <../fig/Initial_Schem.png>]
-<../fig/Final_Schem.png, id=139, 463.23062pt x 319.1925pt>
-File: ../fig/Final_Schem.png Graphic file (type png)
-<use ../fig/Final_Schem.png>
-Package pdftex.def Info: ../fig/Final_Schem.png  used on input line 56.
-(pdftex.def)             Requested size: 645.0pt x 444.4799pt.
- [4 <../fig/Final_Schem.png>]
-Underfull \hbox (badness 1365) in paragraph at lines 69--70
- \OT1/ptm/m/it/10 3) Flask Thread: [][][] \OT1/ptm/m/n/10 The Flask thread laun
-ches a Flask
- []
-
-
-
-LaTeX Font Info:    Trying to load font information for OMS+ptm on input line 8
-9.
-
-(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/psnfss\omsptm.
-fd
-File: omsptm.fd 
-)
-LaTeX Font Info:    Font shape `OMS/ptm/m/n' in size <10> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 89.
 
 
 ** Conference Paper **
@@ -1090,47 +1032,39 @@ Before submitting the final camera ready copy, remember to:
 
 
 
-[5
+[1
 
-
-
-
-] (5_design.aux)
+{C:/Users/Brandon Esebag/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}{C:/U
+sers/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/base/8r.enc}]
+ (9_conc.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 1
 L3 programming layer <2024-12-25>
  ***********
 
 
-Package rerunfilecheck Warning: File `5_design.out' has changed.
+Package rerunfilecheck Warning: File `9_conc.out' has changed.
 (rerunfilecheck)                Rerun to get outlines right
 (rerunfilecheck)                or use package `bookmark'.
 
-Package rerunfilecheck Info: Checksums for `5_design.out':
-(rerunfilecheck)             Before: C26068F2B4936A859EAB1C72BE6A9BDB;3581
-(rerunfilecheck)             After:  B923FBC32533FBE9640C25E4B7792ECF;3802.
+Package rerunfilecheck Info: Checksums for `9_conc.out':
+(rerunfilecheck)             Before: 2F9B51D5935E8C8EF0107660D035AE9A;1035
+(rerunfilecheck)             After:  E24B8CB2E13855E78279640927D4B278;1412.
  ) 
 Here is how much of TeX's memory you used:
- 41457 strings out of 473497
- 995691 string characters out of 5708694
- 1635100 words of memory out of 5000000
- 64170 multiletter control sequences out of 15000+600000
- 592072 words of font info for 101 fonts, out of 8000000 for 9000
+ 41250 strings out of 473497
+ 991774 string characters out of 5708694
+ 1621656 words of memory out of 5000000
+ 64028 multiletter control sequences out of 15000+600000
+ 583845 words of font info for 80 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 104i,17n,104p,983b,458s stack positions out of 10000i,1000n,20000p,200000b,200000s
-<C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/ams
-fonts/cm/cmr6.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/
-type1/public/amsfonts/cm/cmr8.pfb><C:/Users/Brandon Esebag/AppData/Local/Progra
-ms/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Users/Brandon Esebag/Ap
-pData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/Users/
-Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/urw-base35/ucrr
-8a.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/publi
-c/urw-base35/utmb8a.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/
-fonts/type1/public/urw-base35/utmr8a.pfb><C:/Users/Brandon Esebag/AppData/Local
-/Programs/MiKTeX/fonts/type1/public/urw-base35/utmri8a.pfb>
-Output written on 5_design.pdf (5 pages, 428355 bytes).
+ 104i,5n,104p,928b,439s stack positions out of 10000i,1000n,20000p,200000b,200000s
+<C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/urw
+-base35/utmr8a.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts
+/type1/public/urw-base35/utmri8a.pfb>
+Output written on 9_conc.pdf (1 page, 40143 bytes).
 PDF statistics:
- 198 PDF objects out of 1000 (max. 8388607)
- 40 named destinations out of 1000 (max. 500000)
- 231 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 58 PDF objects out of 1000 (max. 8388607)
+ 11 named destinations out of 1000 (max. 500000)
+ 69 words of extra memory for PDF output out of 10000 (max. 10000000)
 
