@@ -6,6 +6,22 @@
 \section{Standards and Constraints}
 \label{sec:standards}
 
+\noindent\textbf{Standard:} International Society of Automation (ISA). ISA112: Supporting SCADA System Reliability. International Society of Automation, 2023. 
+
+\noindent\textbf{Justification:} We chose ISA-112 as it provides guidelines for the design, implementation, reliability, and maintenance of SCADA systems. Since this project is a low-cost SCADA system we decided to use the standard to guide the system’s architecture and added features that resonate with ISA112. We added valves to our pumps to ensure there would be no risks of leaks, we also added an emergency dump valve to use if the system would ever fail, we had a manual way to dump the water. Features such as these backups and valves, add a level of security to ensure if errors would occur, we had ways to deal with them.
+
+\noindent\textbf{Standard:} IEEE 802.11: Wireless LAN Medium Access Control (MAC) and Physical Layer (PHY) Specifications. Institute of Electrical and Electronics Engineers, IEEE Standards Association. 
+
+\noindent\textbf{Justification:} This standard defines how wireless devices communicate over Wi-Fi networks. Originally since we wanted our project to be wireless, we would have followed this standard as it was made so different manufacturers can communicate reliably using the same networking rules. Although we ended up not following this standard due to us utilizing wired connections between the Arduino and laptop. If we had stuck to wireless communication, IEEE 802.11 defines the protocols to ensure wireless data transmission, which is important as a SCADA system heavily operates on moving data around.
+
+\noindent\textbf{Standard:} IEEE Std 1615-2019, IEEE Recommended Practice for Network Communication in Electric Power Substations. 
+
+\noindent\textbf{Justification:} This standard details the use of TCP/IP Ethernet connections for communication in SCADA control systems. This standard recommends utilizing Ethernet switches and Serial-to-Ethernet converters in wireless networks and SCADA systems. This standard is suitable for our project as we were considering implementing Ethernet controlled DCS support and may consider it as a future work.
+
+\noindent\textbf{Standard:} IEEE Std 3001.11–2017, IEEE Recommended Practice for Application of Controllers and Automation to Industrial and Commercial Power Systems. 
+
+\noindent\textbf{Justification:} This standard details selecting controllers and the application of controllers for industrial systems. For outputs where the pilot controllers supply less voltage than the load needs the standard recommends using relays for the outputs. I anticipate our project following this standard because our project will utilize 5 V for the outputs but most motors and valves require 12 V or 24 V. Therefore we will follow this standard and use a relay to drive the actuator. The second standard employed is: IEEE Std 1615-2019, IEEE Recommended Practice for Network Communication in Electric Power Substations. This standard details the use of TCP/IP or ethernet connections for communication in SCADA control systems. This standard recommends utilizing ethernet switches and serial to ethernet converters in wireless networks for SCADA systems. This standard is suitable for our project because one of our design constraints is to communicate wirelessly between our controller (Raspberry Pi) and a laptop/computer. We also hope to have the Raspberry Pi wirelessly communicate with another plant controller such as an Arduino.
+
 
 
 \end{document}

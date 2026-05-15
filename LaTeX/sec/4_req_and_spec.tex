@@ -3,9 +3,61 @@
 
 \begin{document}
 
-\section{System Overview}
+\section{Requirements and Specifications}
 \label{sec:req_and_spec}
 
+Our SCADA and SDA systems were developed under many self-imposed design constrains, all of which were met during development. This system was publicly demonstrated at the 2026 Cal Poly Pomona Senior Project Symposium in Building 9, 401. 
 
+\noindent\textbf{Hardware Constraints}
+\begin{enumerate}[label=\arabic*.]
+
+\item The system should be able to maintain a water level within a user specified tolerance.
+\item The system should be able to detect water level using an analog sensor.
+\item The system should be able to actuate motors and valves to control the water level and water movement.
+
+\end{enumerate}
+
+\noindent\textbf{Manual Control Constraints}
+\begin{enumerate}[label=\arabic*.]
+
+\item The system should have physical switches that allow hardware actuators to be enabled or disabled.
+\item The system should have an emergency off switch to kill all actuator power without unpowering the SCADA system.
+\item The system should have software override capabilities (software point holds) that allow the user to hold a variable (such as a sensor reading or output) at a certain specified level.
+
+\end{enumerate}
+
+\noindent\textbf{Internal Control Constraints}
+\begin{enumerate}[label=\arabic*.]
+
+\item Each DCS should be able to control its actuators based on sensor input and user configured logical conditions.
+\item All intermediate variables should be reported to the SCADA system for logging and display.
+
+
+\end{enumerate}
+
+\noindent\textbf{Communication Constraints}
+\begin{enumerate}[label=\arabic*.]
+
+\item The SCADA system is connected to all active DCS systems via USB serial connection.
+\item The SCADA system can be accessed over local WIFI for control and data retrieval.
+\item The SCADA system can be accessed by SSH for headless control and CLI usage.
+
+\end{enumerate}
+
+\noindent\textbf{Software Constraints and Requirements}
+\begin{enumerate}[label=\arabic*.]
+
+\item The SCADA software will feature both CLI and GUI user control that can be accessed locally or over the web (within local network).
+\item The SCADA software will be self-deploying when ran, creating all folders and needed files at a user specified file location which can be moved.
+\item The SCADA software will be multi-threaded such that user commands do not block server/supervisor operations.
+\item The SCADA software will feature a \textbf{serial monitoring} thread to make serial connection management and detection non-blocking.
+\item The SCADA software will feature a \textbf{FLASK back-end} thread to make user input and requests non-blocking.
+\item The SCADA software will feature a \textbf{flashing} thread to make writing code to Arduino AVR boards non-blocking. This will use the Arduino IDE CLI.
+\item The SCADA software will feature a feature complete code-block logic system with C++ code-generation. This should feed into the \textbf{flashing} thread via an upload pipeline.
+\item The SCADA software should feature a functionally complete CLI that can access server commands.
+\item The SCADA software should feature a functionally complete GUI that can utilize server commands to display information to the user.
+
+
+\end{enumerate}
 
 \end{document}

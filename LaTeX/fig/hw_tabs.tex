@@ -1,0 +1,201 @@
+% Ragged-right paragraph column (avoids hyphenation pressure)
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+ 
+% Header style: bold, top-left, no extra gap
+\renewcommand\theadfont{\bfseries\small}
+\renewcommand\theadgape{}
+
+% ==============================================================
+% TABLE I — Sensors
+% ==============================================================
+\begin{table*}[p]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.4}
+  \setlength{\tabcolsep}{5pt}
+  \caption{Sensors chosen for the control system.}
+  \label{tab:sensors}
+  \begin{tabular}{|P{1.8cm}|P{2.6cm}|P{5.8cm}|P{5.8cm}|}
+    \hline
+    \makecell[tl]{Sensor}
+      & \makecell[tl]{Item Name}
+      & \makecell[tl]{Role}
+      & \makecell[tl]{Implementation Details} \\
+    \hline
+    Water Level Sensor
+      & \textbf{Robot Contact Water/Liquid Level Sensor}
+      & Detects if water in the tank reaches a high or low point.
+        Prevents overfilling or running dry.
+      & Optical sensor output (HIGH/LOW). Connect to GPIO input.
+        Can trigger pump ON/OFF automatically. \\
+    \hline
+    Flow Rate Sensor
+      & \textbf{1/4'' Water Flow Sensor (Hall-Effect)}
+      & Measures water flow rate in L/min to ensure the pump is
+        moving water and to calculate total volume.
+      & Generates digital pulses proportional to flow.
+        Connect to GPIO input; count pulses using interrupt. \\
+    \hline
+    Temperature Sensor
+      & \textbf{NTC Thermistor 10\,k$\Omega$ MF52-103}
+      & Measures the water temperature.
+        Can detect overheating or environmental changes.
+      & Analog sensor. Use an ADC module (e.g.\ MCP3008) to read
+        voltage, then convert to temperature in code. \\
+    \hline
+  \end{tabular}
+\end{table*}
+ 
+ 
+% ==============================================================
+% TABLE II — Actuators
+% ==============================================================
+\begin{table*}[p]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.4}
+  \setlength{\tabcolsep}{5pt}
+  \caption{Actuators used in the control system.}
+  \label{tab:actuators}
+  \begin{tabular}{|P{1.8cm}|P{3.2cm}|P{5.2cm}|P{5.8cm}|}
+    \hline
+    \makecell[tl]{Actuator}
+      & \makecell[tl]{Item Name}
+      & \makecell[tl]{Role}
+      & \makecell[tl]{Implementation Details} \\
+    \hline
+    Water Pump
+      & \textbf{HiLetgo DC 12\,V 240\,L/h Micro Brushless Pump}
+      & Pumps water into or out of the tank.
+        Controlled automatically based on level sensor input.
+      & Connect through the Pump Controller (relay/MOSFET)
+        that switches the 12\,V power. \\
+    \hline
+    Hydraulic Valve
+      & \textbf{1/4'' DC 12\,V 2-Way Normally Closed Solenoid
+               Valve (WIC Valve 2ACK Series)}
+      & Opens/closes to allow or stop water flow.
+      & Controlled through the Valve Controller.
+        When the coil is energized, the valve opens;
+        otherwise, it closes. \\
+    \hline
+  \end{tabular}
+\end{table*}
+ 
+ 
+% ==============================================================
+% TABLE III — Controllers
+% ==============================================================
+\begin{table*}[p]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.4}
+  \setlength{\tabcolsep}{5pt}
+  \caption{Modules interfacing the Raspberry Pi with actuators.}
+  \label{tab:controllers}
+  \begin{tabular}{|P{2cm}|P{2.2cm}|P{5.8cm}|P{5.8cm}|}
+    \hline
+    \makecell[tl]{Controller}
+      & \makecell[tl]{Connected To}
+      & \makecell[tl]{Role}
+      & \makecell[tl]{Implementation} \\
+    \hline
+    Pump Controller
+      & Water Pump
+      & Acts as a switch driver---receives a 3.3\,V signal from
+        the Pi to toggle 12\,V power to the pump.
+      & Can be a relay board or a MOSFET circuit.
+        Isolates the Pi from the high-power pump. \\
+    \hline
+    Valve Controller
+      & Hydraulic Valve
+      & Same principle as the Pump Controller, but for
+        opening/closing the valve.
+      & When Pi output is HIGH $\rightarrow$ coil energized
+        $\rightarrow$ valve opens.
+        When LOW $\rightarrow$ valve closes. \\
+    \hline
+  \end{tabular}
+\end{table*}
+ 
+ 
+% ==============================================================
+% TABLE IV — SCADA / HMI
+% ==============================================================
+\begin{table*}[p]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.4}
+  \setlength{\tabcolsep}{5pt}
+  \caption{SCADA / Human--Machine Interface components.}
+  \label{tab:scada}
+  \begin{tabular}{|P{2.4cm}|P{2.4cm}|P{11cm}|}
+    \hline
+    \makecell[tl]{Component}
+      & \makecell[tl]{Role}
+      & \makecell[tl]{Description} \\
+    \hline
+    Laptop / Computer
+      & CLI or GUI
+      & Acts as the human--machine interface (HMI) for remote
+        monitoring and manual control. \\
+    \hline
+    Wireless Communication
+      & Local Area Wifi
+      & Connects the Raspberry Pi to the laptop using Wi-Fi.
+        Can send real-time data or receive control commands. \\
+    \hline
+    Software Options
+      & Data Visualization
+      & \textbf{Flask Web Server:} Allows CLI or GUI to send commands to SCADA.
+        \textbf{Plotly:} Allows GUI to poll SQL database to generate plots.
+        \textbf{SSH:} Remote access for starting and troubleshooting server.\\
+    \hline
+  \end{tabular}
+\end{table*}
+ 
+ 
+% ==============================================================
+% TABLE V — Communication Links (Pi--Arduino)
+% ==============================================================
+\begin{table*}[p]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.4}
+  \setlength{\tabcolsep}{5pt}
+  \caption{Communication link options between the Raspberry Pi and Arduino.}
+  \label{tab:comms}
+  \begin{tabular}{|P{3.2cm}|P{3cm}|P{3cm}|P{6.6cm}|}
+    \hline
+    \makecell[tl]{Link}
+      & \makecell[tl]{Pros}
+      & \makecell[tl]{Cons}
+      & \makecell[tl]{Method} \\
+    \hline
+    \textbf{USB Serial (UART over USB)}
+    \textit{(Recommended)}
+      & Easiest; powered and isolated via cable; stable.
+      & Requires a USB cable.
+      & Connect Arduino to Pi via USB; use
+        \texttt{/dev/ttyACM0} or \texttt{/dev/ttyUSB0}
+        at 115200\,baud. \\
+    \hline
+    \textbf{I$^{2}$C} (Pi master, Arduino slave)
+      & Simple 2-wire interface.
+      & 3.3$\leftrightarrow$5\,V level shifting; address management.
+      & Pi SDA/SCL $\leftrightarrow$ Arduino A4/A5 (Uno);
+        add bi-directional level shifter. \\
+    \hline
+    \textbf{SPI}
+      & Fast throughput.
+      & Chip-select management; level shifting required.
+      & Pi SPI0 $\leftrightarrow$ Arduino SPI pins;
+        level shifter required. \\
+    \hline
+    \textbf{RS-485 (Modbus RTU)}
+      & Long cable runs; noise-robust.
+      & Requires transceivers and protocol stack.
+      & MAX485 modules, twisted-pair cable, Modbus library. \\
+    \hline
+  \end{tabular}
+\end{table*}

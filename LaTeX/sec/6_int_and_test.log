@@ -1,12 +1,23 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (MiKTeX 24.4) (preloaded format=pdflatex 2026.5.12)  14 MAY 2026 18:08
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (MiKTeX 24.4) (preloaded format=pdflatex 2026.5.12)  14 MAY 2026 18:10
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
-**./main.tex
-(main.tex
+**./6_int_and_test.tex
+(6_int_and_test.tex
 LaTeX2e <2024-11-01> patch level 1
 L3 programming layer <2024-12-25>
-(IEEEtran.cls
+
+(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/subfiles\subfi
+les.cls
+Document Class: subfiles 2020/11/14 v2.2 Multi-file projects (class)
+Preamble taken from file `../main.tex'
+
+(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/import\import.
+sty
+Package: import 2020/04/01  v 6.2
+) (../main.tex
+(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/ieeetran\IEEEt
+ran.cls
 Document Class: IEEEtran 2015/08/26 V1.8b by Michael Shell
 -- See the "IEEEtran_HOWTO" manual for usage information.
 -- http://www.michaelshell.org/tex/ieeetran/
@@ -723,11 +734,7 @@ gfcircflow.tex))
 (C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/subfiles\subfi
 les.sty
 Package: subfiles 2020/11/14 v2.2 Multi-file projects (package)
-
-(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/import\import.
-sty
-Package: import 2020/04/01  v 6.2
-))
+)
 (C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/enumitem\enumi
 tem.sty
 Package: enumitem 2019/06/20 v3.9 Customized lists
@@ -950,33 +957,33 @@ Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 2
 85.
 )
 \Hy@SectionHShift=\skip60
-)
+)))
 (C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/l3backend\l3ba
 ckend-pdftex.def
 File: l3backend-pdftex.def 2024-05-08 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count339
 \l__pdf_internal_box=\box74
-) (main.aux)
-\openout1 = `main.aux'.
+) (6_int_and_test.aux)
+\openout1 = `6_int_and_test.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 4.
+LaTeX Font Info:    ... okay on input line 4.
 
 -- Lines per column: 56 (exact).
 
@@ -1005,137 +1012,35 @@ Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
 pdf-sys.cfg
 File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 ))
-Package hyperref Info: Link coloring OFF on input line 33.
- (main.out) (main.out)
+Package hyperref Info: Link coloring OFF on input line 4.
+ (6_int_and_test.out) (6_int_and_test.out)
 \@outlinefile=\write4
-\openout4 = `main.out'.
-
-<com/CPP_Logo.png, id=254, 585.387pt x 291.9708pt>
-File: com/CPP_Logo.png Graphic file (type png)
-<use com/CPP_Logo.png>
-Package pdftex.def Info: com/CPP_Logo.png  used on input line 49.
-(pdftex.def)             Requested size: 204.8885pt x 102.1913pt.
+\openout4 = `6_int_and_test.out'.
 
 
-[0
 
+(../fig/test_tab.tex
+LaTeX Font Info:    Trying to load font information for U+msa on input line 19.
 
-{C:/Users/Brandon Esebag/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}{C:/U
-sers/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/base/8r.enc} 
-<./com/CPP_Logo.png>] (main.toc
-LaTeX Font Info:    Trying to load font information for U+msa on input line 2.
 
 (C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.
 fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 2.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 19.
+
 
 (C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.
 fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
-)
-
-[1
-
-
-])
-\tf@toc=\write5
-\openout5 = `main.toc'.
-
-
-
-[2]
-Overfull \hbox (16.27444pt too wide) in paragraph at lines 84--84
- [] 
- []
-
-
-Overfull \hbox (16.27444pt too wide) in paragraph at lines 84--84
- [] 
- []
-
-
-Overfull \hbox (16.27444pt too wide) in paragraph at lines 84--84
- [] 
- []
-
-(sec/0_abstract.tex) (sec/1_intro.tex
-
-
-
-[1
-
-
-]
-
-) (sec/2_background.tex
-
-[2]
-
-
-
-[3]) (sec/3_related_work.tex
-
-
-Underfull \hbox (badness 2103) in paragraph at lines 15--16
- \OT1/ptm/m/it/10 2) Open-SCADA: [][][] \OT1/ptm/m/n/10 Open-SCADA is an-other 
-open-source
- []
-
-) (sec/4_req_and_spec.tex
-
-[4]) (sec/5_design.tex
-
-(sec/../fig/hw_tabs.tex
-LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 1
-80.
-
-(C:\Users\Brandon Esebag\AppData\Local\Programs\MiKTeX\tex/latex/psnfss\ot1pcr.
-fd
-File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
 ))
 
-[5] [6]
-<sec/../fig/Initial_Schem.png, id=469, 459.7175pt x 317.185pt>
-File: sec/../fig/Initial_Schem.png Graphic file (type png)
-<use sec/../fig/Initial_Schem.png>
-Package pdftex.def Info: sec/../fig/Initial_Schem.png  used on input line 47.
-(pdftex.def)             Requested size: 645.0pt x 445.04811pt.
- [7 <./sec/../fig/Initial_Schem.png>]
-<sec/../fig/Final_Schem.png, id=476, 463.23062pt x 319.1925pt>
-File: sec/../fig/Final_Schem.png Graphic file (type png)
-<use sec/../fig/Final_Schem.png>
-Package pdftex.def Info: sec/../fig/Final_Schem.png  used on input line 56.
-(pdftex.def)             Requested size: 645.0pt x 444.4799pt.
- [8 <./sec/../fig/Final_Schem.png>]) (sec/6_int_and_test.tex
+[1
 
-(sec/../fig/test_tab.tex)
-
-[9
+{C:/Users/Brandon Esebag/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}{C:/U
+sers/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/base/8r.enc}]
 
 
-
-]
-
-) (sec/7_standards.tex
-Underfull \hbox (badness 5578) in paragraph at lines 9--10
-\OT1/ptm/b/n/10 Standard: \OT1/ptm/m/n/10 In-ter-na-tional So-ci-ety of Au-toma
--tion (ISA).
- []
-
-
-
-[10]) (sec/8_planning.tex
-
-<sec/../fig/Gantt.png, id=498, 905.3825pt x 637.88312pt>
-File: sec/../fig/Gantt.png Graphic file (type png)
-<use sec/../fig/Gantt.png>
-Package pdftex.def Info: sec/../fig/Gantt.png  used on input line 17.
-(pdftex.def)             Requested size: 232.19843pt x 163.58757pt.
-) (sec/9_conc.tex) (main.bbl
-
-[11 <./sec/../fig/Gantt.png>])
 
 ** Conference Paper **
 Before submitting the final camera ready copy, remember to:
@@ -1149,45 +1054,34 @@ Before submitting the final camera ready copy, remember to:
 
 
 
-
-
-[12
-
-] (main.aux)
+[2] (6_int_and_test.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 1
 L3 programming layer <2024-12-25>
  ***********
-Package rerunfilecheck Info: File `main.out' has not changed.
-(rerunfilecheck)             Checksum: CE07960BFAF14267FBC949B532074EB8;10947.
+Package rerunfilecheck Info: File `6_int_and_test.out' has not changed.
+(rerunfilecheck)             Checksum: D0B82D3D0531587E32DD01BB56680047;1926.
  ) 
 Here is how much of TeX's memory you used:
- 41767 strings out of 473497
- 1001350 string characters out of 5708694
- 1643486 words of memory out of 5000000
- 64330 multiletter control sequences out of 15000+600000
- 602933 words of font info for 115 fonts, out of 8000000 for 9000
+ 41333 strings out of 473497
+ 993411 string characters out of 5708694
+ 1639763 words of memory out of 5000000
+ 64078 multiletter control sequences out of 15000+600000
+ 591475 words of font info for 103 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 84i,17n,87p,1238b,649s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 104i,17n,104p,882b,443s stack positions out of 10000i,1000n,20000p,200000b,200000s
 <C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/ams
 fonts/cm/cmmi10.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/font
 s/type1/public/amsfonts/cm/cmmi7.pfb><C:/Users/Brandon Esebag/AppData/Local/Pro
 grams/MiKTeX/fonts/type1/public/amsfonts/cm/cmr10.pfb><C:/Users/Brandon Esebag/
-AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmr6.pfb><C:/Users
-/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cm
-r8.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/publi
-c/amsfonts/cm/cmsy10.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX
-/fonts/type1/public/amsfonts/cm/cmsy7.pfb><C:/Users/Brandon Esebag/AppData/Loca
-l/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy8.pfb><C:/Users/Brandon Es
-ebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/urw-base35/ucrr8a.pfb><C:
-/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/urw-base
-35/utmb8a.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type
-1/public/urw-base35/utmbi8a.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs
-/MiKTeX/fonts/type1/public/urw-base35/utmr8a.pfb><C:/Users/Brandon Esebag/AppDa
-ta/Local/Programs/MiKTeX/fonts/type1/public/urw-base35/utmri8a.pfb>
-Output written on main.pdf (15 pages, 871920 bytes).
+AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Use
+rs/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/public/urw-base35/u
+tmb8a.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKTeX/fonts/type1/pu
+blic/urw-base35/utmr8a.pfb><C:/Users/Brandon Esebag/AppData/Local/Programs/MiKT
+eX/fonts/type1/public/urw-base35/utmri8a.pfb>
+Output written on 6_int_and_test.pdf (2 pages, 96370 bytes).
 PDF statistics:
- 605 PDF objects out of 1000 (max. 8388607)
- 144 named destinations out of 1000 (max. 500000)
- 529 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 99 PDF objects out of 1000 (max. 8388607)
+ 17 named destinations out of 1000 (max. 500000)
+ 85 words of extra memory for PDF output out of 10000 (max. 10000000)
 

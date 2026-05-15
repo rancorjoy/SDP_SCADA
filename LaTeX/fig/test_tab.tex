@@ -1,0 +1,52 @@
+% Ragged-right paragraph column (avoids hyphenation pressure)
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
+ 
+% Header style: bold, top-left, no extra gap
+\renewcommand\theadfont{\bfseries\small}
+\renewcommand\theadgape{}
+
+% ==============================================================
+% TABLE — Current Draw Summary
+% Single-column float; fits in one column of a two-column paper.
+% ==============================================================
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \renewcommand{\arraystretch}{1.4}
+  \setlength{\tabcolsep}{5pt}
+  \caption{Current draw of system components.}
+  \label{tab:current}
+  \begin{tabular}{|P{4cm}|P{2cm}|}
+    \hline
+    \makecell[tl]{Part} & \makecell[tl]{I (mA)} \\
+    \hline
+    Relay 1 ON              & 80     \\
+    \hline
+    Relay 2 ON              & 80     \\
+    \hline
+    Relay 3 ON              & 80     \\
+    \hline
+    Flow Rate Sensor 1      & 10     \\
+    \hline
+    Flow Rate Sensor 2      & 10     \\
+    \hline
+    Water Level Sensor      & 5.2    \\
+    \hline
+    Digital Output 5        & 5      \\
+    \hline
+    Digital Output 6        & 5      \\
+    \hline
+    Digital Output 7        & 5      \\
+    \hline
+    Potentiometer           & 5      \\
+    \hline
+    Total without Relays    & 45.2   \\
+    \hline
+    Total with Relays       & 285.2  \\
+    \hline
+    Maximum I of Arduino    & 150    \\
+    \hline
+    Maximum I of Alt.\ Power Supply & 1000 \\
+    \hline
+  \end{tabular}
+\end{table}

@@ -1,33 +1,62 @@
-\contentsline {section}{\numberline {I}Introduction}{1}{}%
-\contentsline {subsection}{\numberline {\mbox {I-A}}Project Overview}{1}{}%
-\contentsline {subsection}{\numberline {\mbox {I-B}}Public Health, Safety, and Welfare Impact}{1}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-B}1}PCB Manufacturing Energy Consumption}{1}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-B}2}PCB Manufacturing Waste Production}{1}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-B}3}PCB End of Life Concerns}{1}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-B}4}Cables Manufacturing Concerns}{2}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-B}5}Logistics Concerns}{2}{}%
-\contentsline {subsection}{\numberline {\mbox {I-C}}Global Impact}{2}{}%
-\contentsline {subsection}{\numberline {\mbox {I-D}}Cultural and Societal Impact}{2}{}%
-\contentsline {subsection}{\numberline {\mbox {I-E}}Environmental Impact}{2}{}%
-\contentsline {subsection}{\numberline {\mbox {I-F}}Economic Impact}{2}{}%
-\contentsline {subsection}{\numberline {\mbox {I-G}}Ethical and Professional Responsibility Judgment}{2}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-G}1}Environmental vs Economic Impact}{2}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-G}2}Accessibility vs. Safety}{2}{}%
-\contentsline {subsubsection}{\numberline {\mbox {I-G}3}Open-source Transparency vs. Security Risks}{2}{}%
-\contentsline {section}{\numberline {II}Background}{3}{}%
-\contentsline {section}{\numberline {III}Related Works}{3}{}%
-\contentsline {subsection}{\numberline {\mbox {III-A}}Current Open Source SCADA Solutions}{3}{}%
-\contentsline {subsubsection}{\numberline {\mbox {III-A}1}RapidSCADA}{3}{}%
-\contentsline {subsubsection}{\numberline {\mbox {III-A}2}OpenSCADA}{3}{}%
-\contentsline {subsubsection}{\numberline {\mbox {III-A}3}Proposed Solution}{3}{}%
-\contentsline {subsection}{\numberline {\mbox {III-B}}Current Open Source DCS Solutions}{3}{}%
-\contentsline {subsubsection}{\numberline {\mbox {III-B}1}RapidSCADA}{3}{}%
-\contentsline {subsubsection}{\numberline {\mbox {III-B}2}TANGO Controls}{3}{}%
-\contentsline {subsubsection}{\numberline {\mbox {III-B}3}Proposed Solution}{3}{}%
-\contentsline {section}{\numberline {IV}System Overview}{3}{}%
-\contentsline {section}{\numberline {V}Design}{3}{}%
-\contentsline {section}{\numberline {VI}Integration and Test Results}{3}{}%
-\contentsline {section}{\numberline {VII}Standards and Constraints}{3}{}%
-\contentsline {section}{\numberline {VIII}Project Planning and Task Definition}{3}{}%
-\contentsline {section}{\numberline {IX}Conclusion}{3}{}%
-\contentsline {section}{References}{3}{}%
+\contentsline {section}{\numberline {I}Introduction}{1}{section.1}%
+\contentsline {subsection}{\numberline {\mbox {I-A}}Project Overview}{1}{subsection.1.1}%
+\contentsline {subsection}{\numberline {\mbox {I-B}}Public Health, Safety, and Welfare Impact}{1}{subsection.1.2}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}1}PCB Manufacturing Energy Consumption}{1}{subsubsection.1.2.1}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}2}PCB Manufacturing Waste Production}{1}{subsubsection.1.2.2}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}3}PCB End of Life Concerns}{1}{subsubsection.1.2.3}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}4}Cables Manufacturing Concerns}{2}{subsubsection.1.2.4}%
+\contentsline {subsubsection}{\numberline {\mbox {I-B}5}Logistics Concerns}{2}{subsubsection.1.2.5}%
+\contentsline {subsection}{\numberline {\mbox {I-C}}Global Impact}{2}{subsection.1.3}%
+\contentsline {subsection}{\numberline {\mbox {I-D}}Cultural and Societal Impact}{2}{subsection.1.4}%
+\contentsline {subsection}{\numberline {\mbox {I-E}}Environmental Impact}{2}{subsection.1.5}%
+\contentsline {subsection}{\numberline {\mbox {I-F}}Economic Impact}{2}{subsection.1.6}%
+\contentsline {subsection}{\numberline {\mbox {I-G}}Ethical and Professional Responsibility Judgment}{2}{subsection.1.7}%
+\contentsline {subsubsection}{\numberline {\mbox {I-G}1}Environmental vs Economic Impact}{2}{subsubsection.1.7.1}%
+\contentsline {subsubsection}{\numberline {\mbox {I-G}2}Accessibility vs. Safety}{2}{subsubsection.1.7.2}%
+\contentsline {subsubsection}{\numberline {\mbox {I-G}3}Open-source Transparency vs. Security Risks}{2}{subsubsection.1.7.3}%
+\contentsline {section}{\numberline {II}Background}{3}{section.2}%
+\contentsline {subsection}{\numberline {\mbox {II-A}}DCS - Digital Control System}{3}{subsection.2.1}%
+\contentsline {subsubsection}{\numberline {\mbox {II-A}1}PLC - Programmable Logic Controller}{3}{subsubsection.2.1.1}%
+\contentsline {subsubsection}{\numberline {\mbox {II-A}2}Arduino AVR - ATmega RISC Controller}{3}{subsubsection.2.1.2}%
+\contentsline {subsubsection}{\numberline {\mbox {II-A}3}Data Collection}{3}{subsubsection.2.1.3}%
+\contentsline {subsection}{\numberline {\mbox {II-B}}SCADA - Supervisory Control and Data Acquisition}{3}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {\mbox {II-B}1}Supervisory Control}{4}{subsubsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {\mbox {II-B}2}Data Acquisition}{4}{subsubsection.2.2.2}%
+\contentsline {section}{\numberline {III}Related Works}{4}{section.3}%
+\contentsline {subsection}{\numberline {\mbox {III-A}}Current Open Source SCADA Solutions}{4}{subsection.3.1}%
+\contentsline {subsubsection}{\numberline {\mbox {III-A}1}RapidSCADA}{4}{subsubsection.3.1.1}%
+\contentsline {subsubsection}{\numberline {\mbox {III-A}2}OpenSCADA}{4}{subsubsection.3.1.2}%
+\contentsline {subsubsection}{\numberline {\mbox {III-A}3}Proposed Solution}{4}{subsubsection.3.1.3}%
+\contentsline {subsection}{\numberline {\mbox {III-B}}Current Open Source DCS Solutions}{4}{subsection.3.2}%
+\contentsline {subsubsection}{\numberline {\mbox {III-B}1}RapidSCADA}{4}{subsubsection.3.2.1}%
+\contentsline {subsubsection}{\numberline {\mbox {III-B}2}TANGO Controls}{4}{subsubsection.3.2.2}%
+\contentsline {subsubsection}{\numberline {\mbox {III-B}3}Proposed Solution}{4}{subsubsection.3.2.3}%
+\contentsline {section}{\numberline {IV}Requirements and Specifications}{4}{section.4}%
+\contentsline {section}{\numberline {V}Design}{5}{section.5}%
+\contentsline {subsection}{\numberline {\mbox {V-A}}Chosen Components}{5}{subsection.5.1}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}1}DCS Controller}{5}{subsubsection.5.1.1}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}2}SCADA Supervisor}{5}{subsubsection.5.1.2}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}3}Tubing}{5}{subsubsection.5.1.3}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}4}Container/Project Platform}{5}{subsubsection.5.1.4}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}5}Pumps}{5}{subsubsection.5.1.5}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}6}Valves}{5}{subsubsection.5.1.6}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}7}Water-Level Sensor}{5}{subsubsection.5.1.7}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}8}Temperature Sensor}{5}{subsubsection.5.1.8}%
+\contentsline {subsubsection}{\numberline {\mbox {V-A}9}Flowrate Sensor}{5}{subsubsection.5.1.9}%
+\contentsline {subsection}{\numberline {\mbox {V-B}}Electronics}{5}{subsection.5.2}%
+\contentsline {subsection}{\numberline {\mbox {V-C}}Manual Switches}{5}{subsection.5.3}%
+\contentsline {subsection}{\numberline {\mbox {V-D}}Network}{5}{subsection.5.4}%
+\contentsline {subsection}{\numberline {\mbox {V-E}}Software Design}{9}{subsection.5.5}%
+\contentsline {section}{\numberline {VI}Integration and Test Results}{9}{section.6}%
+\contentsline {subsection}{\numberline {\mbox {VI-A}}Hardware Development and Testing}{9}{subsection.6.1}%
+\contentsline {subsubsection}{\numberline {\mbox {VI-A}1}Issues with Power Distribution}{9}{subsubsection.6.1.1}%
+\contentsline {subsubsection}{\numberline {\mbox {VI-A}2}Debugging Power Supply Issues}{9}{subsubsection.6.1.2}%
+\contentsline {subsubsection}{\numberline {\mbox {VI-A}3}Worst Case Current Draw}{9}{subsubsection.6.1.3}%
+\contentsline {subsubsection}{\numberline {\mbox {VI-A}4}Testing of Water Level Sensor}{9}{subsubsection.6.1.4}%
+\contentsline {subsubsection}{\numberline {\mbox {VI-A}5}Testing of Flow Rate Sensor}{10}{subsubsection.6.1.5}%
+\contentsline {subsection}{\numberline {\mbox {VI-B}}Trouble Shooting Test Control Code}{10}{subsection.6.2}%
+\contentsline {subsection}{\numberline {\mbox {VI-C}}SCADA Software Development}{10}{subsection.6.3}%
+\contentsline {section}{\numberline {VII}Standards and Constraints}{10}{section.7}%
+\contentsline {section}{\numberline {VIII}Project Planning and Task Definition}{11}{section.8}%
+\contentsline {section}{\numberline {IX}Conclusion}{11}{section.9}%
+\contentsline {section}{References}{11}{section*.2}%

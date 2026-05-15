@@ -6,6 +6,59 @@
 \section{Design}
 \label{sec:design}
 
+\subsection{Chosen Components}
 
+\subsubsection{DCS Controller} An Arduino MEGA 2560 Rev3 was chosen as the DCS for this project. Initially we intended on using an Arduino Uno Rev3 however the device did not contain enough memory for us to provide it with the generated code (by 4\%).
+
+\subsubsection{SCADA Supervisor} A Raspberry Pi v4 is being used as the SCADA controller, however a significant portion of testing was done using a Framework 16 Latop.
+
+\subsubsection{Tubing} Quarter inch thick, clear plastic tubing is used for all actuator connections where liquid is transported.
+
+\subsubsection{Container/Project Platform} A three compartment plastic divider is being used as the platform for this project. The middle compartment was removed and is being used as space to place the valves and flowrate sensors. Holes were placed in the bottom of the top container (the container that is being level controlled) with fittings added for hose connections.
+
+\subsubsection{Pumps} HiLetgo DC 12V water pumps were used to move water up (into the controlled vessel) and down (out of the controlled vessel).
+
+\subsubsection{Valves} 12V normally closed solenoid valves were used to stop siphoning when pumping water down, and to implement a manually controlled valve that allows water to be emptied from the upper container.
+
+\subsubsection{Water-Level Sensor} A ruler-style analog water level sensor is used to determine the water level of the container. This is the primary input for determining actuation.
+
+\subsubsection{Temperature Sensor} It was suggested that temperature would be a good metric to track inside our system, however due to scope reduction it was not implemented.
+
+\subsubsection{Flowrate Sensor} It was suggested that flowrate detection across our pumps would be a good metric to track inside our system allowing PID style control with feedback, however due to scope reduction it was not implemented.
+
+\subsection{Electronics}
+An Arduino is not typically capable of delivering sufficient current to actuation devices such as pumps and solenoids. To alleviate this issue, a 12V DC supply is used to power the Arduino (barrel connection) and a set of relays. These relays are what is used to drive the pumps and valves, the Arduino simply outputs (digital) to these devices at 5V. The Raspberry Pi is separately powered. The wiring was connected using Wago connectors, and utilized wires of various gauges.
+
+\subsection{Manual Switches}
+Several manual switches are present that allow a single valve to be manually controlled, and system power to be manually controlled. This is implemented using simple rocker-style switches.
+
+\subsection{Network}
+To isolate our network (for SSH and GUI connection purposes), a TP-Link nano-router was used as a network extender for my Laptop's hotspot. This allows any device connected to that hotspot to wirelessly command the SCADA system.
+
+
+
+
+\input{../fig/hw_tabs.tex}
+\clearpage
+
+\begin{figure*}[p]
+    \centering % Centers the image
+    \rotatebox{90}{
+    \includegraphics[width=1.25\textwidth]{../fig/Initial_Schem}} % Image file without extension
+    \caption{Initial Hardware Schematic}
+    \label{fig:Initial_Schem} % Used for \ref{fig:my_label} in text
+\end{figure*}
+\clearpage
+
+\begin{figure*}[p]
+    \centering % Centers the image
+    \rotatebox{90}{
+    \includegraphics[width=1.25\textwidth]{../fig/Final_Schem}} % Image file without extension
+    \caption{Final Hardware Schematic}
+    \label{fig:Final_Schem} % Used for \ref{fig:my_label} in text
+\end{figure*}
+\clearpage
+
+\subsection{Software Design}
 
 \end{document}
